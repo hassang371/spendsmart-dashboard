@@ -1,9 +1,29 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { ArrowDownLeft, ArrowUpRight, CreditCard, Loader2, TrendingUp, Wallet, Activity } from "lucide-react";
+import {
+  ArrowUpRight,
+  Loader2,
+  Activity,
+  Zap,
+  ShoppingBag,
+  TrendingDown,
+  Flame,
+  ArrowRight
+} from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie
+} from "recharts";
 import { supabase } from "../../lib/supabase/client";
 
 function firstNameFromDisplayName(value: string): string {
@@ -20,26 +40,32 @@ type Transaction = {
   transaction_date: string;
   category: string;
   type?: string;
+  merchant_name?: string;
 };
 
 type TrendData = {
   date: string;
   amount: number;
-  height: number; // 0-100 for css height
+  fullDate: string;
 };
+
+type CategoryStat = {
+  name: string;
+  value: number; // Recharts uses 'value'
+  color: string;
+};
+
+const OVERVIEW_CACHE_TTL_MS = 60 * 1000;
 
 export default function OverviewPage() {
   const router = useRouter();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("there");
   const [stats, setStats] = useState({
-    netWorth: 0,
-    income: 0,
-    expenses: 0,
-    trendDirection: "up", // or 'down'
-    trendPercentage: 0
+    weeklyExpenses: 0,
+    dailyAverage: 0,
   });
 
   useEffect(() => {
@@ -58,7 +84,26 @@ export default function OverviewPage() {
       const fallbackName = user.email?.split("@")[0] ?? "there";
       setDisplayName(firstNameFromDisplayName(fullName || fallbackName));
 
-      const { data, error: txError } = await supabase
+      const cacheKey = `overview-cache:${user.id}`;
+      const cachedRaw = sessionStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw) as {
+            timestamp: number;
+            rows: Transaction[];
+            stats: { weeklyExpenses: number; dailyAverage: number };
+          };
+          if (Date.now() - cached.timestamp < OVERVIEW_CACHE_TTL_MS) {
+            setData(cached.rows);
+            setStats(cached.stats);
+            setLoading(false);
+          }
+        } catch {
+          // Ignore bad cache and continue.
+        }
+      }
+
+      const { data: txData, error: txError } = await supabase
         .from("transactions")
         .select("*")
         .eq("user_id", user.id)
@@ -71,90 +116,124 @@ export default function OverviewPage() {
         return;
       }
 
-      const rows = (data ?? []) as Transaction[];
-      setTransactions(rows);
+      const rows = (txData ?? []) as Transaction[];
+      setData(rows);
 
-      let netWorth = 0;
-      let income = 0;
-      let expenses = 0;
+      // --- Calculate Stats ---
+      let weeklyExpenses = 0;
       const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
 
       for (const tx of rows) {
         const amount = Number(tx.amount || 0);
         const txDate = new Date(tx.transaction_date);
 
-        netWorth += amount;
-        if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
-          if (amount >= 0) {
-            income += amount;
-          } else {
-            expenses += Math.abs(amount);
-          }
+        // Weekly Expenses (Last 7 Days)
+        if (amount < 0 && txDate >= oneWeekAgo && txDate <= now) {
+          weeklyExpenses += Math.abs(amount);
         }
       }
 
       setStats({
-        netWorth,
-        income,
-        expenses,
-        trendDirection: netWorth >= 0 ? "up" : "down",
-        trendPercentage: 2.4 // Placeholder or calculate real DoD/MoM later
+        weeklyExpenses,
+        dailyAverage: weeklyExpenses / 7,
       });
+      sessionStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          timestamp: Date.now(),
+          rows,
+          stats: {
+            weeklyExpenses,
+            dailyAverage: weeklyExpenses / 7,
+          },
+        }),
+      );
       setLoading(false);
     };
 
     fetchData();
   }, [router]);
 
-  // 3. Generate Spending Trends Data (Last 10 Days)
+  // Derived Data: Spending Trends (Last 7 Days)
   const trendData: TrendData[] = useMemo(() => {
-    if (transactions.length === 0) return Array(10).fill({ date: "", amount: 0, height: 0 });
+    if (data.length === 0) return Array(7).fill({ date: "", amount: 0, fullDate: "" });
 
-    const last10Days = [];
+    const last7Days = [];
     const today = new Date();
-
-    // Create map of date -> total spending (negative amounts)
     const spendingByDate = new Map<string, number>();
 
-    transactions.forEach(tx => {
+    data.forEach(tx => {
       const amount = Number(tx.amount);
       if (amount < 0) {
-        const dateStr = new Date(tx.transaction_date).toISOString().split('T')[0]; // YYYY-MM-DD
+        const dateStr = new Date(tx.transaction_date).toISOString().split('T')[0];
         const current = spendingByDate.get(dateStr) || 0;
         spendingByDate.set(dateStr, current + Math.abs(amount));
       }
     });
 
-    let maxSpend = 0;
-
-    for (let i = 9; i >= 0; i--) {
+    for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(today.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const spend = spendingByDate.get(dateStr) || 0;
-      if (spend > maxSpend) maxSpend = spend;
 
-      last10Days.push({
-        date: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+      last7Days.push({
+        date: d.toLocaleDateString('en-IN', { weekday: 'short' }), // Mon, Tue
+        fullDate: d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
         amount: spend,
-        height: 0 // calculate after
       });
     }
 
-    // Normalize heights to 0-100%
-    return last10Days.map(d => ({
-      ...d,
-      height: maxSpend > 0 ? (d.amount / maxSpend) * 100 : 0
-    }));
+    return last7Days;
+  }, [data]);
 
-  }, [transactions]);
+  // Derived Data: Top Categories (This Month) for Donut
+  const topCategories: CategoryStat[] = useMemo(() => {
+    const spendingMap = new Map<string, number>();
+    const now = new Date();
+
+    data.forEach(tx => {
+      const amount = Number(tx.amount);
+      const d = new Date(tx.transaction_date);
+      if (amount < 0 && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        const absAmount = Math.abs(amount);
+        const cat = tx.category || "Uncategorized";
+        spendingMap.set(cat, (spendingMap.get(cat) || 0) + absAmount);
+      }
+    });
+
+    const sorted = Array.from(spendingMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+
+    const colors = ["#3B82F6", "#8B5CF6", "#EC4899", "#10B981"]; // Blue, Purple, Pink, Emerald
+
+    return sorted.map(([name, value], index) => ({
+      name,
+      value,
+      color: colors[index % colors.length]
+    }));
+  }, [data]);
+
+  // Derived Data: Largest Splurges (This Month)
+  const splurges = useMemo(() => {
+    return data
+      .filter(tx => {
+        const d = new Date(tx.transaction_date);
+        const now = new Date();
+        return Number(tx.amount) < 0 && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .sort((a, b) => Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)))
+      .slice(0, 3);
+  }, [data]);
+
 
   if (loading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
       </div>
     );
   }
@@ -194,175 +273,257 @@ export default function OverviewPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex h-full flex-col gap-6 overflow-hidden"
+      className="flex h-full flex-col gap-6 overflow-hidden p-1"
     >
-      <motion.div variants={itemVariants} className="flex-shrink-0 flex justify-between items-end">
+      <motion.div variants={itemVariants} className="flex-shrink-0 mb-2 flex justify-between items-end">
         <div>
-          <h1 className="text-4xl font-black text-white tracking-tight">
-            Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{displayName}</span>
+          <h1 className="text-3xl font-black text-white tracking-tight">
+            Hi, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{displayName}</span>
           </h1>
-          <p className="text-base text-slate-400 mt-1">Here&apos;s what&apos;s happening with your money today.</p>
-        </div>
-        <div className="hidden md:flex items-center gap-2 text-sm font-medium text-slate-400 bg-white/5 px-4 py-2 rounded-full border border-white/5">
-          <span>📅 {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</span>
+          <p className="text-sm text-slate-400">Your weekly spending snapshot.</p>
         </div>
       </motion.div>
 
-      {/* Top Stats Cards */}
-      <div className="grid flex-shrink-0 grid-cols-1 gap-5 md:grid-cols-4">
-        {/* Net Worth - Large Card */}
+      {/* Empty State Check */}
+      {data.length === 0 ? (
         <motion.div
-          variants={itemVariants}
-          whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-          className="relative min-w-0 md:col-span-2 rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-[#0B1221] to-[#151C2F] p-8 shadow-2xl overflow-hidden group"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex-1 flex flex-col items-center justify-center rounded-[2rem] border border-white/5 bg-[#0B1221] p-12 text-center shadow-xl relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity duration-500">
-            <Wallet size={180} />
-          </div>
-          <div className="relative z-10">
-            <div className="mb-2 text-gray-400 font-medium flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              Total Net Worth
+          <div className="absolute inset-0 bg-slush-gradient opacity-10"></div>
+          <div className="relative z-10 max-w-lg">
+            <motion.div
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="w-48 h-48 bg-gray-800/50 rounded-full mx-auto mb-8 flex items-center justify-center border border-white/10 shadow-2xl relative"
+            >
+              <div className="absolute inset-0 rounded-full bg-blue-500/10 animate-ping"></div>
+              <Flame size={64} className="text-blue-400" />
+            </motion.div>
+
+            <h2 className="text-3xl font-black text-white mb-4">Welcome to SpendSmart!</h2>
+            <p className="text-gray-400 text-lg mb-8">
+              Your financial dashboard is currently empty. Add your first transaction to unlock powerful insights and visualizations.
+            </p>
+
+            <div className="flex justify-center gap-4">
+              {/* We could route to transactions or open a modal. For now, route to transactions. */}
+              <button
+                onClick={() => router.push('/dashboard/transactions')}
+                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl font-bold text-white shadow-lg shadow-blue-500/25 hover:scale-105 transition-transform flex items-center gap-2"
+              >
+                <ShoppingBag size={20} />
+                Add Transaction
+              </button>
             </div>
-            <h2 className="mb-4 font-mono text-5xl font-bold tracking-tighter text-white">
-              ₹{stats.netWorth.toLocaleString("en-IN")}
-            </h2>
-            <div className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-bold border ${stats.netWorth >= 0
-              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              : "bg-red-500/10 text-red-400 border-red-500/20"
-              }`}>
-              <TrendingUp size={16} />
-              <span>{stats.netWorth >= 0 ? "+2.4%" : "-1.2%"} from last month</span>
-            </div>
           </div>
         </motion.div>
+      ) : (
+        <>
+          {/* Row 1: Weekly Expenses, Categories, Splurges */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-        {/* Income Card */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ scale: 1.05, rotate: -1, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-          className="flex cursor-pointer flex-col justify-between rounded-[2.5rem] bg-[#10B981] p-6 text-black shadow-lg hover:shadow-emerald-500/20 transition-shadow"
-        >
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-black/10 backdrop-blur-sm">
-            <ArrowDownLeft size={24} className="text-black" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-black/60 uppercase tracking-wider">Income</p>
-            <h3 className="mt-1 font-mono text-3xl font-bold text-black truncate">₹{stats.income.toLocaleString("en-IN")}</h3>
-          </div>
-        </motion.div>
+            {/* 1. Weekly Expenses Card (Bright Red) */}
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              className="rounded-[2rem] bg-gradient-to-br from-[#EF4444] to-[#B91C1C] p-6 text-white shadow-xl shadow-red-900/20 relative overflow-hidden group flex flex-col justify-between"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity duration-500">
+                <ArrowUpRight size={100} />
+              </div>
 
-        {/* Expenses Card */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ scale: 1.05, rotate: 1, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-          className="flex cursor-pointer flex-col justify-between rounded-[2.5rem] bg-[#EF4444] p-6 text-white shadow-lg hover:shadow-red-500/20 transition-shadow"
-        >
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-            <ArrowUpRight size={24} className="text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-white/80 uppercase tracking-wider">Expenses</p>
-            <h3 className="mt-1 font-mono text-3xl font-bold text-white truncate">₹{stats.expenses.toLocaleString("en-IN")}</h3>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Bottom Section - Charts & Transactions */}
-      <div className="flex min-h-0 min-w-0 flex-1 gap-6 flex-col md:flex-row">
-        {/* Spending Trends */}
-        <motion.section
-          variants={itemVariants}
-          className="flex min-h-0 min-w-0 flex-[2] flex-col rounded-[2.5rem] border border-white/5 bg-[#0B1221] p-6 shadow-xl relative overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
-          <div className="mb-6 flex items-center justify-between relative z-10">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Activity size={20} className="text-blue-500" />
-              Spending Trends
-            </h3>
-            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-bold text-gray-400">Last 10 Days</div>
-          </div>
-
-          <div className="flex min-h-0 flex-1 items-end gap-3 px-2 pb-2 relative z-10">
-            {trendData.map((d, i) => (
-              <div key={i} className="flex-1 flex flex-col justify-end gap-2 group h-full">
-                <div className="h-full flex items-end relative">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${d.height || 5}%` }} // Ensure at least a sliver shows
-                    transition={{ delay: 0.3 + i * 0.05, duration: 0.6, type: "spring" }}
-                    className="w-full rounded-t-xl bg-gradient-to-t from-blue-600 to-blue-400 opacity-60 group-hover:opacity-100 transition-opacity relative"
-                  >
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-white text-black text-xs font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
-                      ₹{d.amount}
-                    </div>
-                  </motion.div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 rounded-full bg-white/20 backdrop-blur-sm">
+                    <TrendingDown size={14} className="text-white" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/90">Last 7 Days</span>
                 </div>
-                <div className="text-center text-[10px] uppercase font-bold text-gray-500 group-hover:text-blue-400 transition-colors">
-                  {d.date}
+                <h2 className="text-3xl font-mono font-bold tracking-tighter mt-2">
+                  ₹{stats.weeklyExpenses.toLocaleString("en-IN")}
+                </h2>
+              </div>
+
+              <div className="relative z-10 mt-3 pt-3 border-t border-white/20">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-[10px] font-bold text-white/80 uppercase mb-0.5">Daily Average</p>
+                    <p className="text-lg font-mono font-bold">₹{Math.round(stats.dailyAverage).toLocaleString("en-IN")}</p>
+                  </div>
+                  <div className="text-[10px] font-medium bg-white/20 px-2 py-0.5 rounded text-white/90">
+                    Avg / Day
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </motion.section>
+            </motion.div>
 
-        {/* Recent Transactions */}
-        <motion.section
-          variants={itemVariants}
-          className="flex min-h-0 min-w-0 flex-1 flex-col rounded-[2.5rem] border border-white/5 bg-[#0B1221] p-6 shadow-xl"
-        >
-          <h3 className="mb-6 text-xl font-bold text-white flex items-center gap-2">
-            <CreditCard size={20} className="text-purple-500" />
-            Recent Activity
-          </h3>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
-            {transactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-2">
-                <div className="p-4 rounded-full bg-white/5"><Wallet size={24} /></div>
-                <p>No transactions found.</p>
+            {/* 2. Top Categories (Donut Chart) */}
+            <motion.section
+              variants={itemVariants}
+              className="rounded-[2rem] border border-white/5 bg-[#0B1221] p-5 shadow-xl flex flex-row items-center gap-4 relative overflow-hidden"
+            >
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-1">
+                  <ShoppingBag size={14} className="text-pink-500" />
+                  Top Categories
+                </h3>
+                <span className="text-[10px] font-bold uppercase text-gray-500 mb-2 block">This Month</span>
+                <div className="flex flex-col gap-1.5">
+                  {topCategories.slice(0, 3).map((cat, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                      <span className="text-[11px] text-gray-400 truncate font-medium">{cat.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ) : (
-              transactions.map((tx, i) => {
-                const amount = Number(tx.amount || 0);
-                const isIncome = amount >= 0;
-                return (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * i }}
-                    key={tx.id}
-                    className="flex items-center justify-between rounded-2xl p-4 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-lg ${isIncome ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                        }`}>
-                        {isIncome ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+
+              <div className="w-[120px] h-[120px] relative flex-shrink-0">
+                {topCategories.length === 0 ? (
+                  <p className="text-gray-500 text-[10px] italic absolute inset-0 flex items-center justify-center">No data</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={topCategories}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={55}
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {topCategories.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', borderRadius: '8px', padding: '4px 8px' }}
+                        itemStyle={{ color: '#fff', fontSize: '10px' }}
+                        formatter={(value: any) => `₹${(value || 0).toLocaleString()}`}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </motion.section>
+
+            {/* 3. Big Splurges (List) */}
+            <motion.section
+              variants={itemVariants}
+              className="rounded-[2rem] border border-white/5 bg-[#0B1221] p-5 shadow-xl flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Zap size={14} className="text-yellow-500" />
+                  Big Splurges
+                </h3>
+              </div>
+
+              <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                {splurges.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-500 text-xs italic">No large purchases.</div>
+                ) : (
+                  splurges.map((tx, i) => (
+                    <motion.div
+                      whileHover={{ x: 2, backgroundColor: 'rgba(255,255,255,0.05)' }}
+                      key={tx.id}
+                      className="flex items-center gap-3 p-2 rounded-lg border border-transparent transition-all cursor-pointer group"
+                    >
+                      <div className="h-6 w-6 rounded-md bg-white/5 flex items-center justify-center font-bold text-[10px] shrink-0 text-white">
+                        {i + 1}
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-white group-hover:text-blue-400 transition-colors max-w-[120px]">
-                          {tx.description || "Transaction"}
-                        </p>
-                        <p className="text-xs text-slate-400 font-medium">
-                          {new Date(tx.transaction_date).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                          })} · {tx.category}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-white truncate group-hover:text-red-400 transition-colors">{tx.description || "Purchase"}</p>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <span className={`font-mono text-base font-bold block ${isIncome ? "text-emerald-400" : "text-white"}`}>
-                        {isIncome ? "+" : ""}₹{Math.abs(amount).toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                  </motion.div>
-                );
-              })
-            )}
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-mono font-bold text-red-400">₹{Math.abs(Number(tx.amount)).toLocaleString("en-IN")}</p>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </motion.section>
           </div>
-        </motion.section>
-      </div>
+
+          {/* Row 2: Full Width Spending Trends */}
+          <motion.section
+            variants={itemVariants}
+            className="flex-1 min-h-[380px] rounded-[2rem] border border-white/5 bg-[#0B1221] p-6 shadow-xl relative overflow-hidden flex flex-col"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Activity size={20} className="text-blue-500" />
+                  Spending Trends
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 ml-7">Your daily spending activity for the last week</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 rounded-full border border-blue-500/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-blue-400 uppercase">Live Data</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 w-full min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="barHover" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#F472B6" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#DB2777" stopOpacity={0.5} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-[#1F2937] border border-white/10 p-3 rounded-xl shadow-xl backdrop-blur-md bg-opacity-90">
+                            <p className="text-gray-400 text-xs font-medium mb-1">{payload[0].payload.fullDate}</p>
+                            <p className="text-white font-bold font-mono text-lg">₹{Number(payload[0].value).toLocaleString()}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 600 }}
+                    dy={10}
+                  />
+                  <Bar
+                    dataKey="amount"
+                    radius={[6, 6, 6, 6]}
+                    animationDuration={1500}
+                  >
+                    {trendData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill="url(#barGradient)"
+                        className="hover:opacity-100 transition-all duration-300 hover:fill-[url(#barHover)] cursor-pointer" // Correct hover effect
+                        style={{ outline: 'none' }}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.section>
+        </>
+      )}
     </motion.div>
   );
 }
