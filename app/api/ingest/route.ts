@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../lib/supabase";
+import { supabaseAdmin } from "../../../lib/supabase/admin";
 import Papa from "papaparse";
 import { z } from "zod";
 
@@ -13,8 +13,19 @@ const TransactionSchema = z.object({
 
 const IngestRequestSchema = z.object({
     csv: z.string().min(1),
-    userId: z.string().uuid(),
 });
+
+const UuidSchema = z.string().uuid();
+
+type TransactionInsert = {
+    user_id: string;
+    transaction_date: string;
+    description: string;
+    amount: number;
+    category: string;
+    type: string;
+    created_at: string;
+};
 
 function parseAmount(value: string | number): number | null {
     if (typeof value === "number") {
@@ -42,6 +53,49 @@ function inferType(amount: number): "income" | "expense" {
     return amount >= 0 ? "income" : "expense";
 }
 
+function normalizeType(value: string | undefined, amount: number): string {
+    if (!value) {
+        return inferType(amount);
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "income" || normalized === "expense") {
+        return normalized;
+    }
+
+    return inferType(amount);
+}
+
+function buildFingerprint(transaction: Pick<TransactionInsert, "user_id" | "transaction_date" | "description" | "amount">) {
+    return [
+        transaction.user_id,
+        transaction.transaction_date,
+        transaction.description.trim().toLowerCase(),
+        transaction.amount.toFixed(2),
+    ].join("|");
+}
+
+async function transactionAlreadyExists(transaction: TransactionInsert) {
+    if (!supabaseAdmin) {
+        return false;
+    }
+
+    const { data, error } = await supabaseAdmin
+        .from("transactions")
+        .select("id")
+        .eq("user_id", transaction.user_id)
+        .eq("transaction_date", transaction.transaction_date)
+        .eq("description", transaction.description)
+        .eq("amount", transaction.amount)
+        .limit(1);
+
+    if (error) {
+        throw new Error(`Duplicate check failed: ${error.message}`);
+    }
+
+    return Boolean(data && data.length > 0);
+}
+
 async function ingestCsv(csvData: string, userId: string) {
     const parsed = Papa.parse<Record<string, unknown>>(csvData, {
         header: true,
@@ -54,8 +108,9 @@ async function ingestCsv(csvData: string, userId: string) {
         };
     }
 
-    const validTransactions: Array<Record<string, unknown>> = [];
+    const parsedTransactions: TransactionInsert[] = [];
     const errors: Array<{ row: Record<string, unknown>; error: string }> = [];
+    const fingerprints = new Set<string>();
 
     for (const row of parsed.data) {
         const result = TransactionSchema.safeParse(row);
@@ -77,33 +132,48 @@ async function ingestCsv(csvData: string, userId: string) {
             continue;
         }
 
-        const transaction: Record<string, unknown> = {
+        const transaction: TransactionInsert = {
             user_id: userId,
             transaction_date: transactionDate.toISOString(),
             description: result.data.Description,
             amount,
             category: result.data.Category || "Uncategorized",
+            type: normalizeType(result.data.Type, amount),
             created_at: new Date().toISOString(),
         };
 
-        if (result.data.Type) {
-            transaction.type = result.data.Type;
-        } else {
-            transaction.type = inferType(amount);
+        const fingerprint = buildFingerprint(transaction);
+        if (fingerprints.has(fingerprint)) {
+            continue;
         }
 
-        validTransactions.push(transaction);
+        fingerprints.add(fingerprint);
+        parsedTransactions.push(transaction);
     }
 
-    if (!validTransactions.length) {
+    const transactionsToInsert: TransactionInsert[] = [];
+    let skippedDuplicates = 0;
+
+    for (const transaction of parsedTransactions) {
+        const exists = await transactionAlreadyExists(transaction);
+        if (exists) {
+            skippedDuplicates += 1;
+            continue;
+        }
+
+        transactionsToInsert.push(transaction);
+    }
+
+    if (!transactionsToInsert.length) {
         return {
             response: NextResponse.json(
                 {
                     success: false,
                     inserted: 0,
+                    skipped_duplicates: skippedDuplicates,
                     failed: errors.length,
                     errors,
-                    message: "No valid transactions found",
+                    message: "No new valid transactions found",
                 },
                 { status: 400 },
             ),
@@ -116,7 +186,7 @@ async function ingestCsv(csvData: string, userId: string) {
         };
     }
 
-    const { error } = await supabaseAdmin.from("transactions").insert(validTransactions);
+    const { error } = await supabaseAdmin.from("transactions").insert(transactionsToInsert);
 
     if (error) {
         return {
@@ -127,7 +197,8 @@ async function ingestCsv(csvData: string, userId: string) {
     return {
         response: NextResponse.json({
             success: true,
-            inserted: validTransactions.length,
+            inserted: transactionsToInsert.length,
+            skipped_duplicates: skippedDuplicates,
             failed: errors.length,
             errors,
         }),
@@ -153,6 +224,24 @@ export const POST = async (req: NextRequest) => {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const userAccessToken = getBearerToken(req);
+    if (!userAccessToken) {
+        return NextResponse.json({ error: "Missing bearer token" }, { status: 401 });
+    }
+
+    if (!supabaseAdmin) {
+        return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured" }, { status: 500 });
+    }
+
+    const {
+        data: { user },
+        error: userError,
+    } = await supabaseAdmin.auth.getUser(userAccessToken);
+
+    if (userError || !user) {
+        return NextResponse.json({ error: "Invalid bearer token" }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
         const payload = IngestRequestSchema.safeParse(body);
@@ -161,7 +250,7 @@ export const POST = async (req: NextRequest) => {
             return NextResponse.json({ error: payload.error.flatten() }, { status: 400 });
         }
 
-        const { response } = await ingestCsv(payload.data.csv, payload.data.userId);
+        const { response } = await ingestCsv(payload.data.csv, user.id);
         return response;
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unexpected server error";
@@ -193,6 +282,11 @@ export const GET = async (req: NextRequest) => {
         );
     }
 
+    const userIdCheck = UuidSchema.safeParse(defaultUserId);
+    if (!userIdCheck.success) {
+        return NextResponse.json({ error: "INGEST_DEFAULT_USER_ID must be a valid UUID" }, { status: 500 });
+    }
+
     try {
         const sourceResponse = await fetch(sourceUrl, { cache: "no-store" });
         if (!sourceResponse.ok) {
@@ -203,7 +297,7 @@ export const GET = async (req: NextRequest) => {
         }
 
         const csv = await sourceResponse.text();
-        const { response } = await ingestCsv(csv, defaultUserId);
+        const { response } = await ingestCsv(csv, userIdCheck.data);
         return response;
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unexpected server error";

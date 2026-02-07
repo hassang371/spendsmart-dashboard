@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, ArrowDownLeft, TrendingUp, CreditCard, Loader2 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase/client";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 
@@ -49,13 +49,14 @@ export default function DashboardPage() {
                 console.error("Error fetching transactions:", error);
                 setError("Unable to load transactions right now.");
             } else if (data) {
-                setTransactions(data);
+                const transactionRows = data as Transaction[];
+                setTransactions(transactionRows);
 
                 let net = 0;
                 let inc = 0;
                 let exp = 0;
 
-                data.forEach((txn) => {
+                transactionRows.forEach((txn: Transaction) => {
                     const amt = Number(txn.amount);
                     net += amt;
                     if (amt > 0) inc += amt;
