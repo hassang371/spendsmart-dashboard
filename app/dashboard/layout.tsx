@@ -7,6 +7,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase/client";
 
+function firstNameFromDisplayName(value: string): string {
+    const cleaned = value.trim().replace(/\s+/g, " ");
+    if (!cleaned) return "User";
+    return cleaned.split(" ")[0] || "User";
+}
+
 export default function DashboardLayout({
     children,
 }: {
@@ -27,7 +33,8 @@ export default function DashboardLayout({
             }
 
             const fullName = data.user.user_metadata?.full_name as string | undefined;
-            setDisplayName(fullName || data.user.email?.split("@")[0] || "User");
+            const fallback = data.user.email?.split("@")[0] || "User";
+            setDisplayName(firstNameFromDisplayName(fullName || fallback));
             setEmail(data.user.email || "");
             setLoading(false);
         };

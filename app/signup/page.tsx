@@ -34,9 +34,7 @@ export default function SignupPage() {
             setError(signupError.message);
             setLoading(false);
         } else {
-            // Check if user is created (and maybe need email verification)
             if (data.user) {
-                alert("Signup successful! Please check your email for verification.");
                 router.push("/login");
             }
         }

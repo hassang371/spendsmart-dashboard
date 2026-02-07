@@ -2,9 +2,15 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { ArrowDownLeft, ArrowUpRight, CreditCard, Loader2, TrendingUp, Wallet, Activity } from "lucide-react";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase/client";
+
+function firstNameFromDisplayName(value: string): string {
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "there";
+  return cleaned.split(" ")[0] || "there";
+}
 
 // Types
 type Transaction = {
@@ -27,7 +33,7 @@ export default function OverviewPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState("Hassan"); // Defaulting to Hassan as requested
+  const [displayName, setDisplayName] = useState("there");
   const [stats, setStats] = useState({
     netWorth: 0,
     income: 0,
@@ -36,16 +42,26 @@ export default function OverviewPage() {
     trendPercentage: 0
   });
 
-  // Hardcoded ID for hassanmohiddin3@gmail.com
-  const TARGET_USER_ID = "f2631a28-02cb-4996-acf0-a9f0672e91c4";
-
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Fetch Transactions for the specific user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        router.replace("/login");
+        return;
+      }
+
+      const fullName = user.user_metadata?.full_name as string | undefined;
+      const fallbackName = user.email?.split("@")[0] ?? "there";
+      setDisplayName(firstNameFromDisplayName(fullName || fallbackName));
+
       const { data, error: txError } = await supabase
         .from("transactions")
         .select("*")
-        .eq("user_id", TARGET_USER_ID)
+        .eq("user_id", user.id)
         .order("transaction_date", { ascending: false });
 
       if (txError) {
@@ -58,13 +74,9 @@ export default function OverviewPage() {
       const rows = (data ?? []) as Transaction[];
       setTransactions(rows);
 
-      // 2. Calculate Stats
       let netWorth = 0;
       let income = 0;
       let expenses = 0;
-
-      // Calculate specifically for current month for income/expenses labels if preferred, 
-      // but usually dashboard shows total or monthly. Let's do Total Net Worth, and Monthly Income/Exp.
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
@@ -73,10 +85,7 @@ export default function OverviewPage() {
         const amount = Number(tx.amount || 0);
         const txDate = new Date(tx.transaction_date);
 
-        // Net Worth is cumulative of all time (assuming starting from 0)
         netWorth += amount;
-
-        // Income/Expenses for THIS MONTH
         if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
           if (amount >= 0) {
             income += amount;
@@ -190,9 +199,9 @@ export default function OverviewPage() {
       <motion.div variants={itemVariants} className="flex-shrink-0 flex justify-between items-end">
         <div>
           <h1 className="text-4xl font-black text-white tracking-tight">
-            Good evening, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{displayName}</span>
+            Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{displayName}</span>
           </h1>
-          <p className="text-base text-slate-400 mt-1">Here's what's happening with your money today.</p>
+          <p className="text-base text-slate-400 mt-1">Here&apos;s what&apos;s happening with your money today.</p>
         </div>
         <div className="hidden md:flex items-center gap-2 text-sm font-medium text-slate-400 bg-white/5 px-4 py-2 rounded-full border border-white/5">
           <span>📅 {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</span>
