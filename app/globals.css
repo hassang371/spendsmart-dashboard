@@ -10,6 +10,15 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  .recharts-wrapper:focus,
+  .recharts-surface:focus,
+  .recharts-sector:focus,
+  .recharts-rectangle:focus,
+  .recharts-layer:focus {
+    outline: none !important;
+    box-shadow: none !important;
+  }
 }
 
 @layer utilities {

@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import {
+  Check,
   ChevronDown,
   Download,
   Filter,
   Loader2,
+  Pencil,
   Search,
   X,
 } from "lucide-react";
@@ -63,6 +66,7 @@ type FilterState = {
 };
 
 type CsvFormat = "google" | "bank" | "upi" | "generic";
+type ImportFileKind = "csv" | "excel" | "json" | "text" | "pdf" | "unknown";
 
 const defaultFilters: FilterState = {
   year: "all",
@@ -101,6 +105,7 @@ const MAX_FETCH_DURATION_MS = 45000;
 const INSERT_BATCH_SIZE = 2000;
 const INSERT_CONCURRENCY = 4;
 const PARSE_CHUNK_SIZE = 1024 * 1024;
+const TRANSACTIONS_CACHE_TTL_MS = 60 * 1000;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -153,12 +158,110 @@ function inferPaymentMethod(value: string): string {
   return method;
 }
 
+function toTitleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function isNoiseSegment(value: string): boolean {
+  const cleaned = value.trim();
+  if (!cleaned) return true;
+  const upper = cleaned.toUpperCase();
+
+  if (/^[A-Z0-9._-]{10,}$/.test(upper)) return true;
+  if (/^[0-9]{6,}$/.test(upper)) return true;
+  if (/^ICI[A-Z0-9]+$/.test(upper)) return true;
+  if (/^[A-Z]{2,5}\d{6,}$/.test(upper)) return true;
+
+  const noiseWords = [
+    "UPI",
+    "IMPS",
+    "NEFT",
+    "RTGS",
+    "ACH",
+    "NACH",
+    "CREDIT",
+    "DEBIT",
+    "PAYMENT",
+    "TRANSFER",
+    "BANK",
+    "AXIS BANK",
+    "HDFC BANK",
+    "SBI",
+    "ICICI",
+    "YES BANK",
+    "KOTAK",
+  ];
+  return noiseWords.includes(upper);
+}
+
+function extractReadableDescription(raw: string): string {
+  const source = raw.trim();
+  if (!source) return "Imported transaction";
+
+  const normalizedSource = source.replace(/\s+/g, " ").trim();
+
+  if (normalizedSource.includes("/")) {
+    const parts = normalizedSource
+      .split(/[\/|>]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    for (const part of parts) {
+      if (isNoiseSegment(part)) continue;
+      if (part.length < 3) continue;
+      if (/@/.test(part)) continue;
+      return toTitleCase(part.replace(/[._-]+/g, " "));
+    }
+  }
+
+  if (/^[A-Z]{2,5}\.[A-Z0-9-]{8,}$/i.test(normalizedSource)) {
+    return "Card/UPI transaction";
+  }
+
+  const trimmed = normalizedSource
+    .replace(/\b(UPI|IMPS|NEFT|RTGS|ACH|NACH)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!trimmed) return "Imported transaction";
+  if (trimmed.length <= 64) return toTitleCase(trimmed);
+  return `${toTitleCase(trimmed.slice(0, 61).trim())}...`;
+}
+
 function parseDateValue(value: string): string | null {
   const raw = value.trim();
   if (!raw) return null;
 
-  const direct = new Date(raw.replace("Sept", "Sep"));
-  if (!Number.isNaN(direct.getTime())) return direct.toISOString();
+  const slashDateTime = raw.match(/^\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*$/);
+  if (slashDateTime) {
+    const day = Number.parseInt(slashDateTime[1], 10);
+    const month = Number.parseInt(slashDateTime[2], 10) - 1;
+    const yearRaw = Number.parseInt(slashDateTime[3], 10);
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const hour = Number.parseInt(slashDateTime[4] ?? "0", 10);
+    const minute = Number.parseInt(slashDateTime[5] ?? "0", 10);
+    const second = Number.parseInt(slashDateTime[6] ?? "0", 10);
+    const date = new Date(year, month, day, hour, minute, second);
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
+
+  const dashDateTime = raw.match(/^\s*(\d{1,2})-(\d{1,2})-(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*$/);
+  if (dashDateTime) {
+    const day = Number.parseInt(dashDateTime[1], 10);
+    const month = Number.parseInt(dashDateTime[2], 10) - 1;
+    const yearRaw = Number.parseInt(dashDateTime[3], 10);
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const hour = Number.parseInt(dashDateTime[4] ?? "0", 10);
+    const minute = Number.parseInt(dashDateTime[5] ?? "0", 10);
+    const second = Number.parseInt(dashDateTime[6] ?? "0", 10);
+    const date = new Date(year, month, day, hour, minute, second);
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
 
   const googleLike = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4}),\s*(\d{1,2}):(\d{2})$/);
   if (googleLike) {
@@ -174,29 +277,129 @@ function parseDateValue(value: string): string | null {
     }
   }
 
-  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (slash) {
-    const day = Number.parseInt(slash[1], 10);
-    const month = Number.parseInt(slash[2], 10) - 1;
-    const yearRaw = Number.parseInt(slash[3], 10);
-    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
-    const date = new Date(year, month, day);
-    if (!Number.isNaN(date.getTime())) return date.toISOString();
-  }
+  const direct = new Date(raw.replace("Sept", "Sep"));
+  if (!Number.isNaN(direct.getTime())) return direct.toISOString();
 
-  const iso = new Date(raw.replace(" ", "T"));
+  const iso = new Date(raw.replace(" ", "T").replace("Sept", "Sep"));
   if (!Number.isNaN(iso.getTime())) return iso.toISOString();
   return null;
 }
 
+function detectImportFileKind(fileName: string): ImportFileKind {
+  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (extension === "csv" || extension === "tsv") return "csv";
+  if (extension === "xls" || extension === "xlsx" || extension === "xlsm") return "excel";
+  if (extension === "json") return "json";
+  if (extension === "txt") return "text";
+  if (extension === "pdf") return "pdf";
+  return "unknown";
+}
+
+function normalizeSpreadsheetRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  if (!rows.length) return rows;
+
+  const firstRow = rows[0];
+  const firstKeys = Object.keys(firstRow);
+  const looksLikeEmptyHeaders = firstKeys.length > 0 && firstKeys.every((key) => key.startsWith("__EMPTY"));
+  if (!looksLikeEmptyHeaders) return rows;
+
+  const dynamicHeaders = firstKeys.map((key, index) => {
+    const value = toText(firstRow[key]);
+    return value || `column_${index + 1}`;
+  });
+
+  return rows
+    .slice(1)
+    .map((row) => {
+      const normalized: Record<string, unknown> = {};
+      firstKeys.forEach((key, index) => {
+        normalized[dynamicHeaders[index]] = row[key];
+      });
+      return normalized;
+    })
+    .filter((row) => Object.values(row).some((value) => toText(value) !== ""));
+}
+
+function parseTableText(text: string): Record<string, unknown>[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return [];
+
+  const delimiters = [",", "\t", "|", ";"];
+  let selectedDelimiter = ",";
+  let bestScore = -1;
+  const headerLine = lines[0];
+  for (const delimiter of delimiters) {
+    const score = headerLine.split(delimiter).length;
+    if (score > bestScore) {
+      bestScore = score;
+      selectedDelimiter = delimiter;
+    }
+  }
+
+  const parsed = Papa.parse<Record<string, unknown>>(lines.join("\n"), {
+    header: true,
+    skipEmptyLines: true,
+    delimiter: selectedDelimiter,
+  });
+
+  return parsed.data;
+}
+
+async function parseFileRows(file: File): Promise<{ rows: Record<string, unknown>[]; fileKind: ImportFileKind }> {
+  const fileKind = detectImportFileKind(file.name);
+
+  if (fileKind === "csv") {
+    return { rows: [], fileKind };
+  }
+
+  if (fileKind === "excel") {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array", cellDates: false, raw: false });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return { rows: [], fileKind };
+
+    const worksheet = workbook.Sheets[sheetName];
+    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "", raw: false });
+    return { rows: normalizeSpreadsheetRows(rawRows), fileKind };
+  }
+
+  if (fileKind === "json") {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    if (Array.isArray(json)) {
+      return { rows: json as Record<string, unknown>[], fileKind };
+    }
+    if (json && Array.isArray((json as { transactions?: unknown[] }).transactions)) {
+      return { rows: (json as { transactions: Record<string, unknown>[] }).transactions, fileKind };
+    }
+    return { rows: [], fileKind };
+  }
+
+  if (fileKind === "text" || fileKind === "pdf") {
+    const text = await file.text();
+    return { rows: parseTableText(text), fileKind };
+  }
+
+  return { rows: [], fileKind };
+}
+
 function guessCategory(description: string): string {
   const source = description.toLowerCase();
-  if (source.includes("food") || source.includes("dining") || source.includes("restaurant")) return "Food";
-  if (source.includes("shop") || source.includes("mart")) return "Shopping";
-  if (source.includes("grocery")) return "Grocery";
-  if (source.includes("rent") || source.includes("bill") || source.includes("utility")) return "Utilities";
-  if (source.includes("fuel") || source.includes("petrol") || source.includes("transport")) return "Transport";
-  if (source.includes("salary") || source.includes("income")) return "Income";
+
+  if (/(salary|income|interest|refund|cashback|credited|deposit)/.test(source)) return "Income";
+  if (/(swiggy|zomato|restaurant|cafe|coffee|food|dining|eat)/.test(source)) return "Food";
+  if (/(blinkit|zepto|bigbasket|grocery|supermarket|mart|dmart)/.test(source)) return "Grocery";
+  if (/(amazon|flipkart|myntra|ajio|meesho|shopping|store|mall|retail)/.test(source)) return "Shopping";
+  if (/(uber|ola|rapido|metro|irctc|rail|bus|flight|petrol|diesel|fuel|transport|parking|toll)/.test(source)) return "Transport";
+  if (/(electricity|water|gas|broadband|wifi|mobile|recharge|postpaid|utility|bill)/.test(source)) return "Utilities";
+  if (/(hospital|clinic|pharma|medicine|health|doctor|lab)/.test(source)) return "Healthcare";
+  if (/(school|college|course|tuition|education|udemy|coursera)/.test(source)) return "Education";
+  if (/(movie|netflix|spotify|youtube|prime|hotstar|entertainment|gaming)/.test(source)) return "Entertainment";
+  if (/(insurance|mutual|sip|investment|loan|emi|credit card)/.test(source)) return "Finance";
   return "Misc";
 }
 
@@ -284,6 +487,13 @@ export default function TransactionsPage() {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [selected, setSelected] = useState<TransactionRow | null>(null);
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [editingCategoryTxId, setEditingCategoryTxId] = useState<string | null>(null);
+  const [editingCategoryValue, setEditingCategoryValue] = useState<string>("Misc");
+  const [updatingCategory, setUpdatingCategory] = useState(false);
+  const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
+  const [bulkCategoryValue, setBulkCategoryValue] = useState<string>("Misc");
+  const [bulkUpdatingCategory, setBulkUpdatingCategory] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
 
   useEffect(() => {
     if (!message) return;
@@ -313,6 +523,18 @@ export default function TransactionsPage() {
     return () => cancelAnimationFrame(frame);
   }, [transactions.length]);
 
+  useEffect(() => {
+    setSelectedTxIds((prev) => {
+      if (prev.size === 0) return prev;
+      const valid = new Set(transactions.map((tx) => tx.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (valid.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [transactions]);
+
   const fetchTransactions = useCallback(async () => {
     const userLookup = await withTimeout<{ data: { user: { id: string } | null }; error: { message?: string } | null }>(
       supabase.auth.getUser().then((result: {
@@ -337,6 +559,20 @@ export default function TransactionsPage() {
     }
 
     setUserId(user.id);
+
+    const cacheKey = `transactions-cache:${user.id}`;
+    const cachedRaw = sessionStorage.getItem(cacheKey);
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as { timestamp: number; rows: TransactionRow[] };
+        if (Date.now() - cached.timestamp < TRANSACTIONS_CACHE_TTL_MS && Array.isArray(cached.rows)) {
+          setTransactions(cached.rows);
+          setLoading(false);
+        }
+      } catch {
+        // Ignore bad cache and continue network fetch.
+      }
+    }
 
     const allRows: Record<string, unknown>[] = [];
     const seenIds = new Set<string>();
@@ -405,19 +641,32 @@ export default function TransactionsPage() {
       pagesFetched += 1;
     }
 
-    setTransactions(
-      allRows.map((row) => ({
-        id: toText(row.id),
-        user_id: toText(row.user_id),
-        transaction_date: toText(row.transaction_date),
-        amount: Number(row.amount ?? 0),
-        description: toText(row.description) || null,
-        merchant_name: toText(row.merchant_name) || null,
-        category: toText(row.category) || "Misc",
-        payment_method: toText(row.payment_method) || "unknown",
-        status: toText(row.status) || "completed",
-        currency: toText(row.currency) || "INR",
-      })),
+    const mappedTransactions = allRows.map((row) => {
+        const rawDescription = toText(row.description) || toText(row.merchant_name) || "Imported transaction";
+        const displayDescription = extractReadableDescription(rawDescription);
+        const rawCategory = toText(row.category);
+
+        return {
+          id: toText(row.id),
+          user_id: toText(row.user_id),
+          transaction_date: toText(row.transaction_date),
+          amount: Number(row.amount ?? 0),
+          description: displayDescription,
+          merchant_name: extractReadableDescription(toText(row.merchant_name) || rawDescription),
+          category: rawCategory && rawCategory.toLowerCase() !== "misc" ? rawCategory : guessCategory(rawDescription),
+          payment_method: toText(row.payment_method) || "unknown",
+          status: toText(row.status) || "completed",
+          currency: toText(row.currency) || "INR",
+        };
+      });
+
+    setTransactions(mappedTransactions);
+    sessionStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        timestamp: Date.now(),
+        rows: mappedTransactions,
+      }),
     );
 
     if (truncated) {
@@ -459,6 +708,27 @@ export default function TransactionsPage() {
       if (tx.category) values.add(tx.category);
     }
     return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b))];
+  }, [transactions]);
+
+  const categoryOptions = useMemo(() => {
+    const defaults = [
+      "Food",
+      "Grocery",
+      "Shopping",
+      "Transport",
+      "Utilities",
+      "Healthcare",
+      "Education",
+      "Entertainment",
+      "Finance",
+      "Income",
+      "Misc",
+    ];
+    const set = new Set(defaults);
+    for (const tx of transactions) {
+      if (tx.category) set.add(tx.category);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [transactions]);
 
   const years = useMemo(() => {
@@ -511,6 +781,9 @@ export default function TransactionsPage() {
     return filteredBase;
   }, [filteredBase, tab]);
 
+  const selectedCount = selectedTxIds.size;
+  const visibleTransactionIds = useMemo(() => filteredTransactions.map((tx) => tx.id), [filteredTransactions]);
+
   const groupedTransactions = useMemo(() => {
     const map = new Map<string, TransactionRow[]>();
     for (const tx of filteredTransactions) {
@@ -546,7 +819,102 @@ export default function TransactionsPage() {
     setIsFilterOpen(false);
   };
 
-  const handleCsvImport = async (file: File) => {
+  const startCategoryEdit = (tx: TransactionRow) => {
+    setEditingCategoryTxId(tx.id);
+    setEditingCategoryValue(tx.category || "Misc");
+  };
+
+  const saveCategoryEdit = async () => {
+    if (!editingCategoryTxId || !userId) return;
+    setUpdatingCategory(true);
+    try {
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ category: editingCategoryValue })
+        .eq("id", editingCategoryTxId)
+        .eq("user_id", userId);
+
+      if (updateError) throw updateError;
+
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx.id === editingCategoryTxId
+            ? {
+                ...tx,
+                category: editingCategoryValue,
+              }
+            : tx,
+        ),
+      );
+
+      setMessage("Category updated.");
+      setEditingCategoryTxId(null);
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Unable to update category.");
+    } finally {
+      setUpdatingCategory(false);
+    }
+  };
+
+  const toggleTransactionSelection = (txId: string) => {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(txId)) next.delete(txId);
+      else next.add(txId);
+      return next;
+    });
+  };
+
+  const selectVisibleTransactions = () => {
+    setSelectedTxIds(new Set(visibleTransactionIds));
+  };
+
+  const clearSelection = () => {
+    setSelectedTxIds(new Set());
+  };
+
+  const applyBulkCategoryUpdate = async () => {
+    if (!userId || selectedTxIds.size === 0) return;
+    const ids = Array.from(selectedTxIds);
+    setBulkUpdatingCategory(true);
+    try {
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ category: bulkCategoryValue })
+        .eq("user_id", userId)
+        .in("id", ids);
+
+      if (updateError) throw updateError;
+
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          selectedTxIds.has(tx.id)
+            ? {
+                ...tx,
+                category: bulkCategoryValue,
+              }
+            : tx,
+        ),
+      );
+      setMessage(`Updated category for ${ids.length} transactions.`);
+      clearSelection();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Unable to update selected transactions.");
+    } finally {
+      setBulkUpdatingCategory(false);
+    }
+  };
+
+  const toggleBulkMode = () => {
+    setBulkMode((prev) => {
+      if (prev) {
+        clearSelection();
+      }
+      return !prev;
+    });
+  };
+
+  const handleDataImport = async (file: File) => {
     if (!userId) throw new Error("No authenticated user found.");
 
     const {
@@ -558,34 +926,189 @@ export default function TransactionsPage() {
       throw new Error("Authentication session expired. Please log in again.");
     }
 
-    const preview = await new Promise<Papa.ParseResult<Record<string, unknown>>>((resolve, reject) => {
-      Papa.parse<Record<string, unknown>>(file, {
-        header: true,
-        skipEmptyLines: true,
-        preview: 20,
-        complete: (result) => resolve(result),
-        error: (parseError) => reject(parseError),
-      });
-    });
+    const detectStatementFormat = (fields: string[]): CsvFormat | null => {
+      const hasGoogle = fields.includes("time") && fields.includes("transactionid") && fields.includes("amount");
+      const hasBankClassic = fields.some((field) => field.includes("withdrawal")) && fields.some((field) => field.includes("deposit"));
+      const hasBankRemarks =
+        (fields.includes("withdrawalamountinr") || fields.includes("debitamount") || fields.includes("debit")) &&
+        (fields.includes("depositamountinr") || fields.includes("creditamount") || fields.includes("credit"));
+      const hasUpi = fields.includes("timestamp") && fields.includes("merchantcategory") && fields.includes("amountinr");
+      const hasGeneric = fields.includes("date") && fields.includes("description") && fields.includes("amount");
 
-    if (preview.errors.length > 0) {
-      throw new Error(`CSV parse error: ${preview.errors[0]?.message ?? "Invalid CSV"}`);
-    }
+      if (hasGoogle) return "google";
+      if (hasUpi) return "upi";
+      if (hasBankClassic || hasBankRemarks) return "bank";
+      if (hasGeneric) return "generic";
+      return null;
+    };
 
-    const fields = (preview.meta.fields ?? []).map((f) => normalizeHeader(f));
-    const hasGoogle = fields.includes("time") && fields.includes("transactionid") && fields.includes("amount");
-    const hasBank = fields.includes("withdrawal") && fields.includes("deposit");
-    const hasUpi = fields.includes("timestamp") && fields.includes("merchantcategory") && fields.includes("amountinr");
-    const hasGeneric = fields.includes("date") && fields.includes("description") && fields.includes("amount");
+    const mapRowToInsert = (row: Record<string, unknown>, format: CsvFormat): InsertTransaction | null => {
+      const normalized = new Map<string, string>();
+      for (const [key, value] of Object.entries(row)) {
+        normalized.set(normalizeHeader(key), toText(value));
+      }
+
+      if (format === "google") {
+        const status = normalizeStatus(normalized.get("status") ?? "completed");
+        const amountRaw = parseAmount(normalized.get("amount") ?? "");
+        const date = parseDateValue(normalized.get("time") ?? "");
+        if (amountRaw === null || amountRaw === 0 || !date) return null;
+
+        let signed = -Math.abs(amountRaw);
+        if (status === "refunded") signed = Math.abs(amountRaw);
+
+        const rawDescription = normalized.get("description") || normalized.get("product") || "Imported transaction";
+        const description = extractReadableDescription(rawDescription);
+        const merchant = extractReadableDescription(normalized.get("product") || rawDescription);
+
+        return {
+          user_id: userId,
+          transaction_date: date,
+          amount: signed,
+          currency: "INR",
+          description,
+          merchant_name: merchant,
+          category: guessCategory(`${rawDescription} ${merchant}`),
+          payment_method: inferPaymentMethod(normalized.get("paymentmethod") ?? ""),
+          status,
+          raw_data: row,
+        };
+      }
+
+      if (format === "bank") {
+        const withdrawal =
+          parseAmount(normalized.get("withdrawal") ?? "") ??
+          parseAmount(normalized.get("withdrawalamountinr") ?? "") ??
+          parseAmount(normalized.get("debit") ?? "") ??
+          parseAmount(normalized.get("debitamount") ?? "") ??
+          0;
+
+        const deposit =
+          parseAmount(normalized.get("deposit") ?? "") ??
+          parseAmount(normalized.get("depositamountinr") ?? "") ??
+          parseAmount(normalized.get("credit") ?? "") ??
+          parseAmount(normalized.get("creditamount") ?? "") ??
+          0;
+
+        const date =
+          parseDateValue(normalized.get("transactiondate") ?? "") ||
+          parseDateValue(normalized.get("valuedate") ?? "") ||
+          parseDateValue(normalized.get("date1") ?? "") ||
+          parseDateValue(normalized.get("date") ?? "");
+
+        if ((withdrawal <= 0 && deposit <= 0) || !date) return null;
+
+        const rawDescription =
+          normalized.get("transactionremarks") ||
+          normalized.get("remarks") ||
+          normalized.get("narration") ||
+          normalized.get("description") ||
+          "Imported bank transaction";
+
+        const description = extractReadableDescription(rawDescription);
+
+        const amount = deposit > 0 ? Math.abs(deposit) : -Math.abs(withdrawal);
+
+        return {
+          user_id: userId,
+          transaction_date: date,
+          amount,
+          currency: "INR",
+          description,
+          merchant_name: description,
+          category: guessCategory(rawDescription),
+          payment_method: inferPaymentMethod(rawDescription),
+          status: "completed",
+          raw_data: row,
+        };
+      }
+
+      if (format === "upi") {
+        const amountRaw = parseAmount(normalized.get("amountinr") ?? "");
+        const date = parseDateValue(normalized.get("timestamp") ?? "");
+        const status = normalizeStatus(normalized.get("transactionstatus") ?? "completed");
+        if (amountRaw === null || amountRaw === 0 || !date) return null;
+
+        const typeText = (normalized.get("transactiontype") ?? "").toLowerCase();
+        const isCredit = /credit|refund|receive|received|salary|deposit/.test(typeText);
+        const amount = isCredit ? Math.abs(amountRaw) : -Math.abs(amountRaw);
+        const rawDescription =
+          normalized.get("description") ||
+          normalized.get("merchant") ||
+          normalized.get("merchantname") ||
+          `${normalized.get("merchantcategory") || "UPI"} ${normalized.get("transactiontype") ?? ""}`;
+        const description = extractReadableDescription(rawDescription);
+        const inferredCategory = guessCategory(rawDescription);
+        const category = normalized.get("merchantcategory") || (inferredCategory === "Misc" ? "UPI" : inferredCategory);
+
+        return {
+          user_id: userId,
+          transaction_date: date,
+          amount,
+          currency: "INR",
+          description,
+          merchant_name: description,
+          category,
+          payment_method: "upi",
+          status,
+          raw_data: row,
+        };
+      }
+
+      const amountRaw = parseAmount(normalized.get("amount") ?? "");
+      const date = parseDateValue(normalized.get("date") ?? "");
+      if (amountRaw === null || amountRaw === 0 || !date) return null;
+
+      const type = (normalized.get("type") ?? "expense").toLowerCase();
+      const amount = /income|credit|deposit/.test(type) ? Math.abs(amountRaw) : -Math.abs(amountRaw);
+      const rawDescription = normalized.get("description") || "Imported transaction";
+      const description = extractReadableDescription(rawDescription);
+
+      return {
+        user_id: userId,
+        transaction_date: date,
+        amount,
+        currency: "INR",
+        description,
+        merchant_name: description,
+        category: normalized.get("category") || guessCategory(rawDescription),
+        payment_method: inferPaymentMethod(normalized.get("paymentmethod") ?? ""),
+        status: normalizeStatus(normalized.get("status") ?? "completed"),
+        raw_data: row,
+      };
+    };
+
+    const fileKind = detectImportFileKind(file.name);
 
     let format: CsvFormat | null = null;
-    if (hasGoogle) format = "google";
-    else if (hasBank) format = "bank";
-    else if (hasUpi) format = "upi";
-    else if (hasGeneric) format = "generic";
+    let nonCsvRows: Record<string, unknown>[] = [];
+
+    if (fileKind === "csv") {
+      const preview = await new Promise<Papa.ParseResult<Record<string, unknown>>>((resolve, reject) => {
+        Papa.parse<Record<string, unknown>>(file, {
+          header: true,
+          skipEmptyLines: true,
+          preview: 30,
+          complete: (result) => resolve(result),
+          error: (parseError) => reject(parseError),
+        });
+      });
+
+      if (preview.errors.length > 0) {
+        throw new Error(`CSV parse error: ${preview.errors[0]?.message ?? "Invalid CSV"}`);
+      }
+
+      const fields = (preview.meta.fields ?? []).map((f) => normalizeHeader(f));
+      format = detectStatementFormat(fields);
+    } else {
+      const parsed = await parseFileRows(file);
+      nonCsvRows = parsed.rows;
+      const fields = Object.keys(nonCsvRows[0] ?? {}).map((key) => normalizeHeader(key));
+      format = detectStatementFormat(fields);
+    }
 
     if (!format) {
-      throw new Error("Unsupported CSV format. Please upload a supported bank/UPI export.");
+      throw new Error("Unsupported statement format. Try CSV/XLS/XLSX/JSON or export statement as tabular data.");
     }
 
     const existingFingerprints = new Set(
@@ -642,110 +1165,8 @@ export default function TransactionsPage() {
       }
     };
 
-    const mapRowToInsert = (row: Record<string, unknown>): InsertTransaction | null => {
-      const normalized = new Map<string, string>();
-      for (const [key, value] of Object.entries(row)) {
-        normalized.set(normalizeHeader(key), toText(value));
-      }
-
-      if (format === "google") {
-        const status = normalizeStatus(normalized.get("status") ?? "completed");
-        const amountRaw = parseAmount(normalized.get("amount") ?? "");
-        const date = parseDateValue(normalized.get("time") ?? "");
-        if (amountRaw === null || amountRaw === 0 || !date) return null;
-
-        let signed = -Math.abs(amountRaw);
-        if (status === "refunded") signed = Math.abs(amountRaw);
-
-        const description = normalized.get("description") || normalized.get("product") || "Imported transaction";
-        const merchant = normalized.get("product") || description;
-
-        return {
-          user_id: userId,
-          transaction_date: date,
-          amount: signed,
-          currency: "INR",
-          description,
-          merchant_name: merchant,
-          category: guessCategory(`${description} ${merchant}`),
-          payment_method: inferPaymentMethod(normalized.get("paymentmethod") ?? ""),
-          status,
-          raw_data: row,
-        };
-      }
-
-      if (format === "bank") {
-        const withdrawal = parseAmount(normalized.get("withdrawal") ?? "") ?? 0;
-        const deposit = parseAmount(normalized.get("deposit") ?? "") ?? 0;
-        const date = parseDateValue(normalized.get("date1") ?? "") || parseDateValue(normalized.get("date") ?? "");
-        if ((withdrawal <= 0 && deposit <= 0) || !date) return null;
-
-        const category = normalized.get("category") || "Misc";
-        const amount = deposit > 0 ? Math.abs(deposit) : -Math.abs(withdrawal);
-        const ref = normalized.get("refno") ?? "";
-
-        return {
-          user_id: userId,
-          transaction_date: date,
-          amount,
-          currency: "INR",
-          description: `${category}${ref ? ` (${ref})` : ""}`,
-          merchant_name: category,
-          category,
-          payment_method: "bank transfer",
-          status: "completed",
-          raw_data: row,
-        };
-      }
-
-      if (format === "upi") {
-        const amountRaw = parseAmount(normalized.get("amountinr") ?? "");
-        const date = parseDateValue(normalized.get("timestamp") ?? "");
-        const status = normalizeStatus(normalized.get("transactionstatus") ?? "completed");
-        if (amountRaw === null || amountRaw === 0 || !date) return null;
-
-        const typeText = (normalized.get("transactiontype") ?? "").toLowerCase();
-        const isCredit = /credit|refund|receive|received|salary|deposit/.test(typeText);
-        const amount = isCredit ? Math.abs(amountRaw) : -Math.abs(amountRaw);
-        const category = normalized.get("merchantcategory") || "Misc";
-
-        return {
-          user_id: userId,
-          transaction_date: date,
-          amount,
-          currency: "INR",
-          description: `${category} ${normalized.get("transactiontype") ?? "UPI"}`.trim(),
-          merchant_name: category,
-          category,
-          payment_method: "upi",
-          status,
-          raw_data: row,
-        };
-      }
-
-      const amountRaw = parseAmount(normalized.get("amount") ?? "");
-      const date = parseDateValue(normalized.get("date") ?? "");
-      if (amountRaw === null || amountRaw === 0 || !date) return null;
-
-      const type = (normalized.get("type") ?? "expense").toLowerCase();
-      const amount = /income|credit|deposit/.test(type) ? Math.abs(amountRaw) : -Math.abs(amountRaw);
-      const description = normalized.get("description") || "Imported transaction";
-
-      return {
-        user_id: userId,
-        transaction_date: date,
-        amount,
-        currency: "INR",
-        description,
-        merchant_name: description,
-        category: normalized.get("category") || guessCategory(description),
-        payment_method: inferPaymentMethod(normalized.get("paymentmethod") ?? ""),
-        status: normalizeStatus(normalized.get("status") ?? "completed"),
-        raw_data: row,
-      };
-    };
-
-    await new Promise<void>((resolve, reject) => {
+    if (fileKind === "csv") {
+      await new Promise<void>((resolve, reject) => {
       let settled = false;
       let parseComplete = false;
       let queue: Promise<void> = Promise.resolve();
@@ -767,12 +1188,12 @@ export default function TransactionsPage() {
           .catch(fail);
       };
 
-      Papa.parse<Record<string, unknown>>(file, {
-        header: true,
-        skipEmptyLines: true,
-        worker: true,
-        chunkSize: PARSE_CHUNK_SIZE,
-        chunk: (results) => {
+        Papa.parse<Record<string, unknown>>(file, {
+          header: true,
+          skipEmptyLines: true,
+          worker: true,
+          chunkSize: PARSE_CHUNK_SIZE,
+          chunk: (results) => {
           queue = queue.then(async () => {
             if (results.errors.length > 0) {
               throw new Error(`CSV parse error: ${results.errors[0]?.message ?? "Invalid CSV"}`);
@@ -783,7 +1204,7 @@ export default function TransactionsPage() {
 
             const inserts: InsertTransaction[] = [];
             for (const row of chunkRows) {
-              const tx = mapRowToInsert(row);
+              const tx = mapRowToInsert(row, format);
               if (!tx) continue;
 
               const fingerprint = `${tx.transaction_date.slice(0, 19)}|${tx.amount.toFixed(2)}|${tx.description.toLowerCase()}`;
@@ -802,19 +1223,48 @@ export default function TransactionsPage() {
           });
 
           queue.catch(fail);
-        },
-        complete: () => {
-          parseComplete = true;
-          finishIfDone();
-        },
-        error: (parseError) => fail(parseError),
+          },
+          complete: () => {
+            parseComplete = true;
+            finishIfDone();
+          },
+          error: (parseError) => fail(parseError),
+        });
       });
-    });
+    } else {
+      const rows = nonCsvRows;
+      if (!rows.length) {
+        throw new Error("No rows found in file. If this is a PDF, export it as CSV/Excel for better accuracy.");
+      }
+
+      let processed = 0;
+      for (let i = 0; i < rows.length; i += INSERT_BATCH_SIZE) {
+        const sourceChunk = rows.slice(i, i + INSERT_BATCH_SIZE);
+        const inserts: InsertTransaction[] = [];
+
+        for (const row of sourceChunk) {
+          const tx = mapRowToInsert(row, format);
+          if (!tx) continue;
+
+          const fingerprint = `${tx.transaction_date.slice(0, 19)}|${tx.amount.toFixed(2)}|${tx.description.toLowerCase()}`;
+          if (existingFingerprints.has(fingerprint) || newFingerprints.has(fingerprint)) continue;
+
+          newFingerprints.add(fingerprint);
+          inserts.push(tx);
+        }
+
+        if (sourceChunk.length > 0) sawAnyRows = true;
+        await insertBatch(inserts);
+
+        processed += sourceChunk.length;
+        setImportProgress(Math.min(99, Math.round((processed / rows.length) * 100)));
+      }
+    }
 
     setImportProgress(100);
 
     if (!sawAnyRows) {
-      throw new Error("No rows found in CSV.");
+      throw new Error("No rows found in file.");
     }
 
     if (!importedCount) {
@@ -838,7 +1288,7 @@ export default function TransactionsPage() {
     setError(null);
     setMessage(null);
     try {
-      const count = await handleCsvImport(file);
+      const count = await handleDataImport(file);
       await fetchTransactions();
       setTab("all");
       listRef.current?.scrollTo({ top: 0, behavior: "auto" });
@@ -964,38 +1414,98 @@ export default function TransactionsPage() {
               className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-shadow disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:shadow-blue-500/20"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              {saving && importProgress !== null ? `Importing ${importProgress}%` : "Import CSV"}
+              {saving && importProgress !== null ? `Importing ${importProgress}%` : "Import Data"}
             </motion.button>
-            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={onSelectFile} disabled={saving} />
+            <input ref={fileInputRef} type="file" accept=".csv,.tsv,.xls,.xlsx,.xlsm,.json,.txt,.pdf" className="hidden" onChange={onSelectFile} disabled={saving} />
           </div>
         </div>
 
         {/* Tab Selection */}
-        <div className="flex p-1 gap-1 bg-black/20 rounded-2xl border border-white/5 w-fit">
-          {(["all", "debit", "credit"] as const).map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setTab(name)}
-              className={`relative px-6 py-2 rounded-xl text-sm font-bold transition-all ${tab === name ? "text-white shadow-lg bg-white/10 ring-1 ring-white/10" : "text-gray-400 hover:text-white"
-                }`}
-            >
-              {tab === name && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute inset-0 bg-white/5 rounded-xl"
-                  initial={false}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 capitalize flex items-center gap-2">
-                {name}
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === name ? "bg-white/20" : "bg-white/5"}`}>
-                  {tabCounts[name]}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex p-1 gap-1 bg-black/20 rounded-2xl border border-white/5 w-fit">
+            {(["all", "debit", "credit"] as const).map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => setTab(name)}
+                className={`relative px-6 py-2 rounded-xl text-sm font-bold transition-all ${tab === name ? "text-white shadow-lg bg-white/10 ring-1 ring-white/10" : "text-gray-400 hover:text-white"
+                  }`}
+              >
+                {tab === name && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-white/5 rounded-xl"
+                    initial={false}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 capitalize flex items-center gap-2">
+                  {name}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === name ? "bg-white/20" : "bg-white/5"}`}>
+                    {tabCounts[name]}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+            {!bulkMode ? (
+              <button
+                type="button"
+                onClick={toggleBulkMode}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-white/10"
+              >
+                Bulk Actions
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={selectVisibleTransactions}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-white/10"
+                >
+                  Select Visible ({visibleTransactionIds.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  disabled={selectedCount === 0}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Clear
+                </button>
+                <span className="text-xs font-semibold text-blue-300">{selectedCount} selected</span>
+                <select
+                  value={bulkCategoryValue}
+                  onChange={(event) => setBulkCategoryValue(event.target.value)}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white outline-none"
+                  disabled={selectedCount === 0 || bulkUpdatingCategory}
+                >
+                  {categoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={applyBulkCategoryUpdate}
+                  disabled={selectedCount === 0 || bulkUpdatingCategory}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkUpdatingCategory ? "Updating..." : "Apply"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleBulkMode}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10"
+                >
+                  Done
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <AnimatePresence>
@@ -1164,9 +1674,25 @@ export default function TransactionsPage() {
                         key={tx.id}
                         whileHover={{ backgroundColor: "rgba(255,255,255,0.03)" }}
                         onClick={() => setSelected(tx)}
-                        className="flex cursor-pointer items-center justify-between px-6 py-4 transition-colors group"
+                        className={`flex cursor-pointer items-center justify-between px-6 py-4 transition-colors group ${bulkMode && selectedTxIds.has(tx.id) ? "bg-blue-500/10" : ""}`}
                       >
                         <div className="flex items-center gap-5 min-w-0">
+                          {bulkMode && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleTransactionSelection(tx.id);
+                              }}
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${selectedTxIds.has(tx.id)
+                                ? "border-blue-400 bg-blue-500 text-white"
+                                : "border-white/20 bg-white/5 text-transparent hover:border-blue-400"
+                                }`}
+                              title={selectedTxIds.has(tx.id) ? "Deselect transaction" : "Select transaction"}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-xl border border-white/5 group-hover:border-white/10 group-hover:bg-white/10 transition-colors">
                             {categoryIcon(tx.category ?? "Misc")}
                           </div>
@@ -1183,14 +1709,63 @@ export default function TransactionsPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5">
+                            <div className="mt-0.5 flex items-center gap-2">
                               <p className="text-xs font-medium text-gray-500">
                                 {new Date(tx.transaction_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", weekday: 'short' })}
                               </p>
                               <span className="h-1 w-1 rounded-full bg-gray-700" />
-                              <p className="text-xs font-medium text-gray-500 truncate max-w-[150px]">
-                                {tx.category}
-                              </p>
+                              {editingCategoryTxId === tx.id ? (
+                                <div
+                                  className="flex items-center gap-1"
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <select
+                                    value={editingCategoryValue}
+                                    onChange={(event) => setEditingCategoryValue(event.target.value)}
+                                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white outline-none"
+                                    disabled={updatingCategory}
+                                  >
+                                    {categoryOptions.map((option) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={saveCategoryEdit}
+                                    disabled={updatingCategory}
+                                    className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-60"
+                                    title="Save category"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCategoryTxId(null)}
+                                    disabled={updatingCategory}
+                                    className="rounded-md border border-white/15 bg-white/5 p-1 text-gray-300 hover:bg-white/10 disabled:opacity-60"
+                                    title="Cancel"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="max-w-[140px] truncate text-xs font-medium text-gray-500">{tx.category}</p>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      startCategoryEdit(tx);
+                                    }}
+                                    className="rounded-md border border-white/10 bg-white/5 p-1 text-gray-400 hover:border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-300"
+                                    title="Edit category"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

@@ -1,51 +1,63 @@
 "use client";
 
-import { useState } from "react";
-import { LogOut, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { User, Bell } from "lucide-react";
 import { supabase } from "../../../lib/supabase/client";
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    setError(null);
-    const { error: signOutError } = await supabase.auth.signOut();
-    setIsLoggingOut(false);
-
-    if (signOutError) {
-      setError(signOutError.message);
-      return;
-    }
-
-    router.replace("/login");
-  };
+  useEffect(() => {
+    supabase.auth.getUser().then((response: any) => {
+      const { data } = response;
+      if (data?.user) {
+        setUser({
+          email: data.user.email || "",
+          name: data.user.user_metadata?.full_name || "User",
+        });
+      }
+    });
+  }, []);
 
   return (
-    <div className="space-y-4">
-      {error && <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
+    <div className="space-y-6">
+      <h1 className="text-3xl font-black tracking-tighter text-white">Settings</h1>
 
-      <div className="rounded-3xl border border-white/10 bg-secondary/70 p-8">
-        <h2 className="text-3xl font-black text-white">Settings</h2>
-        <p className="mt-2 text-sm text-gray-400">Account and session controls.</p>
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Account Information */}
+        <section className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400">
+              <User size={20} />
+            </div>
+            <h2 className="text-lg font-bold text-white">Account Information</h2>
+          </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-background/70 p-5">
-          <h3 className="text-lg font-bold text-white">Session</h3>
-          <p className="mt-1 text-sm text-gray-400">Sign out from this device securely.</p>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold uppercase text-gray-500">Full Name</label>
+              <p className="font-medium text-white">{user?.name || "Loading..."}</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase text-gray-500">Email Address</label>
+              <p className="font-medium text-white">{user?.email || "Loading..."}</p>
+            </div>
+            <div className="pt-2">
+              <button className="text-sm font-bold text-blue-400 hover:text-blue-300">Edit Profile</button>
+            </div>
+          </div>
+        </section>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-            {isLoggingOut ? "Logging out..." : "Log out"}
-          </button>
-        </div>
+        {/* Preferences (Placeholder) */}
+        <section className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20 text-purple-400">
+              <Bell size={20} />
+            </div>
+            <h2 className="text-lg font-bold text-white">Preferences</h2>
+          </div>
+          <p className="text-sm text-gray-400">Notification settings coming soon.</p>
+        </section>
       </div>
     </div>
   );
