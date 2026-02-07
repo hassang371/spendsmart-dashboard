@@ -37,6 +37,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
+  const isLandingRoute = pathname === "/";
 
   if (!user && isDashboardRoute) {
     const redirectUrl = request.nextUrl.clone();
@@ -46,6 +47,13 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAuthRoute) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (user && isLandingRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";
