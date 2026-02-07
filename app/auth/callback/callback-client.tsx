@@ -19,6 +19,12 @@ export function CallbackClient() {
     const completeAuth = async () => {
       const authError = searchParams.get("error_description") || searchParams.get("error");
       if (authError) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          router.replace(nextPath);
+          return;
+        }
+
         setError(authError);
         return;
       }
@@ -27,6 +33,12 @@ export function CallbackClient() {
       if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            router.replace(nextPath);
+            return;
+          }
+
           setError(exchangeError.message);
           return;
         }
