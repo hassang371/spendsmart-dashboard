@@ -1,9 +1,33 @@
 "use client";
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, LayoutGrid, Zap, Shield, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
+    const router = useRouter();
+
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+                router.replace("/dashboard");
+            }
+        };
+
+        checkSession();
+
+        const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === "SIGNED_IN" && session) {
+                router.replace("/dashboard");
+            }
+        });
+
+        return () => subscription.subscription.unsubscribe();
+    }, [router]);
+
     return (
         <main className="min-h-screen bg-background overflow-x-hidden">
             {/* Navbar */}
