@@ -36,9 +36,9 @@ export default function DashboardLayout({
 
         const { data: subscription } = supabase.auth.onAuthStateChange(
             (_event: AuthChangeEvent, session: Session | null) => {
-            if (!session) {
-                router.replace("/login");
-            }
+                if (!session) {
+                    router.replace("/login");
+                }
             },
         );
 
@@ -70,15 +70,15 @@ export default function DashboardLayout({
                     </nav>
 
                     <div className="mt-auto rounded-2xl border border-white/10 bg-background/80 px-4 py-3">
-                        <div className="mb-2 min-w-0">
+                        <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-white">{displayName}</p>
                             <p className="truncate text-xs text-slate-400">{email || "Signed in"}</p>
                         </div>
                     </div>
                 </aside>
 
-                <main className="h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden rounded-[32px] border border-white/10 bg-card p-6 md:p-8">
-                    <div>{children}</div>
+                <main className="h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden rounded-[32px] border border-white/10 bg-card p-6">
+                    {children}
                 </main>
             </div>
         </div>
