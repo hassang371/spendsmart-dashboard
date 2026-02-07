@@ -63,6 +63,7 @@ Headers:
 
 ```http
 x-ingest-key: <INGEST_API_KEY>
+authorization: Bearer <SUPABASE_USER_ACCESS_TOKEN>
 content-type: application/json
 ```
 
@@ -70,10 +71,11 @@ Body:
 
 ```json
 {
-  "userId": "<uuid>",
   "csv": "Date,Description,Amount,Category\n2026-02-01,Coffee,-5.5,Food"
 }
 ```
+
+The target user is derived from the bearer token, not passed in the body.
 
 ### Scheduled ingestion (Vercel Cron GET)
 

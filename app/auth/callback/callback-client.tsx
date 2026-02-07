@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "../../../lib/supabase/client";
 
 export function CallbackClient() {
   const router = useRouter();

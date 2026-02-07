@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { type AuthChangeEvent, type Session } from "@supabase/supabase-js";
 import { LayoutDashboard, Wallet, PieChart, Settings, Bell, LogOut, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase/client";
 
 export default function DashboardLayout({
     children,
@@ -31,11 +32,13 @@ export default function DashboardLayout({
 
         loadUser();
 
-        const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: subscription } = supabase.auth.onAuthStateChange(
+            (_event: AuthChangeEvent, session: Session | null) => {
             if (!session) {
                 router.replace("/login");
             }
-        });
+            },
+        );
 
         return () => subscription.subscription.unsubscribe();
     }, [router]);

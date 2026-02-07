@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useEffect } from "react";
+import { type AuthChangeEvent, type Session } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LayoutGrid, Zap, Shield, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase/client";
 
 export default function Home() {
     const router = useRouter();
@@ -19,11 +20,13 @@ export default function Home() {
 
         checkSession();
 
-        const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === "SIGNED_IN" && session) {
-                router.replace("/dashboard");
-            }
-        });
+        const { data: subscription } = supabase.auth.onAuthStateChange(
+            (event: AuthChangeEvent, session: Session | null) => {
+                if (event === "SIGNED_IN" && session) {
+                    router.replace("/dashboard");
+                }
+            },
+        );
 
         return () => subscription.subscription.unsubscribe();
     }, [router]);
