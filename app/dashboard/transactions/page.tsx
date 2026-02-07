@@ -11,6 +11,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { AnimatePresence, motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase/client";
 
@@ -244,6 +245,7 @@ function monthName(index: number): string {
 export default function TransactionsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -263,6 +265,11 @@ export default function TransactionsPage() {
     const timer = setTimeout(() => setMessage(null), 3500);
     return () => clearTimeout(timer);
   }, [message]);
+
+  // Scroll to top when tab changes
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [tab]);
 
   const fetchTransactions = useCallback(async () => {
     const {
@@ -592,336 +599,432 @@ export default function TransactionsPage() {
     }
   };
 
+  // Animation variants
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[55vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5">
-      {error && <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
-      {message && (
-        <div className="rounded-2xl border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">{message}</div>
-      )}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex h-full min-h-0 flex-col gap-6"
+    >
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-2xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-sm text-red-200 backdrop-blur-md"
+          >
+            {error}
+          </motion.div>
+        )}
+        {message && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-200 backdrop-blur-md"
+          >
+            {message}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <section className="rounded-3xl border border-white/10 bg-secondary/70 p-5">
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-4xl font-black tracking-tight text-white">All Transactions</h2>
-          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+      <section className="flex flex-col gap-6 rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-[#121b2e] to-[#0d1424] p-8 shadow-2xl">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-4xl font-black tracking-tight text-white">
+              Transactions
+              <span className="ml-2 text-lg font-medium text-gray-500">History</span>
+            </h2>
+            <p className="mt-1 text-sm text-gray-400">View and manage your financial activity.</p>
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-3 md:w-auto md:justify-end">
+            <div className="relative group w-full sm:w-72">
+              <Search className="pointer-events-none absolute left-4 top-3 h-4 w-4 text-gray-400 group-focus-within:text-blue-400 transition-colors" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search transactions..."
-                className="w-full rounded-xl border border-white/10 bg-background px-9 py-2 text-sm text-white outline-none focus:border-primary"
+                placeholder="Search by merchant, category..."
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-10 py-2.5 text-sm text-white outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all placeholder:text-gray-500"
               />
             </div>
-            <button
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={() => setIsFilterOpen((prev) => !prev)}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-background px-4 py-2 text-sm font-semibold text-white"
+              className={`inline-flex items-center gap-2 rounded-2xl border px-5 py-2.5 text-sm font-bold transition-all ${isFilterOpen
+                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                : "border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
+                }`}
             >
-              <Filter className="h-4 w-4" /> Filters <ChevronDown className="h-4 w-4" />
-            </button>
-            <button
+              <Filter className="h-4 w-4" />
+              <span>Filters</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isFilterOpen ? "rotate-180" : ""}`} />
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
+              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-shadow"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Import Data
-            </button>
+              Import CSV
+            </motion.button>
             <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={onSelectFile} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {/* Tab Selection */}
+        <div className="flex p-1 gap-1 bg-black/20 rounded-2xl border border-white/5 w-fit">
           {(["all", "debit", "credit"] as const).map((name) => (
             <button
               key={name}
               type="button"
               onClick={() => setTab(name)}
-              className={`rounded-2xl border p-4 text-left transition ${
-                tab === name ? "border-primary bg-primary/15 text-white" : "border-white/10 bg-background/70 text-gray-300"
-              }`}
+              className={`relative px-6 py-2 rounded-xl text-sm font-bold transition-all ${tab === name ? "text-white shadow-lg bg-white/10 ring-1 ring-white/10" : "text-gray-400 hover:text-white"
+                }`}
             >
-              <p className="text-xs font-bold uppercase tracking-wide">{name}</p>
-              <p className="text-sm text-gray-400">{tabCounts[name]} transactions</p>
+              {tab === name && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 bg-white/5 rounded-xl"
+                  initial={false}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 capitalize flex items-center gap-2">
+                {name}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === name ? "bg-white/20" : "bg-white/5"}`}>
+                  {tabCounts[name]}
+                </span>
+              </span>
             </button>
           ))}
         </div>
 
-        {isFilterOpen && (
-          <div className="mt-4 rounded-2xl border border-white/10 bg-background p-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Specific period (year/month)</label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <select
-                    value={draftFilters.year}
-                    onChange={(event) =>
-                      setDraftFilters((prev) => ({
-                        ...prev,
-                        year: event.target.value,
-                        relative: event.target.value === "all" ? prev.relative : "none",
-                      }))
-                    }
-                    className="w-full rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
+        <AnimatePresence>
+          {isFilterOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-2 rounded-3xl border border-white/10 bg-black/20 p-6 backdrop-blur-sm">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {/* Period */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Period</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={draftFilters.year}
+                        onChange={(e) => setDraftFilters(p => ({ ...p, year: e.target.value, relative: e.target.value === "all" ? p.relative : "none" }))}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                      >
+                        {years.map(y => <option key={y} value={y}>{y === "all" ? "All Years" : y}</option>)}
+                      </select>
+                      <select
+                        value={draftFilters.month}
+                        onChange={(e) => setDraftFilters(p => ({ ...p, month: e.target.value }))}
+                        disabled={draftFilters.year === "all"}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none disabled:opacity-50"
+                      >
+                        <option value="all">All Months</option>
+                        {Array.from({ length: 12 }).map((_, i) => <option key={i} value={String(i)}>{monthName(i)}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Relative */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Quick Range</label>
+                    <select
+                      value={draftFilters.relative}
+                      onChange={(e) => setDraftFilters(p => ({ ...p, relative: e.target.value as RelativeRange, year: e.target.value === "none" ? p.year : "all", month: "all" }))}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                    >
+                      <option value="none">Custom / None</option>
+                      <option value="this_month">This Month</option>
+                      <option value="last_30">Last 30 Days</option>
+                      <option value="last_90">Last 3 Months</option>
+                    </select>
+                  </div>
+
+                  {/* Category */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Category</label>
+                    <select
+                      value={draftFilters.category}
+                      onChange={(e) => setDraftFilters(p => ({ ...p, category: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                    >
+                      {categories.map(c => <option key={c} value={c}>{c === "all" ? "All Categories" : c}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Amount Range */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Amount Range</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={draftFilters.minAmount}
+                        onChange={(e) => setDraftFilters(p => ({ ...p, minAmount: e.target.value }))}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                      />
+                      <span className="text-gray-600">-</span>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={draftFilters.maxAmount}
+                        onChange={(e) => setDraftFilters(p => ({ ...p, maxAmount: e.target.value }))}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3 border-t border-white/5 pt-4">
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white"
                   >
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year === "all" ? "All Time" : year}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={draftFilters.month}
-                    onChange={(event) => setDraftFilters((prev) => ({ ...prev, month: event.target.value }))}
-                    disabled={draftFilters.year === "all"}
-                    className="w-full rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white disabled:opacity-50"
+                    Reset Defaults
+                  </button>
+                  <button
+                    onClick={applyFilters}
+                    className="rounded-xl bg-blue-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500"
                   >
-                    <option value="all">All Months</option>
-                    {Array.from({ length: 12 }).map((_, index) => (
-                      <option key={index} value={String(index)}>
-                        {monthName(index)}
-                      </option>
-                    ))}
-                  </select>
+                    Apply Filters
+                  </button>
                 </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Relative time</label>
-                <select
-                  value={draftFilters.relative}
-                  onChange={(event) =>
-                    setDraftFilters((prev) => ({
-                      ...prev,
-                      relative: event.target.value as RelativeRange,
-                      year: event.target.value === "none" ? prev.year : "all",
-                      month: event.target.value === "none" ? prev.month : "all",
-                    }))
-                  }
-                  className="w-full rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-                >
-                  <option value="none">None</option>
-                  <option value="this_week">This Week</option>
-                  <option value="this_month">This Month</option>
-                  <option value="last_30">Last 30 Days</option>
-                  <option value="last_90">Last 90 Days</option>
-                  <option value="last_180">Last 6 Months</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-              </div>
-
-              {draftFilters.relative === "custom" && (
-                <>
-                  <input
-                    type="date"
-                    value={draftFilters.customStart}
-                    onChange={(event) => setDraftFilters((prev) => ({ ...prev, customStart: event.target.value }))}
-                    className="rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-                  />
-                  <input
-                    type="date"
-                    value={draftFilters.customEnd}
-                    onChange={(event) => setDraftFilters((prev) => ({ ...prev, customEnd: event.target.value }))}
-                    className="rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-                  />
-                </>
-              )}
-
-              <select
-                value={draftFilters.category}
-                onChange={(event) => setDraftFilters((prev) => ({ ...prev, category: event.target.value }))}
-                className="rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-              >
-                {categories.map((value) => (
-                  <option key={value} value={value}>
-                    {value === "all" ? "All Categories" : value}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={draftFilters.status}
-                onChange={(event) => setDraftFilters((prev) => ({ ...prev, status: event.target.value }))}
-                className="rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-              >
-                <option value="all">All Status</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="refunded">Refunded</option>
-                <option value="failed">Failed</option>
-              </select>
-
-              <div className="flex min-w-0 items-center gap-2">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={draftFilters.minAmount}
-                  onChange={(event) => setDraftFilters((prev) => ({ ...prev, minAmount: event.target.value }))}
-                  className="w-full rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-                />
-                <span className="text-gray-500">to</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={draftFilters.maxAmount}
-                  onChange={(event) => setDraftFilters((prev) => ({ ...prev, maxAmount: event.target.value }))}
-                  className="w-full rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <select
-                value={draftFilters.paymentMethod}
-                onChange={(event) => setDraftFilters((prev) => ({ ...prev, paymentMethod: event.target.value }))}
-                className="rounded-lg border border-white/10 bg-secondary px-3 py-2 text-sm text-white"
-              >
-                {paymentMethods.map((value) => (
-                  <option key={value} value={value}>
-                    {value === "all" ? "All Methods" : value}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button type="button" onClick={clearFilters} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300">
-                Clear All
-              </button>
-              <button type="button" onClick={applyFilters} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
-                Apply
-              </button>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
-      {groupedTransactions.length === 0 ? (
-        <div className="flex-1 rounded-3xl border border-white/10 bg-secondary/60 p-12 text-center text-gray-400">
-          <Calendar className="mx-auto mb-3 h-8 w-8" />
-          No transactions match your current filters.
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-gutter:stable] snap-y snap-mandatory">
-          {groupedTransactions.map((group) => {
+      {/* Transactions List */}
+      <motion.div
+        ref={listRef}
+        key={tab}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="min-h-0 flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-6 pb-20"
+      >
+        {groupedTransactions.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center py-20 text-center"
+          >
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/5 border border-white/10">
+              <Search className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white">No transactions found</h3>
+            <p className="mt-2 text-gray-400 max-w-sm">
+              Try adjusting your filters or import a new statement to get started.
+            </p>
+            <button onClick={clearFilters} className="mt-6 text-blue-400 font-bold hover:underline">Clear all filters</button>
+          </motion.div>
+        ) : (
+          groupedTransactions.map((group) => {
             const headerLabel = tab === "credit" ? "Total Credited" : tab === "debit" ? "Total Spent" : "Net Total";
             const headerValue = tab === "credit" ? group.credited : tab === "debit" ? group.spent : group.net;
-            const headerColor = tab === "credit" ? "text-green-300" : "text-white";
+            const headerColor =
+              tab === "credit" ? "text-emerald-400" :
+                tab === "debit" ? "text-red-400" :
+                  headerValue >= 0 ? "text-emerald-400" : "text-red-400";
+
             return (
-              <section key={group.key} className="overflow-hidden rounded-3xl border border-white/10 bg-secondary/70 snap-start">
-                <div className="flex items-center justify-between bg-gradient-to-r from-black to-gray-800 px-6 py-4">
+              <motion.div
+                key={group.key}
+                variants={itemVariants}
+                className="rounded-[2rem] border border-white/10 bg-[#0B1221] overflow-hidden shadow-lg"
+              >
+                <div className="flex items-center justify-between bg-gradient-to-r from-blue-900/20 to-transparent px-8 py-5 border-b border-white/5">
                   <div>
-                    <p className="text-xs text-gray-400">{group.year}</p>
-                    <h3 className="text-4xl font-black leading-none text-white">{monthName(group.month)}</h3>
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-400/80 mb-0.5">{group.year}</p>
+                    <h3 className="text-2xl font-black text-white">{monthName(group.month)}</h3>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs uppercase text-gray-400">{headerLabel}</p>
-                    <p className={`text-4xl font-black ${headerColor}`}>
-                      {tab === "all" && headerValue < 0 ? "-" : ""}₹{Math.abs(headerValue).toLocaleString("en-IN")}
+                    <p className="text-xs uppercase font-bold text-gray-500 mb-0.5">{headerLabel}</p>
+                    <p className={`text-2xl font-mono font-bold ${headerColor}`}>
+                      {tab === "all" && headerValue > 0 ? "+" : ""}
+                      {tab === "all" && headerValue < 0 ? "-" : ""}
+                      ₹{Math.abs(headerValue).toLocaleString("en-IN")}
                     </p>
                   </div>
                 </div>
-
                 <div className="divide-y divide-white/5">
                   {group.rows.map((tx) => {
                     const amount = Number(tx.amount || 0);
                     const isCredit = amount >= 0;
                     const status = normalizeStatus(tx.status ?? "completed");
                     return (
-                      <button
-                        type="button"
+                      <motion.div
                         key={tx.id}
+                        whileHover={{ backgroundColor: "rgba(255,255,255,0.03)" }}
                         onClick={() => setSelected(tx)}
-                        className="flex w-full snap-start items-center justify-between px-6 py-4 text-left transition hover:bg-white/5"
+                        className="flex cursor-pointer items-center justify-between px-6 py-4 transition-colors group"
                       >
-                      <div className="flex min-w-0 items-center gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-xl">
-                          {categoryIcon(tx.category ?? "Misc")}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                              <p className="truncate text-lg font-bold text-white">{tx.description || "Transaction"}</p>
+                        <div className="flex items-center gap-5 min-w-0">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-xl border border-white/5 group-hover:border-white/10 group-hover:bg-white/10 transition-colors">
+                            {categoryIcon(tx.category ?? "Misc")}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-3">
+                              <p className="truncate text-base font-bold text-white group-hover:text-blue-400 transition-colors">
+                                {tx.description || "Transaction"}
+                              </p>
                               {status !== "completed" && (
-                                <span className="rounded-full bg-white/10 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-300">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${status === "failed" ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                                  "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                                  }`}>
                                   {status}
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-400">
-                              {new Date(tx.transaction_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-xs font-medium text-gray-500">
+                                {new Date(tx.transaction_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", weekday: 'short' })}
+                              </p>
+                              <span className="h-1 w-1 rounded-full bg-gray-700" />
+                              <p className="text-xs font-medium text-gray-500 truncate max-w-[150px]">
+                                {tx.category}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                        <p className={`shrink-0 text-2xl font-black ${isCredit ? "text-green-400" : "text-red-400"}`}>
-                          {isCredit ? "+" : "-"}₹{Math.abs(amount).toLocaleString("en-IN")}
-                        </p>
-                      </button>
+                        <div className="text-right pl-4">
+                          <p className={`font-mono text-lg font-bold ${isCredit ? "text-emerald-400" : "text-red-400"}`}>
+                            {isCredit ? "+" : ""}₹{Math.abs(amount).toLocaleString("en-IN")}
+                          </p>
+                          <p className="text-[10px] font-bold uppercase text-gray-600 mt-0.5">{tx.payment_method}</p>
+                        </div>
+                      </motion.div>
                     );
                   })}
                 </div>
-              </section>
+              </motion.div>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </motion.div>
 
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-secondary p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <button type="button" onClick={() => setSelected(null)} className="rounded-full bg-white/10 p-2 text-white">
-                <X className="h-4 w-4" />
-              </button>
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/30 text-2xl">
-                {categoryIcon(selected.category ?? "Misc")}
+      {/* Detail Modal */}
+      <AnimatePresence>
+        {selected && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelected(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              layoutId={`tx-${selected.id}`}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#121b2e] shadow-2xl"
+            >
+              <div className="absolute top-0 right-0 p-6 z-10">
+                <button
+                  onClick={() => setSelected(null)}
+                  className="rounded-full bg-black/20 p-2 text-white/50 hover:text-white hover:bg-black/40 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <div className="w-8" />
-            </div>
 
-            <div className="mb-5 text-center">
-              <h4 className="text-3xl font-black text-white">{selected.description || "Transaction"}</h4>
-              <p className="text-gray-400">{selected.merchant_name || selected.category || "Unknown"}</p>
-              <p className={`mt-3 text-5xl font-black ${Number(selected.amount) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {Number(selected.amount) >= 0 ? "+" : "-"}₹{Math.abs(Number(selected.amount)).toLocaleString("en-IN")}
-              </p>
-              <p className="mt-2 text-sm uppercase tracking-wide text-gray-400">{normalizeStatus(selected.status ?? "completed")}</p>
-            </div>
+              <div className="flex flex-col items-center pt-10 pb-8 px-6 bg-gradient-to-b from-blue-500/10 to-transparent">
+                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-gradient-to-br from-blue-500 to-indigo-600 text-4xl shadow-lg shadow-blue-500/20">
+                  {categoryIcon(selected.category ?? "Misc")}
+                </div>
+                <h3 className="text-center text-2xl font-black text-white px-4 leading-tight">
+                  {selected.description || "Transaction"}
+                </h3>
+                <p className="mt-2 text-sm font-medium text-blue-300/70 uppercase tracking-widest">
+                  {selected.category || "Uncategorized"}
+                </p>
+                <h2 className={`mt-6 font-mono text-5xl font-black tracking-tighter ${Number(selected.amount) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {Number(selected.amount) >= 0 ? "+" : ""}₹{Math.abs(Number(selected.amount)).toLocaleString("en-IN")}
+                </h2>
+                <div className="mt-4 flex gap-2">
+                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-gray-400 uppercase">
+                    {normalizeStatus(selected.status ?? "completed")}
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-gray-400 uppercase">
+                    {selected.payment_method || "Unknown Method"}
+                  </span>
+                </div>
+              </div>
 
-            <div className="space-y-2 rounded-2xl bg-background p-4 text-sm text-gray-300">
-              <div className="flex justify-between border-b border-white/5 py-2">
-                <span>Payment Method</span>
-                <span className="font-semibold text-white">{selected.payment_method || "unknown"}</span>
+              <div className="bg-[#0b1221] px-6 py-6 border-t border-white/5 space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Date & Time</span>
+                  <span className="text-white font-bold">
+                    {new Date(selected.transaction_date).toLocaleString("en-IN", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <div className="h-px bg-white/5 w-full" />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Merchant / Ref</span>
+                  <span className="text-white font-bold truncate max-w-[200px]">
+                    {selected.merchant_name || selected.description || "-"}
+                  </span>
+                </div>
+                <div className="h-px bg-white/5 w-full" />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Transaction ID</span>
+                  <span className="text-gray-400 font-mono text-xs truncate max-w-[180px]" title={selected.id}>{selected.id}</span>
+                </div>
+
+                <button className="w-full mt-6 rounded-xl bg-white/5 py-3 text-sm font-bold text-white hover:bg-white/10 transition-colors border border-white/5">
+                  Report an Issue
+                </button>
               </div>
-              <div className="flex justify-between border-b border-white/5 py-2">
-                <span>Transaction ID</span>
-                <span className="max-w-[58%] break-all text-right font-semibold text-white">{selected.id}</span>
-              </div>
-              <div className="flex justify-between border-b border-white/5 py-2">
-                <span>Category</span>
-                <span className="font-semibold text-white">{selected.category || "Misc"}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span>Date</span>
-                <span className="font-semibold text-white">
-                  {new Date(selected.transaction_date).toLocaleString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
