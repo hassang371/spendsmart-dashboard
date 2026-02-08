@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 
 interface Transaction {
@@ -70,6 +70,7 @@ export function CategoryDistribution({ transactions }: { transactions: Transacti
                             outerRadius={80}
                             paddingAngle={5}
                             dataKey="value"
+                            nameKey="name"
                             cornerRadius={8}
                             stroke="none"
                         >
@@ -77,6 +78,16 @@ export function CategoryDistribution({ transactions }: { transactions: Transacti
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
                             ))}
                         </Pie>
+                        <Tooltip
+                            formatter={(value: any) => `₹${(Number(value) || 0).toLocaleString()}`}
+                            contentStyle={{
+                                backgroundColor: "hsl(var(--card))",
+                                borderColor: "hsl(var(--border))",
+                                borderRadius: "12px",
+                                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
+                            }}
+                            itemStyle={{ color: "hsl(var(--foreground))", fontWeight: 600 }}
+                        />
                     </PieChart>
                 </ResponsiveContainer>
             </div>

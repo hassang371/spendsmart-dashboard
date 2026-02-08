@@ -107,7 +107,7 @@ export default function DashboardLayout({
             (event: AuthChangeEvent, session: Session | null) => {
                 if (event === "SIGNED_OUT" || !session) {
                     router.replace("/login");
-                } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+                } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
                     loadUser();
                 }
             },
@@ -147,20 +147,31 @@ export default function DashboardLayout({
     const handleSwitchAccount = async (session: StoredSession) => {
         if (session.email === email) return;
 
-        const { error } = await supabase.auth.setSession({
+        // Optimistic UI: Close menu immediately
+        setIsProfileOpen(false);
+
+        const { data, error } = await supabase.auth.setSession({
             access_token: session.access_token,
             refresh_token: session.refresh_token,
         });
 
-        if (error) {
-            console.error("Failed to switch account:", error);
-            const sessions = readStoredSessions().filter((s) => s.email !== session.email);
-            localStorage.setItem('supabase-multi-auth', JSON.stringify(sessions));
-            setSavedSessions(sessions);
+        if (error || !data.session) {
+            console.error("Failed to switch account - session invalid:", error);
+            // Remove invalid session
+            const validSessions = readStoredSessions().filter((s) => s.email !== session.email);
+            localStorage.setItem('supabase-multi-auth', JSON.stringify(validSessions));
+            setSavedSessions(validSessions);
+
+            // Start - Error Handling Update
+            if (confirm(`Session for ${session.email} has expired. Would you like to log in again?`)) {
+                await supabase.auth.signOut(); // Ensure we are clean state before login
+                router.push("/login");
+            }
             return;
         }
 
-        setIsProfileOpen(false);
+        // Force reload to ensure all state is clean
+        window.location.reload();
     };
 
     const handleAddAccount = () => {
