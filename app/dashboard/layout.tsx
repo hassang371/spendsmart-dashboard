@@ -195,7 +195,7 @@ export default function DashboardLayout({
                         <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black text-lg shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
                             {theme === "light" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                         </div>
-                        <span className="text-xl font-bold tracking-tight text-foreground/90 group-hover:text-primary transition-colors">SpendSmart</span>
+                        <span className="text-xl font-bold tracking-tight text-foreground/90 group-hover:text-primary transition-colors">SCALE</span>
                     </div>
 
                     <nav className="flex-1 space-y-2">

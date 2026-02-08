@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
-import { Outfit, Space_Grotesk } from "next/font/google";
+import { Inter, Oswald } from "next/font/google";
 import "./globals.css";
 
-const outfit = Outfit({
+const inter = Inter({
     subsets: ["latin"],
-    variable: "--font-outfit",
+    variable: "--font-inter",
     display: "swap",
 });
 
-const spaceGrotesk = Space_Grotesk({
+const oswald = Oswald({
     subsets: ["latin"],
-    variable: "--font-space-grotesk",
+    variable: "--font-oswald",
     display: "swap",
 });
 
 export const metadata: Metadata = {
-    title: "SpendSmart - Financial Clarity",
-    description: "Your money. Unstuck.",
+    title: "SCALE — Finance, Leveled Up.",
+    description: "Finance. Leveled Up.",
 };
 
 import { ThemeProvider } from "../components/theme-provider";
@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={`${outfit.variable} ${spaceGrotesk.variable} font-sans antialiased bg-background text-foreground`}>
+            <body className={`${inter.variable} ${oswald.variable} font-sans antialiased bg-background text-foreground`}>
                 <ThemeProvider
                     attribute="class"
                     defaultTheme="dark"
