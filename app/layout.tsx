@@ -19,15 +19,24 @@ export const metadata: Metadata = {
     description: "Your money. Unstuck.",
 };
 
+import { ThemeProvider } from "../components/theme-provider";
+
 export default function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <body className={`${outfit.variable} ${spaceGrotesk.variable} font-sans antialiased bg-background text-foreground`}>
-                {children}
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="dark"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    {children}
+                </ThemeProvider>
             </body>
         </html>
     );

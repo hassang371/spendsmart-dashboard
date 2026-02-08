@@ -2,15 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --radius: 1rem;
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    /* Slate 50 */
+    --foreground: 222.2 47.4% 11.2%;
+    /* Slate 900 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+
+    --primary: 221.2 83.2% 53.3%;
+    /* Blue 600 */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --radius: 1rem;
+
+    /* Custom Sidebar BG for Light Mode */
+    --sidebar-bg: 0 0% 100%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+  }
+
+  .dark {
+    /* Main Background: #0B1221 (221, 50%, 9%) */
+    --background: 221 50% 9%;
+    --foreground: 210 40% 98%;
+    /* Slate 50 */
+
+    /* Sidebar / Card: #111827 (Slate 900: 222.2 47.4% 11.2%) */
+    --card: 222.2 47.4% 11.2%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 47.4% 11.2%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217.2 91.2% 59.8%;
+    /* Blue 500 */
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    /* Red 500 approx, brighter than 30% lightness */
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 217.2 91.2% 59.8%;
+
+    /* Custom Sidebar BG for Dark Mode */
+    --sidebar-bg: 222.2 47.4% 11.2%;
+    --sidebar-border: 0 0% 100% / 0.05;
+    /* white/5 */
+  }
 }
 
 @layer base {
-  body {
-    @apply bg-background text-foreground;
+  * {
+    @apply border-border;
   }
 
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+
+  /* Recharts focus outline removal */
   .recharts-wrapper:focus,
   .recharts-surface:focus,
   .recharts-sector:focus,
@@ -26,16 +108,27 @@
     text-wrap: balance;
   }
 
-  /* Slush-like Soft Neo-Brutalism Shadows */
+  /* Slush-like Soft Shadows */
   .shadow-slush {
-    box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+    @apply shadow-[4px_4px_0px_0px_rgba(0, 0, 0, 1)];
   }
 
-  .shadow-slush-sm {
-    box-shadow: 2px 2px 0px 0px rgba(0, 0, 0, 1);
+  /* Scrollbar Styles */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
 
-  .shadow-glow {
-    box-shadow: 0 0 20px -5px rgba(59, 130, 246, 0.5);
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsla(var(--muted-foreground) / 0.3);
+    border-radius: 20px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsla(var(--muted-foreground) / 0.5);
   }
 }

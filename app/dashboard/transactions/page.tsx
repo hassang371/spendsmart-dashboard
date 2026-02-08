@@ -391,6 +391,7 @@ function guessCategory(description: string): string {
   const source = description.toLowerCase();
 
   if (/(salary|income|interest|refund|cashback|credited|deposit)/.test(source)) return "Income";
+  if (/(subscription|membership|monthly|renewal|google one|youtube premium|netflix|spotify|prime video|hotstar|apple music|icloud)/.test(source)) return "Subscriptions";
   if (/(swiggy|zomato|restaurant|cafe|coffee|food|dining|eat)/.test(source)) return "Food";
   if (/(blinkit|zepto|bigbasket|grocery|supermarket|mart|dmart)/.test(source)) return "Grocery";
   if (/(amazon|flipkart|myntra|ajio|meesho|shopping|store|mall|retail)/.test(source)) return "Shopping";
@@ -408,6 +409,7 @@ function categoryIcon(category: string): string {
   if (key.includes("food")) return "🍔";
   if (key.includes("shop")) return "🛍️";
   if (key.includes("grocery")) return "🛒";
+  if (key.includes("subscription")) return "🔁";
   if (key.includes("utility")) return "📄";
   if (key.includes("transport") || key.includes("fuel")) return "🚕";
   if (key.includes("income")) return "💰";
@@ -494,6 +496,8 @@ export default function TransactionsPage() {
   const [bulkCategoryValue, setBulkCategoryValue] = useState<string>("Misc");
   const [bulkUpdatingCategory, setBulkUpdatingCategory] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
+  const [consumedOpenTxId, setConsumedOpenTxId] = useState<string | null>(null);
+  const [spotlightTxId, setSpotlightTxId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!message) return;
@@ -534,6 +538,32 @@ export default function TransactionsPage() {
       return next;
     });
   }, [transactions]);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      if (isFilterOpen) {
+        const insideFilter = target.closest('[data-filter-panel="true"]');
+        const filterTrigger = target.closest('[data-filter-trigger="true"]');
+        if (!insideFilter && !filterTrigger) {
+          setIsFilterOpen(false);
+        }
+      }
+
+      if (editingCategoryTxId) {
+        const insideCategoryEditor = target.closest('[data-category-editor="true"]');
+        const categoryEditTrigger = target.closest('[data-category-edit-trigger="true"]');
+        if (!insideCategoryEditor && !categoryEditTrigger) {
+          setEditingCategoryTxId(null);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [isFilterOpen, editingCategoryTxId]);
 
   const fetchTransactions = useCallback(async () => {
     const userLookup = await withTimeout<{ data: { user: { id: string } | null }; error: { message?: string } | null }>(
@@ -642,23 +672,23 @@ export default function TransactionsPage() {
     }
 
     const mappedTransactions = allRows.map((row) => {
-        const rawDescription = toText(row.description) || toText(row.merchant_name) || "Imported transaction";
-        const displayDescription = extractReadableDescription(rawDescription);
-        const rawCategory = toText(row.category);
+      const rawDescription = toText(row.description) || toText(row.merchant_name) || "Imported transaction";
+      const displayDescription = extractReadableDescription(rawDescription);
+      const rawCategory = toText(row.category);
 
-        return {
-          id: toText(row.id),
-          user_id: toText(row.user_id),
-          transaction_date: toText(row.transaction_date),
-          amount: Number(row.amount ?? 0),
-          description: displayDescription,
-          merchant_name: extractReadableDescription(toText(row.merchant_name) || rawDescription),
-          category: rawCategory && rawCategory.toLowerCase() !== "misc" ? rawCategory : guessCategory(rawDescription),
-          payment_method: toText(row.payment_method) || "unknown",
-          status: toText(row.status) || "completed",
-          currency: toText(row.currency) || "INR",
-        };
-      });
+      return {
+        id: toText(row.id),
+        user_id: toText(row.user_id),
+        transaction_date: toText(row.transaction_date),
+        amount: Number(row.amount ?? 0),
+        description: displayDescription,
+        merchant_name: extractReadableDescription(toText(row.merchant_name) || rawDescription),
+        category: rawCategory && rawCategory.toLowerCase() !== "misc" ? rawCategory : guessCategory(rawDescription),
+        payment_method: toText(row.payment_method) || "unknown",
+        status: toText(row.status) || "completed",
+        currency: toText(row.currency) || "INR",
+      };
+    });
 
     setTransactions(mappedTransactions);
     sessionStorage.setItem(
@@ -717,6 +747,7 @@ export default function TransactionsPage() {
       "Shopping",
       "Transport",
       "Utilities",
+      "Subscriptions",
       "Healthcare",
       "Education",
       "Entertainment",
@@ -813,6 +844,32 @@ export default function TransactionsPage() {
     setIsFilterOpen(false);
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const openTxId = params.get("openTx") || params.get("highlight");
+    if (!openTxId || openTxId === consumedOpenTxId || transactions.length === 0) return;
+
+    const match = transactions.find((tx) => tx.id === openTxId);
+    if (!match) return;
+
+    setTab("all");
+    setSearch("");
+    setFilters(defaultFilters);
+    setDraftFilters(defaultFilters);
+    setSelected(match);
+    setSpotlightTxId(openTxId);
+    scrollToTransactionRow(openTxId);
+    setConsumedOpenTxId(openTxId);
+    router.replace("/dashboard/transactions", { scroll: false });
+  }, [transactions, consumedOpenTxId, router]);
+
+  useEffect(() => {
+    if (!spotlightTxId) return;
+    const timer = window.setTimeout(() => setSpotlightTxId(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [spotlightTxId]);
+
   const clearFilters = () => {
     setDraftFilters(defaultFilters);
     setFilters(defaultFilters);
@@ -840,9 +897,9 @@ export default function TransactionsPage() {
         prev.map((tx) =>
           tx.id === editingCategoryTxId
             ? {
-                ...tx,
-                category: editingCategoryValue,
-              }
+              ...tx,
+              category: editingCategoryValue,
+            }
             : tx,
         ),
       );
@@ -890,9 +947,9 @@ export default function TransactionsPage() {
         prev.map((tx) =>
           selectedTxIds.has(tx.id)
             ? {
-                ...tx,
-                category: bulkCategoryValue,
-              }
+              ...tx,
+              category: bulkCategoryValue,
+            }
             : tx,
         ),
       );
@@ -912,6 +969,28 @@ export default function TransactionsPage() {
       }
       return !prev;
     });
+  };
+
+  const scrollToTransactionRow = (txId: string) => {
+    if (typeof window === "undefined") return;
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    const tryScroll = () => {
+      attempts += 1;
+      const selector = `[data-tx-row-id="${txId.replace(/"/g, "\\\"")}"]`;
+      const row = document.querySelector(selector) as HTMLElement | null;
+      if (row) {
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        window.setTimeout(tryScroll, 80);
+      }
+    };
+
+    window.setTimeout(tryScroll, 0);
   };
 
   const handleDataImport = async (file: File) => {
@@ -1167,26 +1246,26 @@ export default function TransactionsPage() {
 
     if (fileKind === "csv") {
       await new Promise<void>((resolve, reject) => {
-      let settled = false;
-      let parseComplete = false;
-      let queue: Promise<void> = Promise.resolve();
+        let settled = false;
+        let parseComplete = false;
+        let queue: Promise<void> = Promise.resolve();
 
-      const fail = (error: unknown) => {
-        if (settled) return;
-        settled = true;
-        reject(error);
-      };
+        const fail = (error: unknown) => {
+          if (settled) return;
+          settled = true;
+          reject(error);
+        };
 
-      const finishIfDone = () => {
-        if (!parseComplete || settled) return;
-        queue
-          .then(() => {
-            if (settled) return;
-            settled = true;
-            resolve();
-          })
-          .catch(fail);
-      };
+        const finishIfDone = () => {
+          if (!parseComplete || settled) return;
+          queue
+            .then(() => {
+              if (settled) return;
+              settled = true;
+              resolve();
+            })
+            .catch(fail);
+        };
 
         Papa.parse<Record<string, unknown>>(file, {
           header: true,
@@ -1194,35 +1273,35 @@ export default function TransactionsPage() {
           worker: true,
           chunkSize: PARSE_CHUNK_SIZE,
           chunk: (results) => {
-          queue = queue.then(async () => {
-            if (results.errors.length > 0) {
-              throw new Error(`CSV parse error: ${results.errors[0]?.message ?? "Invalid CSV"}`);
-            }
+            queue = queue.then(async () => {
+              if (results.errors.length > 0) {
+                throw new Error(`CSV parse error: ${results.errors[0]?.message ?? "Invalid CSV"}`);
+              }
 
-            const chunkRows = results.data;
-            if (chunkRows.length > 0) sawAnyRows = true;
+              const chunkRows = results.data;
+              if (chunkRows.length > 0) sawAnyRows = true;
 
-            const inserts: InsertTransaction[] = [];
-            for (const row of chunkRows) {
-              const tx = mapRowToInsert(row, format);
-              if (!tx) continue;
+              const inserts: InsertTransaction[] = [];
+              for (const row of chunkRows) {
+                const tx = mapRowToInsert(row, format);
+                if (!tx) continue;
 
-              const fingerprint = `${tx.transaction_date.slice(0, 19)}|${tx.amount.toFixed(2)}|${tx.description.toLowerCase()}`;
-              if (existingFingerprints.has(fingerprint) || newFingerprints.has(fingerprint)) continue;
+                const fingerprint = `${tx.transaction_date.slice(0, 19)}|${tx.amount.toFixed(2)}|${tx.description.toLowerCase()}`;
+                if (existingFingerprints.has(fingerprint) || newFingerprints.has(fingerprint)) continue;
 
-              newFingerprints.add(fingerprint);
-              inserts.push(tx);
-            }
+                newFingerprints.add(fingerprint);
+                inserts.push(tx);
+              }
 
-            await insertBatch(inserts);
+              await insertBatch(inserts);
 
-            const cursor = Number(results.meta.cursor ?? 0);
-            if (file.size > 0 && Number.isFinite(cursor) && cursor > 0) {
-              setImportProgress(Math.min(99, Math.round((cursor / file.size) * 100)));
-            }
-          });
+              const cursor = Number(results.meta.cursor ?? 0);
+              if (file.size > 0 && Number.isFinite(cursor) && cursor > 0) {
+                setImportProgress(Math.min(99, Math.round((cursor / file.size) * 100)));
+              }
+            });
 
-          queue.catch(fail);
+            queue.catch(fail);
           },
           complete: () => {
             parseComplete = true;
@@ -1355,7 +1434,7 @@ export default function TransactionsPage() {
         </AnimatePresence>
       </div>
 
-      <section className="relative flex flex-col gap-6 rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-[#121b2e] to-[#0d1424] p-8 shadow-2xl">
+      <section className="relative flex flex-col gap-6 rounded-[2.5rem] border border-border bg-card p-8 shadow-xl">
         {saving && (
           <div className="absolute inset-0 z-30 flex items-center justify-center rounded-[2.5rem] bg-[#0b1324]/75 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-6 py-5 text-center">
@@ -1369,11 +1448,11 @@ export default function TransactionsPage() {
         )}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-4xl font-black tracking-tight text-white">
+            <h2 className="text-4xl font-black tracking-tight text-foreground">
               Transactions
-              <span className="ml-2 text-lg font-medium text-gray-500">History</span>
+              <span className="ml-2 text-lg font-medium text-muted-foreground">History</span>
             </h2>
-            <p className="mt-1 text-sm text-gray-400">View and manage your financial activity.</p>
+            <p className="mt-1 text-sm text-muted-foreground">View and manage your financial activity.</p>
           </div>
 
           <div className="flex items-center gap-3 md:flex-nowrap">
@@ -1383,7 +1462,7 @@ export default function TransactionsPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search by merchant, category..."
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-10 py-2.5 text-sm text-white outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all placeholder:text-gray-500"
+                className="w-full rounded-2xl border border-border bg-secondary/30 px-10 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:bg-secondary transition-all placeholder:text-muted-foreground"
               />
             </div>
 
@@ -1391,10 +1470,11 @@ export default function TransactionsPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="button"
+              data-filter-trigger="true"
               onClick={() => setIsFilterOpen((prev) => !prev)}
               className={`inline-flex items-center gap-2 rounded-2xl border px-5 py-2.5 text-sm font-bold transition-all ${isFilterOpen
-                ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                : "border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "border-border bg-secondary/30 text-muted-foreground hover:bg-secondary"
                 }`}
             >
               <Filter className="h-4 w-4" />
@@ -1411,7 +1491,7 @@ export default function TransactionsPage() {
                 fileInputRef.current?.click();
               }}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-shadow disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:shadow-blue-500/20"
+              className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:shadow-primary/20"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {saving && importProgress !== null ? `Importing ${importProgress}%` : "Import Data"}
@@ -1422,13 +1502,13 @@ export default function TransactionsPage() {
 
         {/* Tab Selection */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex p-1 gap-1 bg-black/20 rounded-2xl border border-white/5 w-fit">
+          <div className="flex p-1 gap-1 bg-muted/30 rounded-2xl border border-border w-fit">
             {(["all", "debit", "credit"] as const).map((name) => (
               <button
                 key={name}
                 type="button"
                 onClick={() => setTab(name)}
-                className={`relative px-6 py-2 rounded-xl text-sm font-bold transition-all ${tab === name ? "text-white shadow-lg bg-white/10 ring-1 ring-white/10" : "text-gray-400 hover:text-white"
+                className={`relative px-6 py-2 rounded-xl text-sm font-bold transition-all ${tab === name ? "text-foreground shadow-sm bg-background ring-1 ring-border" : "text-muted-foreground hover:text-foreground"
                   }`}
               >
                 {tab === name && (
@@ -1449,12 +1529,12 @@ export default function TransactionsPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/30 px-3 py-2">
             {!bulkMode ? (
               <button
                 type="button"
                 onClick={toggleBulkMode}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-white/10"
+                className="rounded-lg border border-border bg-secondary/30 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
               >
                 Bulk Actions
               </button>
@@ -1516,7 +1596,7 @@ export default function TransactionsPage() {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-2 rounded-3xl border border-white/10 bg-black/20 p-6 backdrop-blur-sm">
+              <div data-filter-panel="true" className="mt-2 rounded-3xl border border-border bg-card/95 p-6 backdrop-blur-sm shadow-xl">
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
                   {/* Period */}
                   <div className="space-y-2">
@@ -1525,7 +1605,7 @@ export default function TransactionsPage() {
                       <select
                         value={draftFilters.year}
                         onChange={(e) => setDraftFilters(p => ({ ...p, year: e.target.value, relative: e.target.value === "all" ? p.relative : "none" }))}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                        className="w-full rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                       >
                         {years.map(y => <option key={y} value={y}>{y === "all" ? "All Years" : y}</option>)}
                       </select>
@@ -1547,7 +1627,7 @@ export default function TransactionsPage() {
                     <select
                       value={draftFilters.relative}
                       onChange={(e) => setDraftFilters(p => ({ ...p, relative: e.target.value as RelativeRange, year: e.target.value === "none" ? p.year : "all", month: "all" }))}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                      className="w-full rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                     >
                       <option value="none">Custom / None</option>
                       <option value="this_month">This Month</option>
@@ -1562,7 +1642,7 @@ export default function TransactionsPage() {
                     <select
                       value={draftFilters.category}
                       onChange={(e) => setDraftFilters(p => ({ ...p, category: e.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                      className="w-full rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                     >
                       {categories.map(c => <option key={c} value={c}>{c === "all" ? "All Categories" : c}</option>)}
                     </select>
@@ -1577,15 +1657,15 @@ export default function TransactionsPage() {
                         placeholder="Min"
                         value={draftFilters.minAmount}
                         onChange={(e) => setDraftFilters(p => ({ ...p, minAmount: e.target.value }))}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                        className="w-full rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                       />
-                      <span className="text-gray-600">-</span>
+                      <span className="text-muted-foreground">-</span>
                       <input
                         type="number"
                         placeholder="Max"
                         value={draftFilters.maxAmount}
                         onChange={(e) => setDraftFilters(p => ({ ...p, maxAmount: e.target.value }))}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                        className="w-full rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                       />
                     </div>
                   </div>
@@ -1594,7 +1674,7 @@ export default function TransactionsPage() {
                 <div className="mt-6 flex justify-end gap-3 border-t border-white/5 pt-4">
                   <button
                     onClick={clearFilters}
-                    className="px-4 py-2 text-sm font-semibold text-gray-400 hover:text-white"
+                    className="px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
                   >
                     Reset Defaults
                   </button>
@@ -1626,11 +1706,11 @@ export default function TransactionsPage() {
             animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20 text-center"
           >
-            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/5 border border-white/10">
-              <Search className="h-8 w-8 text-gray-400" />
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted/30 border border-border">
+              <Search className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-bold text-white">No transactions found</h3>
-            <p className="mt-2 text-gray-400 max-w-sm">
+            <h3 className="text-xl font-bold text-foreground">No transactions found</h3>
+            <p className="mt-2 text-muted-foreground max-w-sm">
               Try adjusting your filters or import a new statement to get started.
             </p>
             <button onClick={clearFilters} className="mt-6 text-blue-400 font-bold hover:underline">Clear all filters</button>
@@ -1648,15 +1728,15 @@ export default function TransactionsPage() {
               <motion.div
                 key={group.key}
                 variants={itemVariants}
-                className="rounded-[2rem] border border-white/10 bg-[#0B1221] overflow-hidden shadow-lg"
+                className="rounded-[2rem] border border-border bg-card overflow-hidden shadow-lg"
               >
-                <div className="flex items-center justify-between bg-gradient-to-r from-blue-900/20 to-transparent px-8 py-5 border-b border-white/5">
+                <div className="flex items-center justify-between bg-muted/30 px-8 py-5 border-b border-border">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-blue-400/80 mb-0.5">{group.year}</p>
-                    <h3 className="text-2xl font-black text-white">{monthName(group.month)}</h3>
+                    <p className="text-xs font-bold uppercase tracking-wider text-primary/80 mb-0.5">{group.year}</p>
+                    <h3 className="text-2xl font-black text-foreground">{monthName(group.month)}</h3>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs uppercase font-bold text-gray-500 mb-0.5">{headerLabel}</p>
+                    <p className="text-xs uppercase font-bold text-muted-foreground mb-0.5">{headerLabel}</p>
                     <p className={`text-2xl font-mono font-bold ${headerColor}`}>
                       {tab === "all" && headerValue > 0 ? "+" : ""}
                       {tab === "all" && headerValue < 0 ? "-" : ""}
@@ -1672,9 +1752,10 @@ export default function TransactionsPage() {
                     return (
                       <motion.div
                         key={tx.id}
-                        whileHover={{ backgroundColor: "rgba(255,255,255,0.03)" }}
+                        data-tx-row-id={tx.id}
+                        whileHover={{ backgroundColor: "var(--accent)" }}
                         onClick={() => setSelected(tx)}
-                        className={`flex cursor-pointer items-center justify-between px-6 py-4 transition-colors group ${bulkMode && selectedTxIds.has(tx.id) ? "bg-blue-500/10" : ""}`}
+                        className={`flex cursor-pointer items-center justify-between px-6 py-4 transition-colors group ${bulkMode && selectedTxIds.has(tx.id) ? "bg-blue-500/10" : ""} ${spotlightTxId === tx.id ? "ring-1 ring-blue-400/50 bg-blue-500/10" : ""}`}
                       >
                         <div className="flex items-center gap-5 min-w-0">
                           {bulkMode && (
@@ -1693,12 +1774,12 @@ export default function TransactionsPage() {
                               <Check className="h-3.5 w-3.5" />
                             </button>
                           )}
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-xl border border-white/5 group-hover:border-white/10 group-hover:bg-white/10 transition-colors">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/30 text-xl border border-border/50 group-hover:border-border group-hover:bg-muted/50 transition-colors">
                             {categoryIcon(tx.category ?? "Misc")}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-3">
-                              <p className="truncate text-base font-bold text-white group-hover:text-blue-400 transition-colors">
+                              <p className="truncate text-base font-bold text-foreground group-hover:text-primary transition-colors">
                                 {tx.description || "Transaction"}
                               </p>
                               {status !== "completed" && (
@@ -1710,12 +1791,13 @@ export default function TransactionsPage() {
                               )}
                             </div>
                             <div className="mt-0.5 flex items-center gap-2">
-                              <p className="text-xs font-medium text-gray-500">
+                              <p className="text-xs font-medium text-muted-foreground">
                                 {new Date(tx.transaction_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", weekday: 'short' })}
                               </p>
-                              <span className="h-1 w-1 rounded-full bg-gray-700" />
+                              <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
                               {editingCategoryTxId === tx.id ? (
                                 <div
+                                  data-category-editor="true"
                                   className="flex items-center gap-1"
                                   onClick={(event) => event.stopPropagation()}
                                 >
@@ -1759,6 +1841,7 @@ export default function TransactionsPage() {
                                       event.stopPropagation();
                                       startCategoryEdit(tx);
                                     }}
+                                    data-category-edit-trigger="true"
                                     className="rounded-md border border-white/10 bg-white/5 p-1 text-gray-400 hover:border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-300"
                                     title="Edit category"
                                   >
@@ -1773,7 +1856,7 @@ export default function TransactionsPage() {
                           <p className={`font-mono text-lg font-bold ${isCredit ? "text-emerald-400" : "text-red-400"}`}>
                             {isCredit ? "+" : ""}₹{Math.abs(amount).toLocaleString("en-IN")}
                           </p>
-                          <p className="text-[10px] font-bold uppercase text-gray-600 mt-0.5">{tx.payment_method}</p>
+                          <p className="text-[10px] font-bold uppercase text-muted-foreground mt-0.5">{tx.payment_method}</p>
                         </div>
                       </motion.div>
                     );
@@ -1801,25 +1884,25 @@ export default function TransactionsPage() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#121b2e] shadow-2xl"
+              className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] border border-border bg-card shadow-2xl"
             >
               <div className="absolute top-0 right-0 p-6 z-10">
                 <button
                   onClick={() => setSelected(null)}
-                  className="rounded-full bg-black/20 p-2 text-white/50 hover:text-white hover:bg-black/40 transition-colors"
+                  className="rounded-full bg-muted/50 p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="flex flex-col items-center pt-10 pb-8 px-6 bg-gradient-to-b from-blue-500/10 to-transparent">
+              <div className="flex flex-col items-center pt-10 pb-8 px-6 bg-gradient-to-b from-primary/10 to-transparent">
                 <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-gradient-to-br from-blue-500 to-indigo-600 text-4xl shadow-lg shadow-blue-500/20">
                   {categoryIcon(selected.category ?? "Misc")}
                 </div>
-                <h3 className="text-center text-2xl font-black text-white px-4 leading-tight">
+                <h3 className="text-center text-2xl font-black text-foreground px-4 leading-tight">
                   {selected.description || "Transaction"}
                 </h3>
-                <p className="mt-2 text-sm font-medium text-blue-300/70 uppercase tracking-widest">
+                <p className="mt-2 text-sm font-medium text-primary/70 uppercase tracking-widest">
                   {selected.category || "Uncategorized"}
                 </p>
                 <h2 className={`mt-6 font-mono text-5xl font-black tracking-tighter ${Number(selected.amount) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
@@ -1835,10 +1918,10 @@ export default function TransactionsPage() {
                 </div>
               </div>
 
-              <div className="bg-[#0b1221] px-6 py-6 border-t border-white/5 space-y-4">
+              <div className="bg-muted/20 px-6 py-6 border-t border-border space-y-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 font-medium">Date & Time</span>
-                  <span className="text-white font-bold">
+                  <span className="text-muted-foreground font-medium">Date & Time</span>
+                  <span className="text-foreground font-bold">
                     {new Date(selected.transaction_date).toLocaleString("en-IN", {
                       weekday: "short",
                       day: "numeric",

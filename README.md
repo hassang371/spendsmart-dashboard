@@ -15,22 +15,10 @@ Create `dashboard/.env.local` with:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-# For manual CSV ingestion API
-INGEST_API_KEY=
-
-# For Vercel cron auth (Vercel sends Authorization: Bearer $CRON_SECRET)
-CRON_SECRET=
-
-# For scheduled ingestion source
-INGEST_CSV_URL=
-INGEST_DEFAULT_USER_ID=
 ```
 
 Notes:
 - Never commit real secret values.
-- `SUPABASE_SERVICE_ROLE_KEY` is server-only.
 - `NEXT_PUBLIC_*` values are safe for browser usage.
 
 ## Local Development
@@ -53,16 +41,15 @@ Open `http://localhost:3000`.
 
 Login uses `signInWithOAuth` and returns through `/auth/callback`.
 
-## Ingestion API
+## Import API
 
-### Manual ingestion (POST)
+### Bulk import (POST)
 
-`POST /api/ingest`
+`POST /api/import`
 
 Headers:
 
 ```http
-x-ingest-key: <INGEST_API_KEY>
 authorization: Bearer <SUPABASE_USER_ACCESS_TOKEN>
 content-type: application/json
 ```
@@ -71,22 +58,23 @@ Body:
 
 ```json
 {
-  "csv": "Date,Description,Amount,Category\n2026-02-01,Coffee,-5.5,Food"
+  "transactions": [
+    {
+      "transaction_date": "2026-02-01T10:20:00.000Z",
+      "amount": -5.5,
+      "currency": "INR",
+      "description": "Coffee",
+      "merchant_name": "Cafe",
+      "category": "Food",
+      "payment_method": "upi",
+      "status": "completed",
+      "raw_data": { "source": "manual" }
+    }
+  ]
 }
 ```
 
 The target user is derived from the bearer token, not passed in the body.
-
-### Scheduled ingestion (Vercel Cron GET)
-
-`GET /api/ingest`
-
-Requirements:
-- `CRON_SECRET` configured in Vercel
-- `INGEST_CSV_URL` configured
-- `INGEST_DEFAULT_USER_ID` configured
-
-`vercel.json` runs this route daily at midnight UTC.
 
 ## Version Control + Deployment Workflow
 
