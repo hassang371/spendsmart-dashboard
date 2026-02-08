@@ -4,14 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
-  Check,
-  ChevronDown,
-  Download,
-  Filter,
-  Loader2,
-  Pencil,
-  Search,
-  X,
+  Search, Filter, Download, Upload, Plus, Trash2,
+  ArrowUpRight, ArrowDownLeft, MoreHorizontal, X,
+  Calendar, Check, ChevronLeft, ChevronRight, ChevronsLeft,
+  ChevronsRight, Pencil, RefreshCw, XCircle, FileSpreadsheet,
+  ShoppingBag, Coffee, Home, Zap, Car, Plane,
+  Utensils, Smartphone, HeartPulse, GraduationCap,
+  Gamepad2, Gift, PiggyBank, Briefcase, Film,
+  Music, Shield, AlertCircle, HelpCircle,
+  Banknote, TrendingUp, TrendingDown,
+  Bus, Fuel, Hammer, Stethoscope, Landmark,
+  ChevronDown, Loader2,
 } from "lucide-react";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -22,12 +25,14 @@ type TransactionRow = {
   user_id: string;
   transaction_date: string;
   amount: number;
-  description: string | null;
-  merchant_name: string | null;
-  category: string | null;
-  payment_method: string | null;
-  status: string | null;
-  currency: string | null;
+  description: string;
+  category: string;
+  original_category?: string | null;
+  payment_method: string;
+  merchant_name: string;
+  status: string;
+  type: string;
+  created_at: string;
 };
 
 type InsertTransaction = {
@@ -38,6 +43,7 @@ type InsertTransaction = {
   description: string;
   merchant_name: string;
   category: string;
+  original_category?: string | null;
   payment_method: string;
   status: string;
   raw_data: Record<string, unknown>;
@@ -404,16 +410,45 @@ function guessCategory(description: string): string {
   return "Misc";
 }
 
-function categoryIcon(category: string): string {
-  const key = category.toLowerCase();
-  if (key.includes("food")) return "🍔";
-  if (key.includes("shop")) return "🛍️";
-  if (key.includes("grocery")) return "🛒";
-  if (key.includes("subscription")) return "🔁";
-  if (key.includes("utility")) return "📄";
-  if (key.includes("transport") || key.includes("fuel")) return "🚕";
-  if (key.includes("income")) return "💰";
-  return "📄";
+function categoryIcon(category: string) {
+  const cat = category.toLowerCase().trim();
+
+  // Income / Business
+  if (cat === "income" || cat === "salary") return <Banknote className="h-4 w-4 text-emerald-500" />;
+  if (cat.includes("business") || cat.includes("freelance")) return <Briefcase className="h-4 w-4 text-blue-500" />;
+  if (cat.includes("invest")) return <TrendingUp className="h-4 w-4 text-purple-500" />;
+
+  // Essentials
+  if (cat === "food" || cat.includes("grocer")) return <Utensils className="h-4 w-4 text-orange-500" />;
+  if (cat.includes("dining") || cat.includes("restaurant")) return <Coffee className="h-4 w-4 text-orange-600" />;
+  if (cat === "housing" || cat === "rent") return <Home className="h-4 w-4 text-indigo-500" />;
+  if (cat.includes("utility") || cat.includes("bill") || cat.includes("electric")) return <Zap className="h-4 w-4 text-yellow-500" />;
+
+  // Transportation
+  if (cat === "transport" || cat.includes("taxi") || cat.includes("uber")) return <Car className="h-4 w-4 text-blue-400" />;
+  if (cat.includes("fuel") || cat.includes("gas")) return <Fuel className="h-4 w-4 text-red-400" />;
+  if (cat.includes("flight") || cat.includes("travel")) return <Plane className="h-4 w-4 text-sky-500" />;
+  if (cat.includes("bus") || cat.includes("train")) return <Bus className="h-4 w-4 text-blue-300" />;
+
+  // Shopping & Entertainment
+  if (cat === "shopping" || cat.includes("cloth")) return <ShoppingBag className="h-4 w-4 text-pink-500" />;
+  if (cat.includes("entertainment") || cat.includes("movie")) return <Film className="h-4 w-4 text-purple-400" />;
+  if (cat.includes("game") || cat.includes("steam")) return <Gamepad2 className="h-4 w-4 text-violet-500" />;
+  if (cat.includes("music") || cat.includes("spotify")) return <Music className="h-4 w-4 text-green-500" />;
+  if (cat.includes("gift") || cat.includes("donation")) return <Gift className="h-4 w-4 text-rose-400" />;
+
+  // Health & Education
+  if (cat === "health" || cat.includes("medical") || cat.includes("doctor")) return <Stethoscope className="h-4 w-4 text-red-500" />;
+  if (cat.includes("fitness") || cat.includes("gym")) return <HeartPulse className="h-4 w-4 text-rose-500" />;
+  if (cat === "education" || cat.includes("course") || cat.includes("book")) return <GraduationCap className="h-4 w-4 text-blue-600" />;
+
+  // Finance & Misc
+  if (cat.includes("bank") || cat.includes("transfer")) return <Landmark className="h-4 w-4 text-slate-500" />;
+  if (cat.includes("insurance")) return <Shield className="h-4 w-4 text-teal-500" />;
+  if (cat.includes("service") || cat.includes("subscription")) return <Hammer className="h-4 w-4 text-gray-500" />;
+  if (cat.includes("repair")) return <Hammer className="h-4 w-4 text-amber-600" />;
+
+  return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
 }
 
 function inRelativeRange(date: Date, filters: FilterState): boolean {
@@ -628,7 +663,7 @@ export default function TransactionsPage() {
         supabase
           .from("transactions")
           .select(
-            "id,user_id,transaction_date,amount,description,merchant_name,category,payment_method,status,currency",
+            "id,user_id,transaction_date,amount,description,merchant_name,category,original_category,payment_method,status,currency,type,created_at",
           )
           .eq("user_id", user.id)
           .order("transaction_date", { ascending: false })
@@ -677,16 +712,18 @@ export default function TransactionsPage() {
       const rawCategory = toText(row.category);
 
       return {
-        id: toText(row.id),
-        user_id: toText(row.user_id),
-        transaction_date: toText(row.transaction_date),
-        amount: Number(row.amount ?? 0),
+        id: toText(row.id) ?? "",
+        user_id: toText(row.user_id) ?? "",
+        transaction_date: toText(row.transaction_date) ?? new Date().toISOString(),
+        amount: Number(row.amount) || 0,
         description: displayDescription,
-        merchant_name: extractReadableDescription(toText(row.merchant_name) || rawDescription),
-        category: rawCategory && rawCategory.toLowerCase() !== "misc" ? rawCategory : guessCategory(rawDescription),
-        payment_method: toText(row.payment_method) || "unknown",
+        merchant_name: toText(row.merchant_name) || "Unknown Merchant",
+        category: toText(row.category) || "Uncategorized",
+        original_category: toText(row.original_category),
+        payment_method: toText(row.payment_method) || "Cash",
         status: toText(row.status) || "completed",
-        currency: toText(row.currency) || "INR",
+        type: toText(row.type) || (Number(row.amount) >= 0 ? "credit" : "debit"),
+        created_at: toText(row.created_at) || new Date().toISOString(),
       };
     });
 
@@ -881,26 +918,124 @@ export default function TransactionsPage() {
     setEditingCategoryValue(tx.category || "Misc");
   };
 
+  const resetToOriginalCategory = async () => {
+    if (!userId || selectedTxIds.size === 0) return;
+    const ids = Array.from(selectedTxIds);
+    setBulkUpdatingCategory(true);
+
+    try {
+      // We need to fetch the original categories first to know what to revert to? 
+      // We have them in `transactions`.
+
+      const updatesPromise = ids.map(async (id) => {
+        const tx = transactions.find(t => t.id === id);
+        if (!tx || !tx.original_category) return; // Nothing to reset to
+
+        if (tx.category === tx.original_category) return; // Already same
+
+        // Revert Logic:
+        // If we are reverting "Income" back to "Expense", we should probably flip the sign back?
+        // This is complex. If user manually changed amount, we might not want to touch it.
+        // BUT, if our "Smart Logic" flipped it, we should probably flip it back.
+
+        const wasIncome = tx.category.toLowerCase() === "income";
+        const isRevertingToIncome = tx.original_category.toLowerCase() === "income";
+
+        let newAmount = tx.amount;
+
+        // Simple heuristic: If category changes type, flip sign.
+        // If currently Income (Pos) -> Revert to Non-Income => Make Negative.
+        if (wasIncome && !isRevertingToIncome && tx.amount > 0) {
+          newAmount = -Math.abs(tx.amount);
+        }
+        // If currently Non-Income (Neg) -> Revert to Income => Make Positive.
+        else if (!wasIncome && isRevertingToIncome && tx.amount < 0) {
+          newAmount = Math.abs(tx.amount);
+        }
+
+        return supabase
+          .from("transactions")
+          .update({ category: tx.original_category, amount: newAmount })
+          .eq("id", id)
+          .eq("user_id", userId);
+      });
+
+      await Promise.all(updatesPromise);
+
+      // Optimistic Update
+      setTransactions(prev => prev.map(tx => {
+        if (!selectedTxIds.has(tx.id) || !tx.original_category) return tx;
+
+        const wasIncome = tx.category.toLowerCase() === "income";
+        const isRevertingToIncome = tx.original_category.toLowerCase() === "income";
+        let newAmount = tx.amount;
+
+        if (wasIncome && !isRevertingToIncome && tx.amount > 0) newAmount = -Math.abs(tx.amount);
+        else if (!wasIncome && isRevertingToIncome && tx.amount < 0) newAmount = Math.abs(tx.amount);
+
+        return { ...tx, category: tx.original_category!, amount: newAmount };
+      }));
+
+      setMessage(`Reset ${ids.length} transactions to original category.`);
+      setBulkMode(false);
+      clearSelection();
+
+    } catch (err) {
+      setError("Failed to reset categories.");
+    } finally {
+      setBulkUpdatingCategory(false);
+    }
+  };
+
   const saveCategoryEdit = async () => {
     if (!editingCategoryTxId || !userId) return;
     setUpdatingCategory(true);
     try {
+      const tx = transactions.find(t => t.id === editingCategoryTxId);
+      if (!tx) throw new Error("Transaction not found");
+
+      const isIncome = editingCategoryValue.toLowerCase() === "income";
+      const currentAmount = tx.amount;
+
+      // Auto-flip logic
+      let newAmount = currentAmount;
+      if (isIncome && currentAmount < 0) {
+        newAmount = Math.abs(currentAmount); // Convert to positive
+      } else if (!isIncome && currentAmount > 0 && tx.category?.toLowerCase() === "income") {
+        newAmount = -Math.abs(currentAmount); // Convert to negative if moving AWAY from income
+      }
+
+      const updates: { category: string; amount?: number; original_category?: string } = { category: editingCategoryValue };
+
+      // If original_category is missing (e.g. older tx), backfill it with the *current* category before changing it.
+      // Actually, if it's null, it implies the *current* value IS the original (or we missed backfilling).
+      // The migration backfilled it. So we rely on it being there. 
+      // But if it's somehow null, we should probably set it to the OLD category value.
+      if (!tx.original_category) {
+        updates.original_category = tx.category;
+      }
+
+      if (newAmount !== currentAmount) {
+        updates.amount = newAmount;
+      }
+
       const { error: updateError } = await supabase
         .from("transactions")
-        .update({ category: editingCategoryValue })
+        .update(updates)
         .eq("id", editingCategoryTxId)
         .eq("user_id", userId);
 
       if (updateError) throw updateError;
 
       setTransactions((prev) =>
-        prev.map((tx) =>
-          tx.id === editingCategoryTxId
+        prev.map((t) =>
+          t.id === editingCategoryTxId
             ? {
-              ...tx,
+              ...t,
               category: editingCategoryValue,
+              amount: newAmount
             }
-            : tx,
+            : t,
         ),
       );
 
@@ -935,25 +1070,72 @@ export default function TransactionsPage() {
     const ids = Array.from(selectedTxIds);
     setBulkUpdatingCategory(true);
     try {
-      const { error: updateError } = await supabase
-        .from("transactions")
-        .update({ category: bulkCategoryValue })
-        .eq("user_id", userId)
-        .in("id", ids);
+      const isIncome = bulkCategoryValue.toLowerCase() === "income";
 
-      if (updateError) throw updateError;
+      // We need to update each transaction individually if we want to flip signs intelligently,
+      // OR we can do a bulk update if we assume ALL selected ones need flipping.
+      // But purely SQL-side flipping is hard without a stored procedure.
+      // For simplicity and safety, we will iterate updates or use a precise query if possible.
+      // To keep it performant for the user, let's do Client-Side calculation and then bulk update is tricky.
+      // Actually, standardizing: If Category -> Income, force ABS(amount). If Category != Income, force -ABS(amount).
+      // But wait, "Refunds" are positive "Expenses". We shouldn't force negative for everything else.
+      // STRICT RULE from User: "Income transactions to reflect them as credits, not debits."
+      // So: Income = Positive. 
+      // Non-Income? Usually Negative. But could be a refund. 
+      // Let's only apply the logic:
+      // 1. If becoming Income -> Make Positive.
+      // 2. If WAS Income and becoming Non-Income -> Make Negative.
+
+      // Since we don't know "WAS Income" for all selected without checking, 
+      // we will fetch the selected rows first (we have them in state `transactions`).
+
+      const updatesPromise = ids.map(async (id) => {
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return;
+
+        let newAmount = tx.amount;
+        if (isIncome && tx.amount < 0) {
+          newAmount = Math.abs(tx.amount);
+        } else if (!isIncome && tx.amount > 0 && tx.category?.toLowerCase() === "income") {
+          newAmount = -Math.abs(tx.amount);
+        }
+
+        const updates: { category: string; amount?: number; original_category?: string } = { category: bulkCategoryValue };
+
+        if (!tx.original_category) {
+          updates.original_category = tx.category;
+        }
+        if (newAmount !== tx.amount) {
+          updates.amount = newAmount;
+        }
+
+        return supabase.from("transactions").update(updates).eq("id", id).eq("user_id", userId);
+      });
+
+      await Promise.all(updatesPromise);
 
       setTransactions((prev) =>
-        prev.map((tx) =>
-          selectedTxIds.has(tx.id)
-            ? {
-              ...tx,
-              category: bulkCategoryValue,
-            }
-            : tx,
-        ),
+        prev.map((tx) => {
+          if (!selectedTxIds.has(tx.id)) return tx;
+
+          let newAmount = tx.amount;
+          if (isIncome && tx.amount < 0) {
+            newAmount = Math.abs(tx.amount);
+          } else if (!isIncome && tx.amount > 0 && tx.category?.toLowerCase() === "income") {
+            newAmount = -Math.abs(tx.amount);
+          }
+
+          return {
+            ...tx,
+            category: bulkCategoryValue,
+            amount: newAmount
+          };
+        }),
       );
+
       setMessage(`Updated category for ${ids.length} transactions.`);
+      // Close bulk mode after applying
+      setBulkMode(false);
       clearSelection();
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Unable to update selected transactions.");
@@ -1395,6 +1577,13 @@ export default function TransactionsPage() {
     visible: { opacity: 1, y: 0 }
   };
 
+  const hasResettableTransactions = useMemo(() => {
+    return Array.from(selectedTxIds).some(id => {
+      const tx = transactions.find(t => t.id === id);
+      return tx && tx.original_category && tx.category !== tx.original_category;
+    });
+  }, [selectedTxIds, transactions]);
+
   if (loading) {
     return (
       <div className="flex min-h-[55vh] items-center justify-center">
@@ -1501,7 +1690,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* Tab Selection */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-nowrap items-center gap-3 overflow-x-auto no-scrollbar pb-1">
           <div className="flex p-1 gap-1 bg-muted/30 rounded-2xl border border-border w-fit">
             {(["all", "debit", "credit"] as const).map((name) => (
               <button
@@ -1543,7 +1732,7 @@ export default function TransactionsPage() {
                 <button
                   type="button"
                   onClick={selectVisibleTransactions}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-200 hover:bg-white/10"
+                  className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
                 >
                   Select Visible ({visibleTransactionIds.length})
                 </button>
@@ -1551,15 +1740,15 @@ export default function TransactionsPage() {
                   type="button"
                   onClick={clearSelection}
                   disabled={selectedCount === 0}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Clear
                 </button>
-                <span className="text-xs font-semibold text-blue-300">{selectedCount} selected</span>
+                <span className="text-xs font-semibold text-blue-500">{selectedCount} selected</span>
                 <select
                   value={bulkCategoryValue}
                   onChange={(event) => setBulkCategoryValue(event.target.value)}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white outline-none"
+                  className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold text-foreground outline-none"
                   disabled={selectedCount === 0 || bulkUpdatingCategory}
                 >
                   {categoryOptions.map((option) => (
@@ -1578,10 +1767,19 @@ export default function TransactionsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={toggleBulkMode}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10"
+                  onClick={resetToOriginalCategory}
+                  disabled={selectedCount === 0 || bulkUpdatingCategory || !hasResettableTransactions}
+                  className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+                  title="Reset to original category"
                 >
-                  Done
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleBulkMode}
+                  className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+                >
+                  Cancel
                 </button>
               </>
             )}
@@ -1613,7 +1811,7 @@ export default function TransactionsPage() {
                         value={draftFilters.month}
                         onChange={(e) => setDraftFilters(p => ({ ...p, month: e.target.value }))}
                         disabled={draftFilters.year === "all"}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none disabled:opacity-50"
+                        className="w-full rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground outline-none disabled:opacity-50"
                       >
                         <option value="all">All Months</option>
                         {Array.from({ length: 12 }).map((_, i) => <option key={i} value={String(i)}>{monthName(i)}</option>)}
@@ -1720,9 +1918,9 @@ export default function TransactionsPage() {
             const headerLabel = tab === "credit" ? "Total Credited" : tab === "debit" ? "Total Spent" : "Net Total";
             const headerValue = tab === "credit" ? group.credited : tab === "debit" ? group.spent : group.net;
             const headerColor =
-              tab === "credit" ? "text-emerald-400" :
-                tab === "debit" ? "text-red-400" :
-                  headerValue >= 0 ? "text-emerald-400" : "text-red-400";
+              tab === "credit" ? "text-emerald-600 dark:text-emerald-400" :
+                tab === "debit" ? "text-red-600 dark:text-red-400" :
+                  headerValue >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
 
             return (
               <motion.div
@@ -1744,7 +1942,7 @@ export default function TransactionsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="divide-y divide-white/5">
+                <div className="divide-y divide-border">
                   {group.rows.map((tx) => {
                     const amount = Number(tx.amount || 0);
                     const isCredit = amount >= 0;
@@ -1804,7 +2002,7 @@ export default function TransactionsPage() {
                                   <select
                                     value={editingCategoryValue}
                                     onChange={(event) => setEditingCategoryValue(event.target.value)}
-                                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white outline-none"
+                                    className="rounded-lg border border-border bg-secondary/80 px-2 py-1 text-[11px] font-medium text-foreground outline-none"
                                     disabled={updatingCategory}
                                   >
                                     {categoryOptions.map((option) => (
@@ -1817,7 +2015,7 @@ export default function TransactionsPage() {
                                     type="button"
                                     onClick={saveCategoryEdit}
                                     disabled={updatingCategory}
-                                    className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-60"
+                                    className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1 text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-60"
                                     title="Save category"
                                   >
                                     <Check className="h-3.5 w-3.5" />
@@ -1826,7 +2024,7 @@ export default function TransactionsPage() {
                                     type="button"
                                     onClick={() => setEditingCategoryTxId(null)}
                                     disabled={updatingCategory}
-                                    className="rounded-md border border-white/15 bg-white/5 p-1 text-gray-300 hover:bg-white/10 disabled:opacity-60"
+                                    className="rounded-md border border-border bg-secondary/50 p-1 text-muted-foreground hover:bg-secondary disabled:opacity-60"
                                     title="Cancel"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -1842,7 +2040,7 @@ export default function TransactionsPage() {
                                       startCategoryEdit(tx);
                                     }}
                                     data-category-edit-trigger="true"
-                                    className="rounded-md border border-white/10 bg-white/5 p-1 text-gray-400 hover:border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-300"
+                                    className="rounded-md border border-transparent hover:border-border hover:bg-secondary/50 p-1 text-muted-foreground hover:text-foreground"
                                     title="Edit category"
                                   >
                                     <Pencil className="h-3 w-3" />
@@ -1853,7 +2051,7 @@ export default function TransactionsPage() {
                           </div>
                         </div>
                         <div className="text-right pl-4">
-                          <p className={`font-mono text-lg font-bold ${isCredit ? "text-emerald-400" : "text-red-400"}`}>
+                          <p className={`font-mono text-lg font-bold ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                             {isCredit ? "+" : ""}₹{Math.abs(amount).toLocaleString("en-IN")}
                           </p>
                           <p className="text-[10px] font-bold uppercase text-muted-foreground mt-0.5">{tx.payment_method}</p>
@@ -1905,14 +2103,14 @@ export default function TransactionsPage() {
                 <p className="mt-2 text-sm font-medium text-primary/70 uppercase tracking-widest">
                   {selected.category || "Uncategorized"}
                 </p>
-                <h2 className={`mt-6 font-mono text-5xl font-black tracking-tighter ${Number(selected.amount) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                <h2 className={`mt-6 font-mono text-5xl font-black tracking-tighter ${Number(selected.amount) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                   {Number(selected.amount) >= 0 ? "+" : ""}₹{Math.abs(Number(selected.amount)).toLocaleString("en-IN")}
                 </h2>
                 <div className="mt-4 flex gap-2">
-                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-gray-400 uppercase">
+                  <span className="px-3 py-1 rounded-full bg-secondary/50 border border-border text-xs font-bold text-muted-foreground uppercase">
                     {normalizeStatus(selected.status ?? "completed")}
                   </span>
-                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-gray-400 uppercase">
+                  <span className="px-3 py-1 rounded-full bg-secondary/50 border border-border text-xs font-bold text-muted-foreground uppercase">
                     {selected.payment_method || "Unknown Method"}
                   </span>
                 </div>
@@ -1932,17 +2130,17 @@ export default function TransactionsPage() {
                     })}
                   </span>
                 </div>
-                <div className="h-px bg-white/5 w-full" />
+                <div className="h-px bg-border w-full" />
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 font-medium">Merchant / Ref</span>
-                  <span className="text-white font-bold truncate max-w-[200px]">
+                  <span className="text-muted-foreground font-medium">Merchant / Ref</span>
+                  <span className="text-foreground font-bold truncate max-w-[200px]">
                     {selected.merchant_name || selected.description || "-"}
                   </span>
                 </div>
-                <div className="h-px bg-white/5 w-full" />
+                <div className="h-px bg-border w-full" />
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 font-medium">Transaction ID</span>
-                  <span className="text-gray-400 font-mono text-xs truncate max-w-[180px]" title={selected.id}>{selected.id}</span>
+                  <span className="text-muted-foreground font-medium">Transaction ID</span>
+                  <span className="text-muted-foreground/70 font-mono text-xs truncate max-w-[180px]" title={selected.id}>{selected.id}</span>
                 </div>
 
               </div>

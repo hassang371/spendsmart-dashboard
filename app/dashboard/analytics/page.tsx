@@ -11,6 +11,7 @@ import { MonthlyComparison } from "./components/MonthlyComparison";
 import { SpendingHeatmap } from "./components/SpendingHeatmap";
 import { CategoryDistribution } from "./components/CategoryDistribution";
 import { MerchantLeaderboard } from "./components/MerchantLeaderboard";
+import { AnalyticsEmptyState } from "./components/AnalyticsEmptyState";
 
 // Types
 type Transaction = {
@@ -116,6 +117,11 @@ export default function AnalyticsPage() {
         </div>
       </div>
     );
+  }
+
+  // Empty State Check
+  if (transactions.length === 0) {
+    return <AnalyticsEmptyState />;
   }
 
   // Filter for valid expenses only for deeper analysis if needed, 
