@@ -1,10 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Apple, Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import Link from "next/link";
+// Importing ScaleLogo from the components folder for consistency with new design
+// If it's not exported properly, we might need to inline or adjust.
+// import ScaleLogo from "../../components/landing/ScaleLogo"; 
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -63,154 +66,147 @@ export default function LoginPage() {
         }
     };
 
-    const handleResetPassword = async () => {
-        if (!email) {
-            setError("Please enter your email to reset password.");
-            return;
-        }
-        setLoading(true);
-        setError(null);
-
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/auth/update-password`,
-        });
-
-        if (error) {
-            setError(error.message);
-        } else {
-            setError("If an account exists, a password reset link has been sent.");
-        }
-        setLoading(false);
+    // New "More options" handler -> redirect to signup
+    const handleMoreOptions = () => {
+        router.push("/signup");
     };
 
     return (
-        <div className="min-h-screen bg-background flex flex-col md:flex-row">
-            {/* Visual Side */}
-            <div className="hidden md:flex w-1/2 bg-secondary items-center justify-center p-12 relative overflow-hidden">
-                <div className="absolute inset-0 bg-slush-gradient opacity-10"></div>
-                <div className="absolute top-[-20%] left-[-20%] w-[140%] h-[140%] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 animate-pulse"></div>
+        <AnimatePresence>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex flex-col bg-brand-slushBlue text-white overflow-hidden font-display"
+            >
+                {/* Top Bar */}
+                <div className="absolute top-0 left-0 w-full p-8 flex justify-center z-20">
+                    <h1 className="text-4xl font-bold tracking-tighter uppercase">SCALE</h1>
+                </div>
 
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.8 }}
-                    className="relative z-10 max-w-md"
+                <Link
+                    href="/"
+                    className="absolute top-8 left-8 flex items-center gap-2 text-white/50 hover:text-white transition-colors z-30 font-sans font-bold uppercase tracking-widest text-sm"
                 >
-                    <h2 className="text-5xl font-black mb-6 leading-tight">
-                        See where your money goes. <br />
-                        <span className="text-primary">Finally.</span>
-                    </h2>
-                    <p className="text-xl text-gray-400">Join 10,000+ users tracking their net worth with B.L.A.S.T. precision.</p>
-
-                    {/* Abstract Phone/Card Visual */}
-                    <motion.div
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                        className="mt-12 bg-background border border-white/10 rounded-3xl p-6 rotate-3 shadow-2xl hover:rotate-0 transition-transform duration-500"
-                    >
-                        <div className="flex justify-between items-center mb-8">
-                            <div className="w-12 h-12 bg-primary/20 rounded-full"></div>
-                            <div className="w-20 h-4 bg-white/10 rounded-full"></div>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="h-16 bg-white/5 rounded-xl w-full"></div>
-                            <div className="h-16 bg-white/5 rounded-xl w-full"></div>
-                            <div className="h-16 bg-white/5 rounded-xl w-full"></div>
-                        </div>
-                    </motion.div>
-                </motion.div>
-            </div>
-
-            {/* Form Side */}
-            <div className="flex-1 flex flex-col justify-center items-center p-8 bg-background relative">
-                <Link href="/" className="absolute top-8 left-8 flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
-                    <ArrowLeft className="w-4 h-4" /> Back
+                    <ArrowLeft className="w-5 h-5" /> Back
                 </Link>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="w-full max-w-sm"
-                >
-                    <div className="mb-10 text-center">
-                        <motion.div
-                            whileHover={{ rotate: 10 }}
-                            className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center rotate-3 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] mx-auto mb-4 cursor-pointer"
-                        >
-                            <span className="text-white font-mono font-bold text-xl">S</span>
-                        </motion.div>
-                        <h1 className="text-3xl font-bold">Welcome back</h1>
-                    </div>
+                {/* Main Content */}
+                <div className="relative flex-1 flex flex-col items-center justify-center w-full max-w-[1600px] mx-auto">
 
-                    {error && (
-                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-500 text-sm">
-                            {error}
+                    {/* Floating Elements (Background) */}
+                    <motion.div
+                        animate={{ y: [-10, 10, -10], rotate: [0, 5, 0] }}
+                        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute top-[20%] left-[10%] z-10 w-24 md:w-40 pointer-events-none"
+                    >
+                        {/* Rocket */}
+                        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full drop-shadow-2xl">
+                            <path d="M50 5L65 30H35L50 5Z" fill="#FF7D45" stroke="black" strokeWidth="3" />
+                            <rect x="35" y="30" width="30" height="40" fill="white" stroke="black" strokeWidth="3" />
+                            <circle cx="50" cy="50" r="8" fill="#4892FF" stroke="black" strokeWidth="3" />
+                            <path d="M35 60L20 80H40L35 60Z" fill="#FF7D45" stroke="black" strokeWidth="3" />
+                            <path d="M65 60L80 80H60L65 60Z" fill="#FF7D45" stroke="black" strokeWidth="3" />
+                        </svg>
+                    </motion.div>
+
+                    <motion.div
+                        animate={{ y: [10, -10, 10], rotate: [0, -10, 0] }}
+                        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute top-[15%] right-[5%] z-10 w-32 md:w-48 pointer-events-none"
+                    >
+                        {/* Coin */}
+                        <div className="w-full aspect-square rounded-full bg-brand-yellow border-4 border-black flex items-center justify-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                            <div className="text-black text-6xl font-bold">:)</div>
                         </div>
-                    )}
+                    </motion.div>
 
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Email</label>
+                    <motion.div
+                        animate={{ y: [0, 20, 0] }}
+                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute bottom-[20%] left-[-2%] z-10 w-32 md:w-56 pointer-events-none"
+                    >
+                        {/* Wallet */}
+                        <div className="w-full aspect-[4/3] bg-brand-violet border-4 border-black rounded-3xl relative shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transform rotate-12">
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-12 bg-black/20 rounded-md border-2 border-black"></div>
+                        </div>
+                    </motion.div>
+
+                    {/* Central Form / Text */}
+                    <div className="relative z-20 text-center w-full max-w-md px-4">
+                        <h1 className="text-[10vw] md:text-[5vw] leading-[0.85] font-bold uppercase tracking-tighter text-white drop-shadow-lg mb-8">
+                            Login
+                        </h1>
+
+                        {error && (
+                            <div className="mb-6 p-4 bg-brand-coral/20 border border-brand-coral rounded-xl text-brand-coral bg-black/40 backdrop-blur-md text-sm font-bold font-sans">
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleLogin} className="flex flex-col gap-4 font-sans text-left">
                             <input
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 type="email"
-                                placeholder="name@example.com"
-                                className="w-full px-4 py-3 bg-secondary border border-white/10 rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-white placeholder-gray-600"
+                                placeholder="Email"
+                                className="w-full px-6 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-full focus:outline-none focus:border-brand-blue focus:bg-white/20 transition-all text-white placeholder-white/50"
                             />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Password</label>
                             <input
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 type="password"
-                                placeholder="••••••••"
-                                className="w-full px-4 py-3 bg-secondary border border-white/10 rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-white placeholder-gray-600"
+                                placeholder="Password"
+                                className="w-full px-6 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-full focus:outline-none focus:border-brand-blue focus:bg-white/20 transition-all text-white placeholder-white/50"
                             />
-                        </div>
+                            <button
+                                disabled={loading}
+                                type="submit"
+                                className="w-full py-4 bg-brand-green text-black font-bold uppercase tracking-widest rounded-full hover:scale-105 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Continue"}
+                            </button>
+                        </form>
+                    </div>
 
-                        <div className="flex items-center justify-between text-sm">
-                            <div className="text-gray-400">Remember me</div>
-                            <button type="button" onClick={handleResetPassword} className="font-semibold text-blue-400 hover:text-blue-300 transition-colors">Forgot password?</button>
+                    {/* Bottom Actions */}
+                    <div className="absolute bottom-24 left-0 w-full flex flex-col items-center gap-4 z-30 px-4 mt-8">
+                        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+                            <button
+                                onClick={handleGoogleLogin}
+                                disabled={googleLoading}
+                                className="flex-1 flex items-center justify-center gap-2 bg-[#4285F4] hover:bg-[#3367D6] text-white font-sans font-bold py-4 px-6 rounded-full transition-all hover:scale-105 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none disabled:opacity-70"
+                            >
+                                {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                                    <>
+                                        <span className="font-bold text-lg">G</span>
+                                        <span>Google</span>
+                                    </>
+                                )}
+                            </button>
+                            <button className="flex-1 flex items-center justify-center gap-2 bg-[#333333] hover:bg-black text-white font-sans font-bold py-4 px-6 rounded-full transition-all hover:scale-105 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none">
+                                <Apple className="w-5 h-5 fill-current" />
+                                <span>Apple</span>
+                            </button>
                         </div>
 
                         <button
-                            disabled={loading}
-                            type="submit"
-                            className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
+                            onClick={handleMoreOptions}
+                            className="w-full max-w-md bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/30 text-white font-sans font-medium py-4 px-6 rounded-full transition-all uppercase tracking-widest text-xs"
                         >
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Continue"}
+                            More options
                         </button>
+                    </div>
 
-                        <div className="relative my-8">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                            <div className="relative flex justify-center text-sm"><span className="px-2 bg-background text-gray-500">or</span></div>
-                        </div>
+                    {/* Footer Legal */}
+                    <div className="absolute bottom-8 left-0 w-full text-center text-white/40 text-xs font-sans pointer-events-none">
+                        By continuing, you agree to our <a href="#" className="underline hover:text-white pointer-events-auto">Terms of Service</a> and <a href="#" className="underline hover:text-white pointer-events-auto">Privacy Policy</a>
+                    </div>
 
-                        <button
-                            type="button"
-                            onClick={handleGoogleLogin}
-                            disabled={googleLoading}
-                            className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white hover:bg-white/10 transition-all"
-                        >
-                            {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-                                <>
-                                    <svg className="h-5 w-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
-                                    Google
-                                </>
-                            )}
-                        </button>
-                    </form>
-
-                    <p className="mt-8 text-center text-sm text-gray-500">
-                        Don&apos;t have an account? <Link href="/signup" className="text-primary hover:underline">Sign up</Link>
-                    </p>
-                </motion.div>
-            </div>
-        </div>
+                </div>
+            </motion.div>
+        </AnimatePresence>
     );
 }

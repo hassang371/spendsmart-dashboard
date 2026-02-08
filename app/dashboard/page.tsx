@@ -404,7 +404,7 @@ export default function OverviewPage() {
               <Flame size={64} className="text-primary" />
             </motion.div>
 
-            <h2 className="text-3xl font-black text-foreground mb-4">Welcome to SpendSmart!</h2>
+            <h2 className="text-3xl font-black text-foreground mb-4">Welcome to SCALE!</h2>
             <p className="text-muted-foreground text-lg mb-8">
               Your financial dashboard is currently empty. Add your first transaction to unlock powerful insights and visualizations.
             </p>

@@ -104,7 +104,7 @@ export default function SignupPage() {
                             <span className="text-white font-mono font-bold text-xl">S</span>
                         </div>
                         <h1 className="text-3xl font-bold">Create an account</h1>
-                        <p className="text-gray-500 mt-2">Join SpendSmart today.</p>
+                        <p className="text-gray-500 mt-2">Join SCALE today.</p>
                     </div>
 
                     {error && (
