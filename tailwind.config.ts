@@ -54,7 +54,8 @@ const config: Config = {
                     dark: '#050505', /* Deep Void Black */
                     slushBlue: '#001E40',
                     light: '#E6F0FF',
-                    white: '#FFFFFF'
+                    white: '#FFFFFF',
+                    bg: '#E6F0FF' /* Same as light */
                 }
             },
             fontFamily: {

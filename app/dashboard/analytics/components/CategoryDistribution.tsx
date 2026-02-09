@@ -78,8 +78,8 @@ export function CategoryDistribution({ transactions }: { transactions: Transacti
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
                             ))}
                         </Pie>
-                        <Tooltip
-                            formatter={(value: any) => `₹${(Number(value) || 0).toLocaleString()}`}
+                            <Tooltip
+                                formatter={(value: number | undefined) => `₹${(Number(value) || 0).toLocaleString()}`}
                             contentStyle={{
                                 backgroundColor: "hsl(var(--card))",
                                 borderColor: "hsl(var(--border))",

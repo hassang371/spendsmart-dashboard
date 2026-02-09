@@ -104,8 +104,8 @@ const monthLookup: Record<string, number> = {
 };
 
 const FETCH_PAGE_SIZE = 1000;
-const MAX_FETCH_PAGES = 500;
-const MAX_FETCH_ROWS = 100000;
+const MAX_FETCH_PAGES = 10;
+const MAX_FETCH_ROWS = 10000;
 const FETCH_REQUEST_TIMEOUT_MS = 12000;
 const MAX_FETCH_DURATION_MS = 45000;
 const INSERT_BATCH_SIZE = 2000;
@@ -375,14 +375,31 @@ async function parseFileRows(file: File): Promise<{ rows: Record<string, unknown
 
   if (fileKind === "json") {
     const text = await file.text();
-    const json = JSON.parse(text);
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error("Invalid JSON file. Please check the file format.");
+    }
+
+    let rawRows: unknown[] = [];
     if (Array.isArray(json)) {
-      return { rows: json as Record<string, unknown>[], fileKind };
+      rawRows = json;
+    } else if (json && typeof json === "object" && Array.isArray((json as { transactions?: unknown[] }).transactions)) {
+      rawRows = (json as { transactions: unknown[] }).transactions;
     }
-    if (json && Array.isArray((json as { transactions?: unknown[] }).transactions)) {
-      return { rows: (json as { transactions: Record<string, unknown>[] }).transactions, fileKind };
+
+    // Validate that each row is a plain object
+    const validRows = rawRows.filter(
+      (row): row is Record<string, unknown> =>
+        row !== null && typeof row === "object" && !Array.isArray(row)
+    );
+
+    if (rawRows.length > 0 && validRows.length === 0) {
+      throw new Error("JSON file contains no valid transaction objects.");
     }
-    return { rows: [], fileKind };
+
+    return { rows: validRows, fileKind };
   }
 
   if (fileKind === "text" || fileKind === "pdf") {

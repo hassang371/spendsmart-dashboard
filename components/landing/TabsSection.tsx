@@ -136,9 +136,9 @@ const TabsSection: React.FC = () => {
       <div className="container mx-auto px-4">
         <AnimatedSection>
           <div className="mb-16 flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
-            <h2 className="font-display text-6xl font-bold uppercase tracking-tighter md:text-8xl leading-none">
-                SCALE IS ALWAYS <br /> 
-                <span className="text-outline text-brand-blue">WITHIN REACH</span>
+            <h2 className="font-display text-6xl font-bold uppercase tracking-tighter md:text-8xl leading-none text-black">
+                SCALE IS ALWAYS <br />
+                <span className="text-outline text-brand-blue" style={{ WebkitTextStroke: "2px black" }}>WITHIN REACH</span>
             </h2>
             
             <div className="flex flex-wrap gap-2 rounded-full border-2 border-black bg-brand-light p-2">
@@ -177,8 +177,8 @@ const TabsSection: React.FC = () => {
                 </div>
               </div>
               <div className="flex-1 space-y-8 order-1 md:order-2">
-                <h3 className="font-display text-8xl font-bold uppercase italic tracking-tight md:text-[8rem] leading-[0.8]">{activeTab.title}</h3>
-                <p className="font-sans text-2xl font-bold leading-relaxed max-w-lg">{activeTab.description}</p>
+                <h3 className="font-display text-8xl font-bold uppercase italic tracking-tight md:text-[8rem] leading-[0.8] text-black">{activeTab.title}</h3>
+                <p className="font-sans text-2xl font-bold leading-relaxed max-w-lg text-black">{activeTab.description}</p>
                 <Button variant="dark" icon className="text-xl px-8 py-4">{activeTab.buttonText}</Button>
               </div>
             </motion.div>

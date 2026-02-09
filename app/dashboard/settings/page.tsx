@@ -105,17 +105,25 @@ export default function SettingsPage() {
 
       const transactions = txsd as Transaction[];
 
-      // Convert to CSV
+      // Convert to CSV with proper escaping
+      const escapeCSV = (value: string): string => {
+        const str = value ?? "";
+        if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
       const headers = ["Date", "Description", "Amount", "Category", "Merchant", "Type"];
       const csvContent = [
         headers.join(","),
         ...transactions.map(tx => [
-          tx.transaction_date,
-          `"${(tx.description || "").replace(/"/g, '""')}"`,
+          escapeCSV(tx.transaction_date || ""),
+          escapeCSV(tx.description || ""),
           tx.amount,
-          tx.category,
-          `"${(tx.merchant_name || "").replace(/"/g, '""')}"`,
-          tx.type || "expense"
+          escapeCSV(tx.category || ""),
+          escapeCSV(tx.merchant_name || ""),
+          escapeCSV(tx.type || "expense")
         ].join(","))
       ].join("\n");
 
@@ -129,9 +137,8 @@ export default function SettingsPage() {
       document.body.removeChild(link);
 
       setToast({ type: "success", message: "Data exported successfully." });
-    } catch (err) {
+    } catch {
       setToast({ type: "error", message: "Failed to export data." });
-      console.error(err);
     } finally {
       setExporting(false);
     }
@@ -158,6 +165,7 @@ export default function SettingsPage() {
 
     if (authError) {
       setVerifying(false);
+      setPassword("");
       setToast({ type: "error", message: "Incorrect password." });
       return;
     }
@@ -383,9 +391,14 @@ export default function SettingsPage() {
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            data-testid="modal-backdrop"
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => (deletingData || verifying ? null : setShowDeleteConfirm(false))}
+          />
           <form
             onSubmit={(e) => { e.preventDefault(); handleDeleteAllData(); }}
-            className="relative w-full max-w-sm rounded-2xl border border-destructive/30 bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            className="relative z-50 w-full max-w-sm rounded-2xl border border-destructive/30 bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           >
             <button
               type="button"

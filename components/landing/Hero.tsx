@@ -1,7 +1,16 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Button from './Button';
-import AppPreview from './AppPreview';
+import { ChevronDown } from 'lucide-react';
+import Image from 'next/image';
+import dynamic from 'next/dynamic';
+
+// Dynamic import for Lottie to avoid SSR issues
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+
+import rocketAnimation from '@/public/slush/rocket.json';
+import coinAnimation from '@/public/slush/coin.json';
+import walletAnimation from '@/public/slush/wallet.json';
 
 const Hero: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -10,101 +19,108 @@ const Hero: React.FC = () => {
     offset: ["start start", "end start"]
   });
 
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+  const textY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
+  const logoY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
 
   return (
-    <>
-      <section ref={containerRef} className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden pt-20">
-        
-        {/* Full Screen Animated Background */}
-        <div className="absolute inset-0 z-0">
-            {/* Mesh Gradient Animation */}
-            <div className="absolute inset-0 bg-brand-light opacity-50"></div>
-            <div className="absolute top-[-50%] left-[-50%] h-[200%] w-[200%] animate-spin-slow opacity-60">
-                <div className="absolute top-[20%] left-[20%] h-[40vw] w-[40vw] rounded-full bg-brand-blue mix-blend-multiply blur-[128px] animate-blob"></div>
-                <div className="absolute top-[20%] right-[20%] h-[40vw] w-[40vw] rounded-full bg-brand-violet mix-blend-multiply blur-[128px] animate-blob animation-delay-2000"></div>
-                <div className="absolute bottom-[20%] left-[30%] h-[40vw] w-[40vw] rounded-full bg-brand-green mix-blend-multiply blur-[128px] animate-blob animation-delay-4000"></div>
-                <div className="absolute bottom-[20%] right-[30%] h-[40vw] w-[40vw] rounded-full bg-brand-yellow mix-blend-multiply blur-[128px] animate-blob animation-delay-6000"></div>
-            </div>
-            {/* Grain Overlay */}
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay"></div>
-        </div>
+    <section ref={containerRef} className="relative min-h-[100vh] w-full overflow-hidden bg-brand-bg pt-20">
 
-        {/* Content - Lower Z-Index than floaters */}
-        <div className="container relative z-10 mx-auto flex h-full flex-col items-center justify-center px-4 text-center mt-10">
-          <motion.div style={{ y, opacity }} className="relative flex flex-col items-center w-full max-w-6xl">
-            
-            {/* Floating 3D Elements - Positioned closer to center and overlapping text */}
-            <motion.div 
-              animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute left-[15%] top-[10%] z-40 hidden lg:block"
-            >
-              <div className="flex h-24 w-24 items-center justify-center rounded-[2rem] border-4 border-black bg-brand-coral shadow-hard-lg text-5xl rotate-12 transform hover:scale-110 transition-transform">
-                🚀
-              </div>
-            </motion.div>
+      {/* Parallax Background 'S' */}
+      <motion.div
+        style={{ y: logoY }}
+        className="absolute top-0 left-0 w-full h-full z-0 flex items-center justify-center opacity-80 pointer-events-none"
+      >
+        <Image
+          src="/slush/bg-s-logo.avif"
+          alt="Slush S Logo Background"
+          width={1200}
+          height={1200}
+          className="w-[120%] max-w-none md:w-[80%] h-auto object-contain mix-blend-multiply"
+          priority
+        />
+      </motion.div>
 
-            <motion.div 
-              animate={{ y: [0, 30, 0], rotate: [0, -10, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute right-[18%] top-[15%] z-40 hidden lg:block"
-            >
-              <div className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-black bg-brand-yellow shadow-hard-lg text-6xl -rotate-12 transform hover:scale-110 transition-transform">
-                🤑
-              </div>
-            </motion.div>
 
-            <motion.div 
-              animate={{ y: [0, -15, 0], x: [0, 10, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-              className="absolute left-[20%] bottom-[25%] z-40 hidden lg:block"
-            >
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-black bg-brand-green shadow-hard text-4xl transform hover:scale-110 transition-transform">
-                💎
-              </div>
-            </motion.div>
+      {/* Main Content Container */}
+      <div className="relative z-10 container mx-auto flex flex-col items-center justify-center h-full px-4 min-h-[80vh]">
 
-            <motion.div 
-              animate={{ y: [0, 20, 0], x: [0, -10, 0] }}
-              transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
-              className="absolute right-[22%] bottom-[20%] z-40 hidden lg:block"
-            >
-              <div className="flex h-24 w-36 items-center justify-center rounded-[2rem] border-4 border-black bg-brand-violet shadow-hard text-4xl -rotate-6 transform hover:scale-110 transition-transform">
-                👛
-              </div>
-            </motion.div>
+        {/* Massive Typography Layer */}
+        <motion.div style={{ y: textY }} className="relative z-20 text-center w-full flex flex-col items-center justify-center">
+          <h1
+            className="font-display font-black text-[20vw] md:text-[25vw] leading-[0.8] tracking-tighter text-black select-none z-10"
+            style={{ transform: "scaleY(1.3)" }}
+          >
+            SCALE
+          </h1>
+          <p className="font-display text-2xl md:text-5xl font-bold text-black mt-4 md:mt-8 tracking-tight z-20 relative bg-brand-bg/80 backdrop-blur-sm px-6 py-2 rounded-full border-2 border-black/5">
+            Personal financing made easy
+          </p>
+        </motion.div>
 
-            {/* Main Text */}
-            <h1 className="font-display text-[25vw] font-bold leading-[0.75] tracking-tighter text-black lg:text-[400px] drop-shadow-sm select-none mix-blend-hard-light scale-y-125 z-10">
-              SCALE
-            </h1>
+        {/* 3D Floating Lottie Elements */}
+        <div className="absolute inset-0 z-30 pointer-events-none">
+          {/* Element 1: Rocket - Top Left */}
+          <motion.div
+            animate={{ y: [0, -20, 0], rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-[15%] left-[5%] md:left-[10%] lg:left-[15%] w-32 h-32 md:w-48 md:h-48"
+          >
+            <Lottie animationData={rocketAnimation} loop={true} />
+          </motion.div>
 
-            <div className="relative -mt-4 md:-mt-8 flex flex-col items-center gap-4 z-30">
-              <h2 className="font-display text-5xl font-semibold uppercase tracking-tight md:text-8xl bg-brand-white/80 backdrop-blur-sm px-6 py-2 rounded-xl border-2 border-black transform rotate-1 shadow-hard-sm">
-                Finance, Leveled Up.
-              </h2>
-              <p className="font-sans text-xl font-medium uppercase tracking-widest text-gray-900 md:text-2xl max-w-2xl bg-brand-green px-6 py-2 border-2 border-black transform -rotate-1 shadow-hard-sm">
-                Personal Financing Made Easy
-              </p>
-            </div>
+          {/* Element 2: Coin - Center Right */}
+          <motion.div
+            animate={{ y: [0, 30, 0], rotate: [0, -10, 0] }}
+            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute top-[30%] right-[5%] md:right-[10%] lg:right-[15%] w-32 h-32 md:w-48 md:h-48"
+          >
+            <Lottie animationData={coinAnimation} loop={true} />
+          </motion.div>
 
-            <div className="mt-16 flex flex-col gap-6 sm:flex-row z-30">
-              <Button variant="dark" icon href="#" className="!text-xl !px-10 !py-5 shadow-hard hover:shadow-glow" glow>Launch Web App</Button>
-              <Button variant="white" icon href="#" className="!text-xl !px-10 !py-5 shadow-hard hover:shadow-hard-sm">Download App</Button>
-            </div>
+          {/* Element 3: Wallet - Bottom Left */}
+          <motion.div
+            animate={{ y: [0, -25, 0], x: [0, 10, 0] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute bottom-[20%] left-[10%] md:left-[20%] w-28 h-28 md:w-40 md:h-40"
+          >
+            <Lottie animationData={walletAnimation} loop={true} />
           </motion.div>
         </div>
-      </section>
 
-      {/* App Interface Reveal Section */}
-      <section className="relative z-30 -mt-32 pb-32">
-        <div className="container mx-auto px-4">
-          <AppPreview />
-        </div>
-      </section>
-    </>
+        {/* CTAs */}
+        <motion.div
+          style={{ y }}
+          className="relative z-40 mt-16 md:mt-24 flex flex-col sm:flex-row gap-6 pointer-events-auto"
+        >
+          <Button
+            variant="brand"
+            href="/login"
+            className="!text-xl !px-12 !py-6 !rounded-full !bg-black !text-white hover:!bg-brand-blue shadow-slush hover:shadow-xl transition-all"
+          >
+            Launch App
+          </Button>
+          <Button
+            variant="outline"
+            href="/dashboard"
+            className="!text-xl !px-12 !py-6 !rounded-full !bg-white !text-black !border-black hover:!bg-brand-yellow shadow-slush"
+          >
+            Learn More
+          </Button>
+        </motion.div>
+
+      </div>
+
+      {/* Scroll Indicator */}
+      <motion.div
+        animate={{ y: [0, 10, 0] }}
+        transition={{ duration: 2, repeat: Infinity }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 text-black/50"
+      >
+        <ChevronDown className="w-10 h-10" />
+      </motion.div>
+
+    </section>
   );
 };
 
