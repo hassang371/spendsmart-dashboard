@@ -141,15 +141,15 @@ const TabsSection: React.FC = () => {
                 <span className="text-outline text-brand-blue" style={{ WebkitTextStroke: "2px black" }}>WITHIN REACH</span>
             </h2>
             
-            <div className="flex flex-wrap gap-2 rounded-full border-2 border-black bg-brand-light p-2">
+            <div className="flex flex-wrap gap-2 rounded-full border-2 border-black bg-brand-light p-2 relative z-10">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab)}
-                  className={`rounded-full px-8 py-3 font-display text-xl font-bold uppercase transition-all ${
+                  className={`relative rounded-full px-8 py-3 font-display text-xl font-bold uppercase transition-all duration-300 ${
                     activeTab.id === tab.id 
                       ? 'bg-black text-white shadow-md' 
-                      : 'hover:bg-gray-200'
+                      : 'bg-transparent text-black hover:bg-black/5'
                   }`}
                 >
                   {tab.label}

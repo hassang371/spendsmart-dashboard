@@ -11,6 +11,7 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 import rocketAnimation from '@/public/slush/rocket.json';
 import coinAnimation from '@/public/slush/coin.json';
 import walletAnimation from '@/public/slush/wallet.json';
+import smileyAnimation from '@/public/slush/icon-smiley.json';
 
 function LoginContent() {
     const [email, setEmail] = useState("");
@@ -78,10 +79,6 @@ function LoginContent() {
         }
     };
 
-    const handleMoreOptions = () => {
-        router.push("/signup");
-    };
-
     return (
         <AnimatePresence>
             <motion.div
@@ -91,11 +88,11 @@ function LoginContent() {
                 className="fixed inset-0 z-[100] flex flex-col bg-brand-light text-black overflow-hidden font-display selection:bg-brand-yellow selection:text-black"
             >
                 {/* Background Details */}
-                <div className="absolute inset-0 z-0 opacity-10 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-multiply"></div>
+                <div className="absolute inset-0 z-0 opacity-30 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-multiply"></div>
 
                 {/* Top Bar */}
                 <div className="absolute top-0 left-0 w-full p-8 flex justify-center z-20">
-                    <h1 className="text-4xl font-black tracking-tighter uppercase" style={{ transform: "scaleY(1.2)" }}>SCALE</h1>
+                    <h1 className="text-4xl font-black tracking-tighter uppercase text-black" style={{ transform: "scaleY(1.2)" }}>SCALE</h1>
                 </div>
 
                 <Link
@@ -112,7 +109,7 @@ function LoginContent() {
                     <motion.div
                         animate={{ y: [-10, 10, -10], rotate: [0, 5, 0] }}
                         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[15%] left-[5%] md:left-[10%] z-10 w-32 md:w-48 pointer-events-none"
+                        className="absolute top-[15%] left-[5%] md:left-[10%] z-10 w-32 md:w-56 pointer-events-none opacity-90"
                     >
                         <Lottie animationData={rocketAnimation} loop={true} />
                     </motion.div>
@@ -120,7 +117,7 @@ function LoginContent() {
                     <motion.div
                         animate={{ y: [10, -10, 10], rotate: [0, -10, 0] }}
                         transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute top-[20%] right-[5%] md:right-[15%] z-10 w-32 md:w-48 pointer-events-none"
+                        className="absolute top-[20%] right-[5%] md:right-[15%] z-10 w-32 md:w-48 pointer-events-none opacity-90"
                     >
                         <Lottie animationData={coinAnimation} loop={true} />
                     </motion.div>
@@ -128,14 +125,24 @@ function LoginContent() {
                     <motion.div
                         animate={{ y: [0, 20, 0] }}
                         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute bottom-[15%] left-[10%] z-10 w-28 md:w-40 pointer-events-none"
+                        className="absolute bottom-[15%] left-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90"
                     >
                         <Lottie animationData={walletAnimation} loop={true} />
                     </motion.div>
 
+                     {/* Smiley - Added as requested */}
+                     <motion.div
+                        animate={{ y: [0, -15, 0], rotate: [0, 10, 0] }}
+                        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                        className="absolute bottom-[20%] right-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90"
+                    >
+                        <Lottie animationData={smileyAnimation} loop={true} />
+                    </motion.div>
+
+
                     {/* Central Form Card */}
                     <div className="relative z-20 text-center w-full max-w-md px-4">
-                        <div className="bg-white border-2 border-black p-8 md:p-12 rounded-[2.5rem] shadow-hard-lg relative overflow-hidden">
+                        <div className="bg-white border-2 border-black p-8 md:p-12 rounded-[2.5rem] shadow-hard relative overflow-hidden text-black">
                             <h1 className="text-6xl md:text-7xl font-black uppercase tracking-tighter mb-8 text-black" style={{ transform: "scaleY(1.1)" }}>
                                 Login
                             </h1>
@@ -159,7 +166,7 @@ function LoginContent() {
                                     onChange={(e) => setEmail(e.target.value)}
                                     type="email"
                                     placeholder="Email"
-                                    className="w-full px-6 py-4 bg-brand-light border-2 border-black rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
+                                    className="w-full px-6 py-4 bg-brand-light border-2 border-black/10 rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
                                 />
                                 <input
                                     required
@@ -167,7 +174,7 @@ function LoginContent() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     type="password"
                                     placeholder="Password"
-                                    className="w-full px-6 py-4 bg-brand-light border-2 border-black rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
+                                    className="w-full px-6 py-4 bg-brand-light border-2 border-black/10 rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
                                 />
                                 <button
                                     disabled={loading}
@@ -177,41 +184,35 @@ function LoginContent() {
                                     {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Continue"}
                                 </button>
                             </form>
-                        </div>
-                    </div>
+                             {/* Actions embedded in card or below? Slush has Google/Apple buttons below form usually or inside. Putting inside for cleaner unit. */}
+                            <div className="flex flex-col gap-3 mt-6">
+                                <div className="flex gap-3">
+                                <button
+                                    onClick={handleGoogleLogin}
+                                    disabled={googleLoading}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-brand-light hover:bg-white text-black border-2 border-black/10 font-sans font-bold py-3 px-4 rounded-full transition-all hover:shadow-hard active:translate-y-1 active:shadow-none disabled:opacity-70 group"
+                                >
+                                    {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                                        <>
+                                            <span className="font-bold text-lg group-hover:text-blue-500 transition-colors">G</span>
+                                        </>
+                                    )}
+                                </button>
+                                 <button
+                                    disabled
+                                    className="flex-1 flex items-center justify-center gap-2 bg-brand-light text-black/40 border-2 border-black/5 font-sans font-bold py-3 px-4 rounded-full cursor-not-allowed"
+                                >
+                                    <Apple className="w-5 h-5 fill-current" />
+                                </button>
+                                </div>
+                            </div>
 
-                    {/* Bottom Actions */}
-                    <div className="absolute bottom-8 left-0 w-full flex flex-col items-center gap-4 z-30 px-4">
-                        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-                            <button
-                                onClick={handleGoogleLogin}
-                                disabled={googleLoading}
-                                className="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-brand-light text-black border-2 border-black font-sans font-bold py-4 px-6 rounded-full transition-all hover:shadow-hard active:translate-y-1 active:shadow-none disabled:opacity-70 group"
-                            >
-                                {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                                    <>
-                                        <span className="font-bold text-lg group-hover:text-blue-500 transition-colors">G</span>
-                                        <span>Google</span>
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                disabled
-                                title="Coming Soon"
-                                className="flex-1 flex items-center justify-center gap-2 bg-black/50 text-white/60 border-2 border-black/50 font-sans font-bold py-4 px-6 rounded-full cursor-not-allowed relative"
-                            >
-                                <Apple className="w-5 h-5 fill-current" />
-                                <span>Apple</span>
-                                <span className="absolute -top-2 -right-2 bg-brand-yellow text-black text-[10px] font-black px-2 py-0.5 rounded-full">Soon</span>
-                            </button>
+                             <div className="mt-8 pt-6 border-t border-black/10">
+                                <p className="font-sans font-bold text-sm text-black/60">
+                                    Don&apos;t have an account? <Link href="/signup" className="text-black hover:underline underline-offset-4 decoration-2">Sign up</Link>
+                                </p>
+                            </div>
                         </div>
-
-                        <button
-                            onClick={handleMoreOptions}
-                            className="text-black/60 hover:text-black font-sans font-bold uppercase tracking-widest text-xs transition-colors"
-                        >
-                            More options
-                        </button>
                     </div>
 
                 </div>

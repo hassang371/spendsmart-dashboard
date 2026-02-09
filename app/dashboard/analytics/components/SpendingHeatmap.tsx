@@ -51,11 +51,11 @@ export function SpendingHeatmap({ transactions }: { transactions: Transaction[] 
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data}>
                         <defs>
-                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                            <linearGradient id="heatmapBarGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1} />
                                 <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
                             </linearGradient>
-                            <linearGradient id="barGradientInactive" x1="0" y1="0" x2="0" y2="1">
+                            <linearGradient id="heatmapBarGradientInactive" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.3} />
                                 <stop offset="100%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.1} />
                             </linearGradient>
@@ -87,7 +87,7 @@ export function SpendingHeatmap({ transactions }: { transactions: Transaction[] 
                             {data.map((entry, index) => (
                                 <Cell
                                     key={`cell-${index}`}
-                                    fill={entry.amount === maxAmount ? "url(#barGradient)" : "url(#barGradientInactive)"}
+                                    fill={entry.amount === maxAmount ? "url(#heatmapBarGradient)" : "url(#heatmapBarGradientInactive)"}
                                     className="transition-all duration-300 hover:opacity-80"
                                 />
                             ))}

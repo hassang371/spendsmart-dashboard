@@ -9,8 +9,9 @@ import dynamic from 'next/dynamic';
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 import rocketAnimation from '@/public/slush/rocket.json';
-import coinAnimation from '@/public/slush/coin.json';
 import walletAnimation from '@/public/slush/wallet.json';
+import goldCoinAnimation from '@/public/slush/67fec9c205180e5c013941f7_GetStashed - Onboarding - Icon Coin - V01.json';
+import smileyAnimation from '@/public/slush/icon-smiley.json';
 
 const Hero: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,65 +46,70 @@ const Hero: React.FC = () => {
       {/* Main Content Container */}
       <div className="relative z-10 container mx-auto flex flex-col items-center justify-center h-full px-4 min-h-[80vh]">
 
-        {/* Massive Typography Layer */}
-        <motion.div style={{ y: textY }} className="relative z-20 text-center w-full flex flex-col items-center justify-center">
+        {/* Massive Typography Layer - Compacted */}
+        <motion.div style={{ y: textY }} className="relative z-20 text-center w-full flex flex-col items-center justify-center -space-y-4 md:-space-y-8">
           <h1
-            className="font-display font-black text-[20vw] md:text-[25vw] leading-[0.8] tracking-tighter text-black select-none z-10"
-            style={{ transform: "scaleY(1.3)" }}
+            className="font-display font-black text-[22vw] md:text-[25vw] leading-[0.8] tracking-tighter text-black select-none z-10 scale-y-125"
           >
             SCALE
           </h1>
-          <p className="font-display text-2xl md:text-5xl font-bold text-black mt-4 md:mt-8 tracking-tight z-20 relative bg-brand-bg/80 backdrop-blur-sm px-6 py-2 rounded-full border-2 border-black/5">
-            Personal financing made easy
-          </p>
         </motion.div>
 
-        {/* 3D Floating Lottie Elements */}
+        {/* 3D Floating Lottie Elements - Restored Positions & Smiley Added */}
         <div className="absolute inset-0 z-30 pointer-events-none">
-          {/* Element 1: Rocket - Top Left */}
+          {/* Element 1: Rocket - Top Left (Restored) */}
           <motion.div
             animate={{ y: [0, -20, 0], rotate: [0, 5, -5, 0] }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-[15%] left-[5%] md:left-[10%] lg:left-[15%] w-32 h-32 md:w-48 md:h-48"
+            className="absolute top-[10%] left-[5%] md:left-[10%] w-32 h-32 md:w-56 md:h-56 lg:w-72 lg:h-72"
           >
             <Lottie animationData={rocketAnimation} loop={true} />
           </motion.div>
 
-          {/* Element 2: Coin - Center Right */}
+          {/* Element 2: Smiley - Top Right (Added as requested) */}
           <motion.div
             animate={{ y: [0, 30, 0], rotate: [0, -10, 0] }}
             transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute top-[30%] right-[5%] md:right-[10%] lg:right-[15%] w-32 h-32 md:w-48 md:h-48"
+            className="absolute top-[15%] right-[5%] md:right-[10%] w-28 h-28 md:w-40 md:h-40"
           >
-            <Lottie animationData={coinAnimation} loop={true} />
+            <Lottie animationData={smileyAnimation} loop={true} />
           </motion.div>
 
-          {/* Element 3: Wallet - Bottom Left */}
+          {/* Element 3: Wallet - Bottom Right (Restored position concept) */}
           <motion.div
             animate={{ y: [0, -25, 0], x: [0, 10, 0] }}
             transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-            className="absolute bottom-[20%] left-[10%] md:left-[20%] w-28 h-28 md:w-40 md:h-40"
+            className="absolute bottom-[20%] right-[10%] md:right-[15%] w-24 h-24 md:w-36 md:h-36"
           >
             <Lottie animationData={walletAnimation} loop={true} />
           </motion.div>
+
+          {/* Element 4: Gold Coin - Bottom Left (Restored position concept) */}
+          <motion.div
+            animate={{ y: [0, 20, 0], rotate: [0, 10, -5, 0] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+            className="absolute bottom-[20%] left-[10%] md:left-[20%] w-20 h-20 md:w-32 md:h-32"
+          >
+            <Lottie animationData={goldCoinAnimation} loop={true} />
+          </motion.div>
         </div>
 
-        {/* CTAs */}
+        {/* CTAs - Compact & Overlapping */}
         <motion.div
           style={{ y }}
-          className="relative z-40 mt-16 md:mt-24 flex flex-col sm:flex-row gap-6 pointer-events-auto"
+          className="relative z-40 mt-24 md:mt-32 flex flex-col sm:flex-row gap-6 pointer-events-auto"
         >
           <Button
             variant="brand"
             href="/login"
-            className="!text-xl !px-12 !py-6 !rounded-full !bg-black !text-white hover:!bg-brand-blue shadow-slush hover:shadow-xl transition-all"
+            className="!text-base !px-8 !py-3 !rounded-full !bg-black !text-white hover:!bg-brand-blue shadow-slush hover:shadow-xl transition-all"
           >
             Launch App
           </Button>
           <Button
             variant="outline"
             href="/dashboard"
-            className="!text-xl !px-12 !py-6 !rounded-full !bg-white !text-black !border-black hover:!bg-brand-yellow shadow-slush"
+            className="!text-base !px-8 !py-3 !rounded-full !bg-white !text-black !border-black hover:!bg-brand-yellow shadow-slush"
           >
             Learn More
           </Button>

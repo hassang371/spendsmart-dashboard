@@ -1,5 +1,9 @@
 import React from 'react';
 import AnimatedSection from './AnimatedSection';
+import dynamic from 'next/dynamic';
+
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+import smileyAnimation from '@/public/slush/icon-smiley.json';
 
 const testimonials = [
   {
@@ -40,11 +44,18 @@ const Testimonials: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="mb-20 flex flex-col items-center text-center">
           <AnimatedSection>
-            <div className="relative inline-block">
-                <h2 className="mb-4 font-display text-8xl font-bold uppercase tracking-tighter md:text-[10rem] leading-none z-10 relative text-black">DON&apos;T BELIEVE US?</h2>
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-coral rounded-full blur-xl opacity-50 z-0"></div>
+            <div className="relative inline-block mb-8">
+               <div className="flex flex-col items-center">
+                   <h2 className="font-display text-8xl font-bold uppercase tracking-tighter md:text-[10rem] leading-[0.8] z-10 relative text-black transform -rotate-2 italic">
+                       DON&apos;T <br/>
+                       BELIEVE US?
+                   </h2>
+                   <div className="absolute top-0 -right-20 w-32 h-32 md:w-48 md:h-48 z-20 transform rotate-12">
+                       <Lottie animationData={smileyAnimation} loop={true} />
+                   </div>
+               </div>
             </div>
-            <p className="font-display text-4xl font-bold italic uppercase md:text-6xl text-black/70 transform -rotate-2">See for yourself.</p>
+            <p className="font-display text-4xl font-bold uppercase md:text-5xl text-black">See for yourself.</p>
           </AnimatedSection>
         </div>
 

@@ -130,10 +130,6 @@ export default function OverviewPage() {
     return data.filter((tx) => {
       const amount = Number(tx.amount || 0);
       if (amount >= 0) return false;
-      const txDate = new Date(tx.transaction_date);
-      if (Number.isNaN(txDate.getTime())) return false;
-
-      // Parse ISO string to Date object
       const dateObj = new Date(tx.transaction_date);
       if (Number.isNaN(dateObj.getTime())) return false;
 
@@ -311,7 +307,7 @@ export default function OverviewPage() {
 
   // Derived Data: Largest Splurges for selected period
   const splurges = useMemo(() => {
-    return periodExpenses
+    return [...periodExpenses]
       .sort((a, b) => Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)))
       .slice(0, 3);
   }, [periodExpenses]);

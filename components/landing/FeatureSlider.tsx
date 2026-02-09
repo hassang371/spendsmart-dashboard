@@ -50,25 +50,25 @@ const FeatureSlider: React.FC = () => {
                 </h2>
             </div>
 
-            <div className="relative w-full overflow-x-auto pb-12 px-4 md:px-0 no-scrollbar snap-x snap-mandatory">
+            <div className="relative w-full overflow-x-auto pb-12 px-4 md:px-0 no-scrollbar snap-x snap-mandatory pt-10">
                  <div className="flex gap-6 md:gap-12 w-max mx-auto px-4 md:px-24">
                     {cards.map((card, index) => (
-                        <div key={index} className={`flex-none w-[300px] md:w-[400px] h-[400px] md:h-[500px] rounded-[2.5rem] border-4 border-black p-8 md:p-12 shadow-hard-lg snap-center flex flex-col justify-between transition-transform hover:scale-105 ${card.color}`}>
+                        <div key={index} className={`flex-none w-[300px] md:w-[400px] h-[400px] md:h-[500px] rounded-[2.5rem] border-4 border-black p-8 md:p-12 shadow-hard-lg snap-center flex flex-col justify-between transition-transform hover:scale-105 ${card.title === 'Automated Accounting' ? 'bg-[#F5F5F7]' : card.color}`}>
                             {card.align === 'top' ? (
                                 <>
                                     <div className="w-full h-40 md:h-56">
                                          <Lottie animationData={card.animation} loop={true} className="w-full h-full object-contain" />
                                     </div>
                                     <div>
-                                         <h3 className="font-display text-3xl md:text-4xl font-bold uppercase leading-none mb-4">{card.title}</h3>
-                                          <p className="font-sans text-lg font-bold opacity-80">{card.description}</p>
+                                         <h3 className="font-display text-3xl md:text-4xl font-bold uppercase leading-none mb-4 text-black">{card.title}</h3>
+                                          <p className="font-sans text-lg font-bold opacity-80 text-black">{card.description}</p>
                                     </div>
                                 </>
                             ) : (
                                   <>
                                     <div>
-                                         <h3 className="font-display text-3xl md:text-4xl font-bold uppercase leading-none mb-4">{card.title}</h3>
-                                          <p className="font-sans text-lg font-bold opacity-80">{card.description}</p>
+                                         <h3 className="font-display text-3xl md:text-4xl font-bold uppercase leading-none mb-4 text-black">{card.title}</h3>
+                                          <p className="font-sans text-lg font-bold opacity-80 text-black">{card.description}</p>
                                     </div>
                                     <div className="w-full h-40 md:h-56">
                                          <Lottie animationData={card.animation} loop={true} className="w-full h-full object-contain" />

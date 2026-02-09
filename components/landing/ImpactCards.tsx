@@ -13,7 +13,7 @@ const ImpactCards: React.FC = () => {
     return (
         <section className="py-24 bg-brand-light">
              <div className="container mx-auto px-4 text-center mb-16">
-                <h2 className="font-display text-5xl md:text-7xl font-bold uppercase tracking-tighter leading-none mb-4">
+                <h2 className="font-display text-5xl md:text-7xl font-bold uppercase tracking-tighter leading-none mb-4 text-black">
                     Finance for Humans.
                 </h2>
                 <h2 className="font-display text-5xl md:text-7xl font-bold uppercase tracking-tighter leading-none text-brand-blue italic">
@@ -24,7 +24,7 @@ const ImpactCards: React.FC = () => {
             <div className="container mx-auto px-4 grid gap-8 md:grid-cols-3">
                 {/* Card 1 */}
                 <div className="bg-white rounded-[2.5rem] border-4 border-black p-8 shadow-hard relative overflow-hidden group hover:-translate-y-2 transition-transform">
-                     <h3 className="font-display text-4xl font-bold uppercase italic mb-8 relative z-10">
+                     <h3 className="font-display text-4xl font-bold uppercase italic mb-8 relative z-10 text-black">
                         For Savers
                     </h3>
                      <Button variant="dark" href="/signup" className="relative z-10">Start Saving</Button>

@@ -5,7 +5,7 @@ interface MarqueeProps {
   text?: string;
 }
 
-const Marquee: React.FC<MarqueeProps> = ({ direction = 'left', text = "UNIFIED DEFI IS HERE. STRATEGIES. LIVE NOW. " }) => {
+const Marquee: React.FC<MarqueeProps> = ({ direction = 'left', text = "SCALE IS HERE. STRATEGIES. LIVE NOW. " }) => {
   const animationClass = direction === 'left' ? 'animate-marquee' : 'animate-marquee-reverse';
   
   // Repeat text to fill width
