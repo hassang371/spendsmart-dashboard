@@ -41,10 +41,10 @@ const Testimonials: React.FC = () => {
         <div className="mb-20 flex flex-col items-center text-center">
           <AnimatedSection>
             <div className="relative inline-block">
-                <h2 className="mb-4 font-display text-8xl font-bold uppercase tracking-tighter md:text-[10rem] leading-none z-10 relative">DON'T BELIEVE US?</h2>
+                <h2 className="mb-4 font-display text-8xl font-bold uppercase tracking-tighter md:text-[10rem] leading-none z-10 relative text-black">DON&apos;T BELIEVE US?</h2>
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-coral rounded-full blur-xl opacity-50 z-0"></div>
             </div>
-            <p className="font-display text-4xl font-bold italic uppercase md:text-6xl text-brand-dark/50 transform -rotate-2">See for yourself.</p>
+            <p className="font-display text-4xl font-bold italic uppercase md:text-6xl text-black/70 transform -rotate-2">See for yourself.</p>
           </AnimatedSection>
         </div>
 
@@ -58,12 +58,12 @@ const Testimonials: React.FC = () => {
 
             {testimonials.map((t, i) => (
               <div key={i} className={`flex-none w-[350px] md:w-[500px] flex flex-col justify-between rounded-[2.5rem] border-4 border-black ${t.color} p-12 shadow-hard-lg snap-center transition-all duration-300 hover:-translate-y-4 hover:shadow-hard-xl ${t.rotation}`}>
-                <p className="font-display text-4xl font-bold leading-[0.9] uppercase">"{t.text}"</p>
+                <p className="font-display text-4xl font-bold leading-[0.9] uppercase text-black">&quot;{t.text}&quot;</p>
                 <div className="mt-12 flex items-center gap-4">
                   <div className="h-16 w-16 rounded-full border-2 border-black bg-gray-900 text-white flex items-center justify-center font-display text-2xl">
                     {t.author[0]}
                   </div>
-                  <p className="font-sans font-bold uppercase tracking-wide text-xl">{t.author}</p>
+                  <p className="font-sans font-bold uppercase tracking-wide text-xl text-black">{t.author}</p>
                 </div>
               </div>
             ))}

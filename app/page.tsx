@@ -1,43 +1,22 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import Navbar from "../components/landing/Navbar";
-import Hero from "../components/landing/Hero";
-import Marquee from "../components/landing/Marquee";
-import Features from "../components/landing/Features";
-import TabsSection from "../components/landing/TabsSection";
-import Testimonials from "../components/landing/Testimonials";
-import Footer from "../components/landing/Footer";
-import CustomCursor from "../components/landing/CustomCursor";
-import { supabase } from "../lib/supabase/client";
-import { useRouter } from "next/navigation";
-import { type AuthChangeEvent, type Session } from "@supabase/supabase-js";
+import React from "react";
+import Navbar from "@/components/landing/Navbar";
+import Hero from "@/components/landing/Hero";
+import Marquee from "@/components/landing/Marquee";
+
+import TabsSection from "@/components/landing/TabsSection";
+import Testimonials from "@/components/landing/Testimonials";
+import Footer from "@/components/landing/Footer";
+import CustomCursor from "@/components/landing/CustomCursor";
+
+import ParallaxText from "@/components/landing/ParallaxText";
+import FeatureSlider from "@/components/landing/FeatureSlider";
+import ImpactCards from "@/components/landing/ImpactCards";
 
 export default function Home() {
-    const router = useRouter();
 
-    useEffect(() => {
-        // Smooth scroll behavior hack
-        document.documentElement.style.scrollBehavior = 'smooth';
-
-        // Auth Check
-        const checkSession = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                router.replace("/dashboard");
-            }
-        };
-        checkSession();
-
-        const { data: subscription } = supabase.auth.onAuthStateChange(
-            (event: AuthChangeEvent, session: Session | null) => {
-                if (event === "SIGNED_IN" && session) {
-                    router.replace("/dashboard");
-                }
-            },
-        );
-
-        return () => subscription.subscription.unsubscribe();
-    }, [router]);
+    // Auth check handled by middleware
+    // Scroll behavior handled by globals.css
 
     return (
         <div className="relative min-h-screen w-full bg-brand-light font-sans selection:bg-brand-orange selection:text-white overflow-x-hidden">
@@ -52,12 +31,13 @@ export default function Home() {
                 </div>
 
                 {/* Main App Content */}
-                <Navbar onLoginClick={() => router.push("/login")} />
+                <Navbar />
 
                 <main>
                     <Hero />
-                    <Marquee direction="left" />
-                    <Features />
+                    <ParallaxText />
+                    <FeatureSlider />
+                    <ImpactCards />
                     <TabsSection />
                     <Marquee direction="right" />
                     <Testimonials />

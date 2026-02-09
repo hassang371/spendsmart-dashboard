@@ -3,7 +3,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "../../lib/supabase/client";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
 export default function SignupPage() {
@@ -12,7 +11,7 @@ export default function SignupPage() {
     const [name, setName] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const router = useRouter();
+    const [confirmationSent, setConfirmationSent] = useState(false);
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,9 +31,7 @@ export default function SignupPage() {
         if (signupError) {
             setError(signupError.message);
         } else {
-            // Check if email confirmation is required? usually yes.
-            // For now, let's assume auto-login or redirect.
-            router.push("/dashboard");
+            setConfirmationSent(true);
         }
         setLoading(false);
     };
@@ -113,6 +110,19 @@ export default function SignupPage() {
                         </div>
                     )}
 
+                    {confirmationSent ? (
+                        <div className="space-y-4 text-center">
+                            <div className="p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                                <h2 className="text-lg font-bold text-emerald-500 mb-2">Check your email</h2>
+                                <p className="text-sm text-gray-400">
+                                    We&apos;ve sent a confirmation link to <strong className="text-white">{email}</strong>. Please check your inbox and click the link to activate your account.
+                                </p>
+                            </div>
+                            <Link href="/login" className="inline-block text-primary hover:underline text-sm font-medium">
+                                Back to Login
+                            </Link>
+                        </div>
+                    ) : (
                     <form onSubmit={handleSignup} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Full Name</label>
@@ -158,7 +168,7 @@ export default function SignupPage() {
 
                         <div className="relative my-4">
                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#0B1221] px-2 text-gray-500">Or continue with</span></div>
+                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-gray-500">Or continue with</span></div>
                         </div>
 
                         <button
@@ -170,6 +180,7 @@ export default function SignupPage() {
                             Google
                         </button>
                     </form>
+                    )}
 
                     <p className="mt-8 text-center text-sm text-gray-500">
                         Already have an account? <Link href="/login" className="text-primary hover:underline">Login</Link>

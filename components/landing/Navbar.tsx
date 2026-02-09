@@ -1,71 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import React, { useState } from 'react';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import Button from './Button';
 import { Plus, X } from 'lucide-react';
-import ScaleLogo from './ScaleLogo';
 
-interface NavbarProps {
-  onLoginClick: () => void;
-}
-
-const Navbar: React.FC<NavbarProps> = ({ onLoginClick }) => {
+const Navbar: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showLoginButton, setShowLoginButton] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { scrollY } = useScroll();
 
-  useEffect(() => {
-    if (menuOpen) {
-      document.body.classList.add('scroll-locked');
-    } else {
-      document.body.classList.remove('scroll-locked');
-    }
-    return () => document.body.classList.remove('scroll-locked');
-  }, [menuOpen]);
-
   useMotionValueEvent(scrollY, "change", (latest) => {
-    // Hide login button after scrolling past roughly the Hero section (e.g., 700px)
-    if (latest > 700) {
-      setShowLoginButton(false);
-    } else {
-      setShowLoginButton(true);
-    }
+    setIsScrolled(latest > 50);
   });
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-6 md:p-8 pointer-events-none">
-        {/* Logo Icon Only - Top Left */}
-        <a href="#" className="pointer-events-auto flex items-center justify-center transition-transform hover:scale-110 active:scale-95">
-          <ScaleLogo className="h-14 w-14" />
-        </a>
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-6`}>
+        <div className="container mx-auto px-6 flex items-center justify-between">
 
-        {/* Right Side: Login + Menu Trigger */}
-        <div className="pointer-events-auto flex items-center gap-4">
-          <AnimatePresence>
-            {showLoginButton && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Button 
-                  variant="dark" 
-                  onClick={onLoginClick} 
-                  className="hidden md:flex !py-3 !px-8 text-lg hover:bg-brand-coral"
-                >
-                  Login
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          
-          <button 
-            onClick={() => setMenuOpen(true)}
-            className="group flex h-14 w-14 items-center justify-center rounded-full border-2 border-black bg-white shadow-hard-sm transition-all hover:bg-brand-green hover:shadow-hard active:scale-95 active:shadow-none"
-          >
-            <Plus className="h-8 w-8 transition-transform group-hover:rotate-90" />
-          </button>
+          {/* Logo (Top Left) */}
+          <Link href="/" className="relative z-50 group" aria-label="Go to Homepage">
+            <div className="h-12 w-12 bg-white rounded-full border-2 border-black flex items-center justify-center shadow-slush transition-transform group-hover:scale-105 active:scale-95">
+              <span className="font-display font-bold text-xl text-black">S</span>
+            </div>
+          </Link>
+
+          {/* Right Side: Login + Menu Trigger */}
+          <div className="flex items-center gap-4">
+            <Link
+              href="/login"
+              className="flex h-12 items-center justify-center rounded-full border-2 border-black bg-white px-6 shadow-slush transition-all hover:bg-brand-yellow active:scale-95 font-display font-bold text-sm uppercase"
+            >
+              Login
+            </Link>
+
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="group flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-white shadow-slush transition-all hover:bg-brand-yellow active:scale-95"
+              aria-label="Open Menu"
+            >
+              <Plus className="h-6 w-6 text-black transition-transform group-hover:rotate-90" />
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -77,44 +53,55 @@ const Navbar: React.FC<NavbarProps> = ({ onLoginClick }) => {
             animate={{ opacity: 1, y: "0%" }}
             exit={{ opacity: 0, y: "-100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 120 }}
-            className="fixed inset-0 z-[60] flex flex-col bg-brand-light"
+            className="fixed inset-0 z-[60] flex flex-col bg-brand-bg"
           >
             {/* Menu Header */}
-            <div className="flex items-center justify-between p-6 md:p-8">
-              <ScaleLogo className="h-14 w-14" />
-              
-              <button 
+            <div className="flex items-center justify-between p-6 container mx-auto">
+              <Link href="/" onClick={() => setMenuOpen(false)} aria-label="Go to Homepage">
+                <div className="h-12 w-12 bg-white rounded-full border-2 border-black flex items-center justify-center shadow-slush">
+                  <span className="font-display font-bold text-xl text-black">S</span>
+                </div>
+              </Link>
+
+              <button
                 onClick={() => setMenuOpen(false)}
-                className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-black bg-brand-coral shadow-hard-sm transition-transform active:scale-95 hover:rotate-90"
+                className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-white shadow-slush transition-transform active:scale-95 hover:rotate-90 hover:bg-brand-coral"
+                aria-label="Close Menu"
               >
-                <X className="h-8 w-8 text-black" />
+                <X className="h-6 w-6 text-black" />
               </button>
             </div>
 
             {/* Menu Links */}
-            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-               {['Get Started', 'DeFi', 'Security', 'Guides', 'Download'].map((item, i) => (
-                 <motion.a 
-                   key={item}
-                   initial={{ opacity: 0, y: 40 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   transition={{ delay: i * 0.05 + 0.2 }}
-                   href={`#${item.toLowerCase().replace(' ', '-')}`}
-                   className="font-display text-7xl font-bold uppercase tracking-tight text-black transition-colors hover:text-brand-blue md:text-9xl hover:italic"
-                   onClick={() => setMenuOpen(false)}
-                 >
-                   {item}
-                 </motion.a>
-               ))}
-               
-               <motion.div 
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ delay: 0.5 }}
-                 className="mt-12 md:hidden"
-               >
-                 <Button variant="dark" onClick={() => { setMenuOpen(false); onLoginClick(); }} className="!text-xl !px-10 !py-4">Login</Button>
-               </motion.div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+              {['Get Started', 'Defi', 'Security', 'Guides', 'Download'].map((item, i) => (
+                <motion.div
+                  key={item}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 + 0.2 }}
+                >
+                  <Link
+                    href={`#${item.toLowerCase().replace(' ', '-')}`}
+                    onClick={() => setMenuOpen(false)}
+                    className="font-display text-4xl md:text-6xl font-black uppercase tracking-tight text-black transition-colors hover:text-brand-blue hover:italic"
+                    style={{ transform: "scaleY(1.2)" }}
+                  >
+                    {item}
+                  </Link>
+                </motion.div>
+              ))}
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="mt-12"
+              >
+                <Button href="/login" variant="brand" className="!px-10 !py-5 !text-xl !rounded-full !bg-brand-dark !text-white hover:!bg-brand-violet shadow-slush">
+                  Launch App
+                </Button>
+              </motion.div>
             </div>
           </motion.div>
         )}
