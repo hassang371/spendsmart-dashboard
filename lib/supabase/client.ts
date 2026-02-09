@@ -25,7 +25,18 @@ try {
 } catch (e) {
   const message = e instanceof Error ? e.message : "Supabase not configured.";
   if (typeof window !== "undefined") {
-    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;padding:2rem;text-align:center"><div><h1 style="color:#e11d48;margin-bottom:1rem">Configuration Error</h1><p>${message}</p></div></div>`;
+    const container = document.createElement("div");
+    container.style.cssText = "display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;padding:2rem;text-align:center";
+    const inner = document.createElement("div");
+    const h1 = document.createElement("h1");
+    h1.style.cssText = "color:#e11d48;margin-bottom:1rem";
+    h1.textContent = "Configuration Error";
+    const p = document.createElement("p");
+    p.textContent = message;
+    inner.appendChild(h1);
+    inner.appendChild(p);
+    container.appendChild(inner);
+    document.body.replaceChildren(container);
   }
   throw e;
 }

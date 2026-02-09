@@ -110,6 +110,16 @@
     outline: none !important;
     box-shadow: none !important;
   }
+
+  /* Autofill Override */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #fdfbf7 inset !important; /* Matches brand-light */
+    -webkit-text-fill-color: black !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
 
 @layer utilities {
@@ -161,4 +171,17 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
 }

@@ -1,8 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import Button from './Button';
 import { ArrowLeft, Apple } from 'lucide-react';
-import ScaleLogo from './ScaleLogo';
 
 interface LoginProps {
   onBack: () => void;

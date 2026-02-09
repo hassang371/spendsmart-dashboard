@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { type AuthChangeEvent, type Session } from "@supabase/supabase-js";
-import { LayoutDashboard, Wallet, PieChart, Settings, LogOut, UserPlus, Check, MoreVertical, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, Wallet, PieChart, Settings, LogOut, UserPlus, Check, MoreVertical, Sun, Moon, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -64,6 +64,7 @@ export default function DashboardLayout({
     const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
     const [savedSessions, setSavedSessions] = useState<StoredSession[]>([]);
+    const [expiredSessionEmail, setExpiredSessionEmail] = useState<string | null>(null);
 
     useEffect(() => {
         const loadUser = async () => {
@@ -162,11 +163,7 @@ export default function DashboardLayout({
             localStorage.setItem('supabase-multi-auth', JSON.stringify(validSessions));
             setSavedSessions(validSessions);
 
-            // Start - Error Handling Update
-            if (confirm(`Session for ${session.email} has expired. Would you like to log in again?`)) {
-                await supabase.auth.signOut(); // Ensure we are clean state before login
-                router.push("/login");
-            }
+            setExpiredSessionEmail(session.email);
             return;
         }
 
@@ -186,6 +183,38 @@ export default function DashboardLayout({
 
     return (
         <div className="h-screen overflow-hidden bg-background p-4 md:p-6 font-sans text-foreground selection:bg-primary/30 transition-colors duration-300">
+            <AnimatePresence>
+                {expiredSessionEmail && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 rounded-2xl border border-destructive/30 bg-card px-5 py-3 shadow-xl backdrop-blur-md"
+                    >
+                        <AlertTriangle size={16} className="text-destructive shrink-0" />
+                        <p className="text-sm font-bold text-foreground">
+                            Session for {expiredSessionEmail} has expired.
+                        </p>
+                        <button
+                            onClick={async () => {
+                                setExpiredSessionEmail(null);
+                                await supabase.auth.signOut();
+                                router.push("/login");
+                            }}
+                            className="rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+                        >
+                            Log in
+                        </button>
+                        <button
+                            onClick={() => setExpiredSessionEmail(null)}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <span className="sr-only">Dismiss</span>
+                            &times;
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             <div className="mx-auto flex h-full max-w-[1700px] gap-6">
                 <aside className="hidden h-full w-72 flex-col rounded-[2.5rem] bg-card border border-border p-6 shadow-2xl md:flex shrink-0 transition-colors duration-300">
                     <div

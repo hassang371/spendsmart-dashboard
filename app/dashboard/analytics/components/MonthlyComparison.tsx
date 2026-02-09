@@ -45,7 +45,7 @@ export function MonthlyComparison({ transactions }: MonthlyComparisonProps) {
         });
 
         const percentChange = prevMonthSpend === 0
-            ? 100
+            ? (currentMonthSpend === 0 ? 0 : 100)
             : ((currentMonthSpend - prevMonthSpend) / prevMonthSpend) * 100;
 
         return { currentMonthSpend, prevMonthSpend, percentChange };

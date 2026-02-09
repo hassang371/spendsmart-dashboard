@@ -4,15 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
-  Search, Filter, Download, Upload, Plus, Trash2,
-  ArrowUpRight, ArrowDownLeft, MoreHorizontal, X,
-  Calendar, Check, ChevronLeft, ChevronRight, ChevronsLeft,
-  ChevronsRight, Pencil, RefreshCw, XCircle, FileSpreadsheet,
+  Search, Filter, Download, X,
+  Check, Pencil,
   ShoppingBag, Coffee, Home, Zap, Car, Plane,
-  Utensils, Smartphone, HeartPulse, GraduationCap,
-  Gamepad2, Gift, PiggyBank, Briefcase, Film,
-  Music, Shield, AlertCircle, HelpCircle,
-  Banknote, TrendingUp, TrendingDown,
+  Utensils, HeartPulse, GraduationCap,
+  Gamepad2, Gift, Briefcase, Film,
+  Music, Shield, HelpCircle,
+  Banknote, TrendingUp,
   Bus, Fuel, Hammer, Stethoscope, Landmark,
   ChevronDown, Loader2,
 } from "lucide-react";
@@ -726,7 +724,6 @@ export default function TransactionsPage() {
     const mappedTransactions = allRows.map((row) => {
       const rawDescription = toText(row.description) || toText(row.merchant_name) || "Imported transaction";
       const displayDescription = extractReadableDescription(rawDescription);
-      const rawCategory = toText(row.category);
 
       return {
         id: toText(row.id) ?? "",
@@ -997,7 +994,7 @@ export default function TransactionsPage() {
       setBulkMode(false);
       clearSelection();
 
-    } catch (err) {
+    } catch {
       setError("Failed to reset categories.");
     } finally {
       setBulkUpdatingCategory(false);
