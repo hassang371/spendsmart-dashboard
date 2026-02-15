@@ -48,7 +48,7 @@ describe('API Client', () => {
       const result = await apiHealthCheck();
 
       expect(result.status).toBe('healthy');
-      expect(result.engines.ingestion).toBe('ready');
+      expect(result.engines?.ingestion).toBe('ready');
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8000/api/v1/health',
         expect.objectContaining({
