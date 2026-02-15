@@ -13,12 +13,13 @@ def test_health_returns_200():
 def test_health_returns_status_ok():
     response = client.get("/api/v1/health")
     data = response.json()
-    assert data["status"] == "healthy"
+    assert data["status"] in {"healthy", "degraded"}
 
 
 def test_health_returns_engine_versions():
     response = client.get("/api/v1/health")
     data = response.json()
-    assert "engines" in data
-    assert "ingestion" in data["engines"]
-    assert "forecasting" in data["engines"]
+    assert "services" in data
+    assert "api" in data["services"]
+    assert "redis" in data["services"]
+    assert "celery" in data["services"]

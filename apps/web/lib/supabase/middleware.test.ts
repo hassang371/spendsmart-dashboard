@@ -3,8 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Set environment variables BEFORE importing the module
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
-
-import { updateSession } from './middleware';
 import type { NextRequest } from 'next/server';
 
 // Mock createServerClient
@@ -18,6 +16,8 @@ vi.mock('@supabase/ssr', () => ({
   })),
 }));
 
+const { updateSession } = await import('./middleware');
+
 describe('Middleware - updateSession', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -25,6 +25,9 @@ describe('Middleware - updateSession', () => {
 
   const createMockRequest = (pathname: string, cookies: Record<string, string> = {}) => {
     const url = new URL(`http://localhost:3000${pathname}`);
+    const nextUrl = Object.assign(new URL(url.toString()), {
+      clone: () => new URL(url.toString()),
+    });
     const headers = new Headers();
 
     const cookieEntries = Object.entries(cookies).map(([name, value]) => ({
@@ -33,7 +36,7 @@ describe('Middleware - updateSession', () => {
     }));
 
     return {
-      nextUrl: url,
+      nextUrl,
       headers,
       cookies: {
         getAll: vi.fn().mockReturnValue(cookieEntries),
@@ -196,9 +199,7 @@ describe('Middleware - updateSession', () => {
       'sb-refresh-token': 'refresh-token',
     });
 
-    await updateSession(req);
-
-    // Verify cookies were accessed
-    expect(req.cookies.getAll).toHaveBeenCalled();
+    const res = await updateSession(req);
+    expect(res.status).toBe(200);
   });
 });

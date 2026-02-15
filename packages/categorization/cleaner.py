@@ -84,6 +84,11 @@ class TextAugmenter:
 
         return " ".join(words[start:end])
 
+    def augment(self, text: str) -> str:
+        """Create a single augmented view for contrastive training."""
+        dropped = self.inverse_frequency_dropout(text)
+        return self.substring_sampling(dropped)
+
 
 def clean_description(text: str) -> str:
     """
