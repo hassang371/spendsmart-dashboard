@@ -1,4 +1,6 @@
 """Tests for text augmentation in HypCD."""
+import random
+
 from packages.categorization.cleaner import TextAugmenter
 
 
@@ -18,6 +20,7 @@ def test_inverse_frequency_dropout():
     augmenter = TextAugmenter(texts)
 
     text = "food delivery zomato"
+    random.seed(42)
     # Run multiple times to account for randomness
     results = [
         augmenter.inverse_frequency_dropout(text, drop_prob=0.5) for _ in range(20)

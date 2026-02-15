@@ -141,7 +141,7 @@ class TransactionDataset(Dataset):
         self.labels = labels
         self.backend = backend
         self.augment = augment
-        self.augmenter = augmenter or TextAugmenter()
+        self.augmenter = augmenter or TextAugmenter(texts)
     
     def __len__(self) -> int:
         return len(self.texts)
@@ -155,8 +155,8 @@ class TransactionDataset(Dataset):
             text = self.augmenter.augment(text)
         
         # Get embedding from backend
-        embedding = self.backend.embed(text)
-        
+        embedding = self.backend.embed_batch([text])[0]
+
         return embedding, label, text
 
 
@@ -212,7 +212,7 @@ class HierarchicalLoss(nn.Module):
         for i in range(batch_size):
             target_class = targets[i].item()
             # Get hierarchy distances for this target
-            hier_distances = self.hierarchy_matrix[target_class]
+            hier_distances = self.hierarchy_matrix[target_class].to(logits.device)
             # Weight probabilities by hierarchy distance
             weighted_probs = probs[i] * (1.0 + hier_distances)
             hierarchical_penalty += weighted_probs.sum()
@@ -570,7 +570,7 @@ class HypCDTrainingPipeline:
             train_dataset,
             batch_size=self.config.batch_size,
             shuffle=True,
-            num_workers=4,
+            num_workers=0,
             pin_memory=True
         )
         
@@ -586,7 +586,7 @@ class HypCDTrainingPipeline:
                 val_dataset,
                 batch_size=self.config.batch_size,
                 shuffle=False,
-                num_workers=4,
+                num_workers=0,
                 pin_memory=True
             )
         

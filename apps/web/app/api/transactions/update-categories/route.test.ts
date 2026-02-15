@@ -16,13 +16,7 @@ const mockSupabase = {
   auth: {
     getUser: vi.fn(),
   },
-  from: vi.fn(() => ({
-    update: vi.fn(() => ({
-      in: vi.fn(() => ({
-        eq: vi.fn(),
-      })),
-    })),
-  })),
+  from: vi.fn(),
 };
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -212,13 +206,17 @@ describe('POST /api/transactions/update-categories', () => {
         error: null,
       });
 
-      const mockUpdate = vi.fn().mockReturnValue({
-        in: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null, count: 2 }),
-        }),
-      });
+      const countEq = vi.fn().mockResolvedValue({ count: 2, error: null });
+      const countIn = vi.fn().mockReturnValue({ eq: countEq });
+      const select = vi.fn().mockReturnValue({ in: countIn });
+
+      const updateEq = vi.fn().mockResolvedValue({ error: null });
+      const updateIn = vi.fn().mockReturnValue({ eq: updateEq });
+      const update = vi.fn().mockReturnValue({ in: updateIn });
+
       mockSupabase.from.mockReturnValue({
-        update: mockUpdate,
+        select,
+        update,
       } as unknown as ReturnType<typeof mockSupabase.from>);
 
       const request = new NextRequest('http://localhost/api/transactions/update-categories', {
@@ -241,6 +239,8 @@ describe('POST /api/transactions/update-categories', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.updatedCount).toBe(2);
+      expect(select).toHaveBeenCalled();
+      expect(update).toHaveBeenCalled();
     });
   });
 
@@ -251,16 +251,19 @@ describe('POST /api/transactions/update-categories', () => {
         error: null,
       });
 
-      const mockUpdate = vi.fn().mockReturnValue({
-        in: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({
-            error: new Error('Database error'),
-            count: 0,
-          }),
-        }),
+      const countEq = vi.fn().mockResolvedValue({ count: 1, error: null });
+      const countIn = vi.fn().mockReturnValue({ eq: countEq });
+      const select = vi.fn().mockReturnValue({ in: countIn });
+
+      const updateEq = vi.fn().mockResolvedValue({
+        error: new Error('Database error'),
       });
+      const updateIn = vi.fn().mockReturnValue({ eq: updateEq });
+      const update = vi.fn().mockReturnValue({ in: updateIn });
+
       mockSupabase.from.mockReturnValue({
-        update: mockUpdate,
+        select,
+        update,
       } as unknown as ReturnType<typeof mockSupabase.from>);
 
       const request = new NextRequest('http://localhost/api/transactions/update-categories', {
