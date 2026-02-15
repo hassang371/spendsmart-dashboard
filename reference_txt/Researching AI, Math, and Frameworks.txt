@@ -1,0 +1,247 @@
+﻿The Algorithmic Architect: A Strategic Blueprint for the SCALE Financial Intelligence Ecosystem (2026)
+1. Introduction: The Convergence of Deterministic Mathematics and Probabilistic Intelligence
+The financial technology landscape of 2026 stands at a critical inflection point, characterized by the collision of two distinct computational paradigms: the probabilistic, generative nature of modern Artificial Intelligence (AI) and the deterministic, rigorous foundations of classical financial mathematics. For the SCALE application, the stated objective is not merely to visualize transaction data but to construct an autonomous "AI Accountant"—a system capable of predicting future liabilities, optimizing asset allocation, and actively regulating user spending behavior with the precision of a human fiduciary. To achieve this, the architectural strategy must transcend the superficial integration of Large Language Models (LLMs) and instead engineer a proprietary "Math Engine" that synthesizes a century of mathematical discovery with the state-of-the-art (SOTA) machine learning architectures of the mid-2020s.
+This report provides an exhaustive technical and strategic analysis of the components required to build this engine. It challenges the prevailing industry narrative that "bigger is better" by validating lightweight, interpretable models like the Temporal Fusion Transformer (TFT) against the emerging class of Time Series Foundation Models (TSFMs). It establishes the viability of Neural Rough Differential Equations (Neural RDEs) for handling the inherent irregularity of personal financial events and proposes Hyperbolic Category Discovery (HypCD) as a geometric approach to transaction taxonomy that is mathematically superior to traditional Euclidean embeddings. Furthermore, the analysis integrates foundational concepts—from Modern Portfolio Theory (1952) to Topological Data Analysis (2020s)—into a cohesive operational framework, creating a system that utilizes Control Theory for spending regulation and Game Theory for autonomous negotiation. Finally, we evaluate the "Agentic Framework Wars" of 2026 to determine the optimal orchestration layer for a system that demands the type-safety of a banking ledger with the cognitive flexibility of an agent.
+________________
+2. The Predictive Core: Temporal Fusion Transformers vs. Foundation Models in 2026
+The core differentiator for SCALE is its ability to predict future spending with high accuracy and explainability. In 2026, this domain is contested by two opposing philosophies: the highly specialized, feature-engineered approach of the Temporal Fusion Transformer (TFT) and the massive, general-purpose Time Series Foundation Models (TSFMs).
+2.1 The "Legacy" Label: Myth vs. Reality
+In the accelerated timeline of AI development, architectures introduced in 2019-2021 are often prematurely labeled "legacy." The Temporal Fusion Transformer (TFT), introduced by Google Research, occupies this contested space. By 2026, the rise of TSFMs such as Amazon Chronos-2, Google TimesFM, and Salesforce MOIRAI-2 has shifted the SOTA benchmarks toward decoder-only transformer architectures trained on billions of time points across diverse domains.1
+TSFMs leverage "zero-shot" forecasting capabilities, allowing them to predict patterns in unseen datasets without specific training, much like GPT-4 processes unseen text. This has led many fintech competitors to abandon custom model training in favor of API-based foundation models. However, the analysis indicates that for the specific use case of personal finance, the "legacy" label applied to TFT is a misnomer. In fact, TFT remains superior to TSFMs in critical dimensions required for a consumer-facing financial app: Interpretability, Covariate Utilization, and Computational Efficiency.3
+2.2 Deep Technical Analysis: Temporal Fusion Transformer (TFT)
+2.2.1 Architectural distinctiveness
+The TFT is a hybrid deep learning model that combines the local processing capabilities of Recurrent Neural Networks (RNNs) with the long-range dependency capture of self-attention mechanisms. Its architecture is explicitly designed for multi-horizon forecasting where explaining why a prediction was made is as important as the prediction itself.
+* Variable Selection Networks (VSN): Unlike standard Transformers that treat all inputs as a unified embedding vector, TFT employs VSNs to explicitly select relevant input variables at each time step. In the context of SCALE, this allows the model to mathematically isolate specific drivers of spending. For instance, the model can determine that a specific prediction of high spending was driven 60% by the "Day of Week" (static covariate) and 40% by "Recent Transaction Volume" (observed input), while completely ignoring irrelevant variables like "Weather" if they show no correlation for that specific user.3
+* Gated Residual Networks (GRN): TFT utilizes GRNs to enable adaptive depth and network complexity. This is crucial for financial data, which is often sparse or noisy. The gating mechanism allows the model to skip over unused components, effectively suppressing noise and preventing overfitting on users with limited transaction history. This contrasts with TSFMs, which often hallucinate correlations in noise unless extensively fine-tuned.5
+* Static Covariate Encoders: Financial forecasting is heavily dependent on static metadata (e.g., User Income Bracket, Age, Location). TFT integrates these static covariates into the network to condition the temporal dynamics. This means the model learns different temporal patterns for a "Student" vs. a "Retiree," a feature that general-purpose TSFMs often struggle to incorporate without complex prompt engineering.6
+2.2.2 Interpretable Multi-Head Attention
+The self-attention mechanism in TFT is modified to provide interpretability. By analyzing the attention weights, the SCALE app can visualize "temporal importance"—identifying exactly which past events are influencing the current forecast. This enables the AI Accountant to provide actionable insights, such as: "I predict you will be short on cash next week because of the large insurance payment you made 11 months ago (Seasonality detected via Attention)".3
+2.3 The Rise of Foundation Models: TimesFM and Chronos-2
+2.3.1 Capabilities and Mechanisms
+By 2026, models like Amazon Chronos-2 and Google TimesFM have redefined the baseline for forecasting.
+* Amazon Chronos-2: Based on the T5 architecture, Chronos-2 treats time series forecasting as a language modeling task. It tokenizes time series values through scaling and quantization, allowing it to generate probabilistic forecasts using the same next-token prediction mechanics as LLMs. It supports univariate, multivariate, and covariate-informed forecasting and boasts processing speeds of over 300 forecasts per second on a single GPU.2
+* Google TimesFM: A patch-based decoder-only model pre-trained on 100 billion real-world time points. TimesFM utilizes "In-Context Fine-Tuning" (ICF), allowing it to adapt to a specific user's spending pattern by simply having the recent history included in the prompt context, similar to few-shot learning in NLP. Benchmarks show TimesFM-ICF matches the performance of fully fine-tuned models without the need for gradient updates.1
+2.3.2 Limitations for Personal Finance
+Despite their power, TSFMs present significant drawbacks for the SCALE use case:
+* Black Box Nature: TSFMs are notoriously difficult to interpret. While they may accurately predict a spending spike, extracting the causal reason from a 710-million parameter transformer is computationally prohibitive and mathematically opaque.
+* Data Hunger and Latency: TSFMs require massive computational resources (GPUs) for inference. For a privacy-preserving app that aims to run "AI Accountants" efficiently (potentially even on-device), the latency and cost of querying a giant model for every user transaction are unsustainable compared to the lightweight inference of a trained TFT.2
+* Handling of Sparsity: Financial data is often zero-inflated (many days with zero spending). TSFMs, trained on continuous signals like server loads or weather, often struggle with the erratic, sparse nature of personal finance without significant adaptation.8
+2.4 Strategic Recommendation
+For SCALE, the recommendation is a Hybrid Tiered Strategy:
+1. Primary Engine (TFT): Use TFT as the core predictive model for users with established history (>3 months). Its interpretability allows the AI Accountant to explain its reasoning, building user trust.
+2. Cold-Start Engine (TimesFM/Chronos): Utilize a TSFM via API for new users ("Cold Start" problem). Since the user has no history to train a TFT, the zero-shot capabilities of TimesFM can provide immediate, "good enough" baselines based on universal spending patterns learned from its massive training corpus.2
+________________
+3. The Irregular Heartbeat: Advanced Mathematical Architectures
+Standard time-series models assume data arrives at fixed intervals (e.g., every hour). Personal finance is inherently irregular; a user might make five transactions on Saturday and none until Wednesday. Forcing this data into fixed bins (e.g., daily totals) destroys valuable temporal information. To address this, SCALE must integrate advanced mathematical architectures from the 2020s.
+3.1 Neural Rough Differential Equations (Neural RDEs)
+3.1.1 Theoretical Foundation: Rough Path Theory
+Originating from the work of Terry Lyons in the 2000s and matured for machine learning in the 2020s, Rough Path Theory provides a mathematical framework for describing complex, irregular streams of data. The core concept is the Path Signature, a collection of iterated integrals that summarizes the geometric and order-based properties of a path. Crucially, the signature is invariant to re-parameterization, meaning it captures the sequence of events regardless of the speed at which they occur.10
+3.1.2 Neural RDE Architecture
+Neural Rough Differential Equations extend Neural Ordinary Differential Equations (Neural ODEs) to handle rough, irregular inputs.
+* Mechanism: The discrete sequence of financial transactions is treated as a continuous path   . The model computes the Log-Signature of this path over sliding intervals. This compressed representation serves as the driving signal for a differential equation:   . A neural network parameterizes the vector field   , learning how the evolving financial state    changes in response to the transaction stream.12
+* The "Sparsity" Advantage: Unlike Recurrent Neural Networks (RNNs) that must process every "zero" day in a padded sequence, Neural RDEs process the intervals between events using the log-signature. This makes them exceptionally efficient for long, sparse time series (e.g., a year of transaction history with only 200 active days). Research demonstrates Neural RDEs outperform RNNs and LSTMs on sequences with up to 50,000 observations due to their resistance to the vanishing gradient problem.12
+3.1.3 Application to SCALE
+The Neural RDE engine will serve as the "Continuous State Monitor" for the user's finances. It maintains a hidden state vector representing the user's financial health that updates continuously in time, not just at discrete steps. This allows the model to predict the exact time a user will run out of money, rather than just the day.15
+3.2 Topological Data Analysis (TDA)
+3.2.1 Persistent Homology for Regime Detection
+Financial behaviors often have a "shape." A stable budget might look like a connected loop in high-dimensional phase space (salary in -> rent out -> food out -> repeat). A financial crisis (job loss, debt spiral) breaks this loop or creates a new, chaotic shape. Topological Data Analysis (TDA) uses algebraic topology to quantify these shapes.16
+3.2.2 The TDA Anomaly Engine
+   * Mechanism: The TDA engine embeds the time series into a point cloud using Takens' embedding. It then computes Persistent Homology, tracking topological features (connected components, loops, voids) as a scale parameter increases. These features are visualized in a Persistence Diagram.
+   * Advantage: TDA is robust to coordinate-level noise. It ignores minor fluctuations in spending amounts and focuses on structural changes. Research in 2025 has shown TDA indicators (specifically the    norm of persistence landscapes) can detect financial "crash" regimes weeks before statistical volatility metrics (like standard deviation) spike.18
+   * Implementation: SCALE will run a lightweight TDA module (optimized via C++ bindings) to monitor the user's "Financial Topology." A sudden change in the Betti numbers (topological invariants) of their spending graph triggers a "Lifestyle Change Alert".19
+________________
+4. The Semantic Geometry: Hyperbolic Category Discovery (HypCD)
+Accurate transaction categorization is the bedrock of financial analytics. Traditional models use Euclidean embeddings (like BERT or Word2Vec), which place concepts in a flat space. However, financial categories are inherently hierarchical (e.g., Spending -> Food -> Groceries -> Whole Foods). Euclidean space struggles to represent trees without significant distortion.
+4.1 Technical Analysis: Hyperbolic Embeddings
+Hyperbolic Category Discovery (HypCD), a breakthrough architecture from 2025, utilizes Hyperbolic Space (specifically the Poincaré ball model) for embeddings.
+      * Exponential Volume: In hyperbolic geometry, the volume of space expands exponentially with the radius. This mirrors the structure of a tree, where the number of nodes grows exponentially with depth. This allows HypCD to embed complex hierarchies with near-zero distortion in lower dimensions compared to Euclidean models.21
+      * Mechanism: HypCD transforms the output of a backbone network (like DINOv2) into hyperbolic space via an exponential map. It then applies a hyperbolic contrastive loss function that optimizes both the hyperbolic distance and the angle between samples. This pulls similar transactions (e.g., "Uber" and "Lyft") closer while preserving their hierarchical relationship to the parent category "Transport".22
+4.2 Handling the "Unknown"
+A critical failure of current fintech apps is the inability to handle new vendors (e.g., a new streaming service). HypCD is designed for Generalized Category Discovery (GCD). It can effectively cluster unlabeled data (new vendors) into new, semantically meaningful groups without requiring retraining on labeled data. This allows SCALE to automatically suggest, "It looks like 'Hulu' is a new subscription," purely based on its hyperbolic geometric proximity to 'Netflix' and 'Disney+'.22
+________________
+5. The External Nervous System: Alternative Data & Privacy-Preserving Ingestion
+To predict spending before it happens, SCALE must ingest leading indicators from the user's digital life.
+5.1 Social Media: The Lifestyle Inflation Signal
+Research confirms a causal link between social media exposure and discretionary spending. High engagement with luxury content on Instagram or X often precedes "status spending".24
+      * The "Data Donation" Model: Direct scraping is unethical and often blocked. SCALE will implement a Data Donation workflow (GDPR-compliant). Users request their data export from social platforms and import the file into SCALE.
+      * Local Processing: A local parser runs on the user's device. It extracts metadata—not the content itself—such as "Event RSVPs" (predicting gifts/travel) or "Brand Interactions" (predicting purchases). Only these anonymized "Spending Signals" are fed into the prediction engine.27
+5.2 Calendar and Email: Deterministic Constraints
+      * Calendar: API integration with Google/Apple Calendar allows SCALE to identify hard financial constraints. An entry like "Trip to Paris" or "Dentist" is parsed using Named Entity Recognition (NER) to forecast specific cost clusters (Travel, Health) weeks in advance.29
+      * Email: Privacy-preserving local email clients (similar to Mailbird's architecture) can scan for "Confirmation" emails (flights, tickets) that haven't hit the bank feed yet. This effectively reduces the "latency" of financial awareness from days (bank settlement) to seconds (purchase confirmation).31
+5.3 Privacy Architecture: The Sovereign Edge
+To handle this sensitive data without creating a surveillance nightmare, SCALE adopts a Sovereign Edge architecture.
+      * Local LLMs: A quantized Small Language Model (SLM) like Gemma 2B or Llama-3-8B runs directly on the user's device (via WebLLM or MLC LLM). This local agent performs the semantic analysis of emails and calendar entries. No raw text ever leaves the phone.32
+      * Federated Learning (FL): To improve the global prediction models without centralizing data, SCALE uses FL. The local model computes gradient updates based on the user's data and sends only the gradients (encrypted via Homomorphic Encryption) to the central server. This allows the "Math Engine" to learn that "Wedding RSVP = High Spending" without ever knowing who is getting married.7
+________________
+6. The Optimizing Mind: Impactful Mathematical Discoveries (1920-2020)
+The "AI Accountant" must operate on proven mathematical principles, not just heuristics. We map a century of discovery to specific SCALE features.
+
+
+Era
+	Mathematical Discovery
+	Originator
+	Application to SCALE
+	Strategic Implementation
+	1920s
+	Ramsey Theory
+	F.P. Ramsey
+	Pattern Detection
+	Used to find order in sparse transaction sets. Validates that even in small datasets (new users), structured spending clusters must exist, enabling "Cold Start" categorization.
+	1940s
+	Game Theory
+	von Neumann / Nash
+	Negotiation Agent
+	Models bill negotiation (ISP, Insurance) as a non-cooperative game. The agent calculates the Nash Equilibrium—the optimal price the provider will accept to avoid churn—before initiating contact.35
+	1950s
+	Modern Portfolio Theory (MPT)
+	H. Markowitz
+	Budget Allocation
+	Treats the monthly budget as an investment portfolio. "Needs" are low-volatility bonds; "Wants" are high-volatility stocks. MPT optimizes the allocation to maximize user utility (happiness) for a given variance (risk of overdraft).37
+	1956
+	Kelly Criterion
+	J.L. Kelly Jr.
+	Savings Sizing
+	Replaces arbitrary rules ("save 10%") with the Kelly formula:   . It calculates the mathematically optimal fraction of excess cash to deploy into savings based on the user's "edge" (income stability vs. expense volatility) to maximize log-wealth growth.37
+	1960s
+	Chaos Theory
+	E. Lorenz
+	Volatility Alerts
+	Uses Lyapunov Exponents to measure the sensitivity of the user's financial system. It distinguishes between stable spending and the onset of a chaotic regime (e.g., debt spiral), triggering "Circuit Breakers" when predictability collapses.40
+	1960s
+	Control Theory
+	Kalman
+	Spending Regulator
+	Implements a PID Controller (Proportional-Integral-Derivative) logic. If spending velocity (derivative) exceeds the target, the controller applies a damping force (e.g., moving funds to a locked vault) to return the system to equilibrium.19
+	1965
+	Fuzzy Logic
+	L. Zadeh
+	Ambiguous Categories
+	Allows transactions to have partial membership (e.g., "Dinner" is 0.7 Business, 0.3 Personal). This enables highly accurate tax deduction estimation and nuanced budgeting.35
+	2020s
+	Optimal Transport
+	G. Monge (revived)
+	Cash Flow Matching
+	Uses Wasserstein Distance to solve the "transport" problem of moving liquidity from income events to bill due dates with minimal "cost" (interest/fees), optimizing the timing of transfers.42
+	________________
+7. The Orchestration Layer: Agentic Frameworks of 2026
+The "Brain" of SCALE requires a framework to coordinate the LLM (Interface) with the Math Engine (Logic). In 2026, three contenders dominate: LangGraph, PydanticAI, and Agno.
+7.1 Comparison and Evaluation
+7.1.1 LangGraph (The Stateful Giant)
+      * Philosophy: Models agents as nodes in a state machine (graph).
+      * Pros: Best-in-class for complex, cyclic workflows (e.g., "Plan -> Execute -> Error -> Re-plan"). Robust state persistence allows long-running financial tasks (e.g., a 3-day negotiation).
+      * Cons: High overhead and complexity ("LangChain bloat"). Debugging the graph state can be difficult. Slower instantiation times.44
+7.1.2 PydanticAI (The Type-Safe Tool User)
+      * Philosophy: Data-first. Agents are defined by the strict schemas of the data they ingest/output.
+      * Pros: Strict Mathematical Typing. If the Kelly Criterion engine expects a float, PydanticAI ensures the LLM provides exactly that, preventing "hallucinated strings" in math operations. Integration with the Python validation ecosystem is seamless.
+      * Cons: Less mature abstraction for complex, multi-turn conversations compared to LangGraph.44
+7.1.3 Agno (The Performance Contender)
+      * Philosophy: Performance-first. Lightweight, multi-modal agents designed for speed.
+      * Pros: Agents instantiate ~10,000x faster than LangGraph and use 50x less memory. Superior "Agentic Memory" handling (vector DB integration) for long-term user context.
+      * Cons: Newer ecosystem with fewer community extensions.47
+7.2 Strategic Choice: The Hybrid Architecture
+For SCALE, a Hybrid Architecture is recommended:
+      * Agno serves as the high-level Orchestrator. Its speed and low memory footprint are critical for the mobile app experience, ensuring the "AI Accountant" feels responsive.
+      * PydanticAI is used at the Tool Level. When the Agno agent calls the "Math Engine," it wraps the call in a PydanticAI schema. This guarantees that the inputs to the rigorous mathematical models (TFT, Kelly, MPT) are type-safe and validated, preventing runtime errors in critical financial calculations.44
+________________
+8. Comprehensive Strategic Implementation Plan
+8.1 The "Math Engine" Architecture
+The SCALE backend is designed as a Composite AI system, layering deterministic math over probabilistic learning.
+Layer 1: The Senses (Ingestion & Privacy)
+      * Components: Mobile App (React Native), Local Parsing Engine (WASM/Python), Local LLM (Gemma 2B).
+      * Data Flow: Bank APIs (Plaid) + Social/Calendar Data (Local Parser) -> Privacy Filter (PII Hashing) -> Anonymized Signal Stream.
+      * Innovation: Social and Calendar data never leave the device in raw form. Only "Spending Signals" (e.g., {event_type: 'wedding', date: '2026-06-12', est_cost: 500}) are transmitted.
+Layer 2: The Analyst (Processing & Geometry)
+      * Components: HypCD Engine, Neural RDE Core, TDA Module.
+      * Function:
+      * HypCD maps transaction text to Hyperbolic space to determine hierarchy and cluster new vendors.
+      * Neural RDE processes the irregular stream to update the continuous "Financial State Vector."
+      * TDA monitors the topology of this state vector for regime changes (Anomalies).
+Layer 3: The Strategist (Prediction & Optimization)
+      * Components: TFT Ensemble, Math Core (MPT, Kelly, Control Theory).
+      * Function:
+      * TFT takes the State Vector + Calendar Signals to output a 30-day Probabilistic Forecast (Quantile Regression).
+      * Math Core calculates the "Safe Savings" amount (Kelly Criterion) and rebalances the budget buckets (MPT).
+      * Control Loop compares Actual vs. Forecast. If the error > threshold, it triggers the Agent.
+Layer 4: The Interface (The AI Accountant)
+      * Components: Agno Orchestrator, LLM (Claude 3.5/Gemini 3).
+      * Function: The Agent receives the "Intervention Trigger" from the Strategist. It synthesizes the math into natural language (e.g., "I noticed a spending anomaly. Based on your Kelly edge, I've paused your savings transfer to cover it.").
+8.2 Implementation Roadmap
+Phase
+	Duration
+	Key Deliverables
+	Strategic Focus
+	Phase 1: Foundation
+	Months 1-3
+	Smart Import Engine: Build robust parsers using LLMs. TFT Training: Train initial models on open datasets (Monash) to establish baselines.
+	Data & Accuracy
+	Phase 2: The Math Core
+	Months 4-6
+	HypCD Integration: Train hyperbolic embeddings on transaction descriptions. Optimization Logic: Implement Kelly Criterion and MPT in Python.
+	Differentiation
+	Phase 3: The Sovereign Edge
+	Months 7-9
+	Local LLM: Deploy quantized models for on-device calendar/email parsing. Privacy Layer: Implement Federated Learning for global model updates.
+	Privacy & Trust
+	Phase 4: Agentic Life
+	Months 10-12
+	Agno Orchestration: Connect the Math Engine to the Chat Interface. Neural RDE: Deploy for sparse data users. Game Theory: Launch negotiation simulations.
+	Autonomy
+	8.3 Conclusion
+SCALE has the potential to redefine the personal finance category by moving beyond passive "tracking" to active, autonomous "regulation." By rejecting the hype of deploying massive, opaque Foundation Models for every task and instead opting for a Composite Architecture—where precise, interpretable mathematical models (TFT, RDE, HypCD) are orchestrated by a high-performance agentic framework (Agno)—SCALE secures a defensible proprietary moat. The integration of historical mathematical truths with cutting-edge topological and hyperbolic deep learning creates a system that is not just "smart" in the generative sense, but mathematically sound, logically robust, and fundamentally trustworthy.
+________________
+Citations:
+18
+Works cited
+      1. Time series foundation models can be few-shot learners - Google Research, accessed on February 11, 2026, https://research.google/blog/time-series-foundation-models-can-be-few-shot-learners/
+      2. The 2026 Time Series Toolkit: 5 Foundation Models for Autonomous Forecasting - MachineLearningMastery.com, accessed on February 12, 2026, https://machinelearningmastery.com/the-2026-time-series-toolkit-5-foundation-models-for-autonomous-forecasting/
+      3. Interpretable Deep Learning for Time Series Forecasting - Google Research, accessed on February 11, 2026, https://research.google/blog/interpretable-deep-learning-for-time-series-forecasting/
+      4. An In-Depth Exploration of Temporal Fusion Transformers for Time Series Forecasting | by Mirza Samad | AI Simplified in Plain English | Medium, accessed on February 11, 2026, https://medium.com/ai-simplified-in-plain-english/an-in-depth-exploration-of-temporal-fusion-transformers-for-time-series-forecasting-91e74040a079
+      5. Deep Understanding of Temporal Fusion Transformers (TFT) and it's Architecture - Medium, accessed on February 11, 2026, https://medium.com/@ramponnana.2011/deep-understanding-of-temporal-fusion-transformers-tft-and-its-architecture-3ec01a0722d6
+      6. Temporal Fusion Transformer-Based Trading Strategy for Multi-Crypto Assets Using On-Chain and Technical Indicators - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2079-8954/13/6/474
+      7. Privacy-Preserving Machine Learning in Financial Customer Data: Trade-Offs Between Accuracy, Security, And Personalization - ResearchGate, accessed on February 11, 2026, https://www.researchgate.net/publication/393441251_Privacy-Preserving_Machine_Learning_in_Financial_Customer_Data_Trade-Offs_Between_Accuracy_Security_And_Personalization
+      8. A Comparative Time Series Analysis of the ARIMA and Temporal Fusion Transformer (TFT) Models - SMU Scholar, accessed on February 11, 2026, https://scholar.smu.edu/cgi/viewcontent.cgi?article=1307&context=datasciencereview
+      9. Benchmarking Time Series Foundation Models for Short-Term Household Electricity Load Forecasting - arXiv, accessed on February 12, 2026, https://arxiv.org/html/2410.09487v1
+      10. Rough paths: machine learning for sequential data - The Alan Turing Institute, accessed on February 11, 2026, https://www.turing.ac.uk/research/interest-groups/rough-paths-machine-learning-sequential-data
+      11. An Introduction to the Theory of Rough Paths - MS Researchers, accessed on February 11, 2026, https://researchers.ms.unimelb.edu.au/~xgge@unimelb/Files/Notes/Rough%20Path%20Theory.pdf
+      12. Neural Rough Differential Equations for Long Time Series and Classification of D - Imperial College London, accessed on February 12, 2026, https://www.imperial.ac.uk/media/imperial-college/faculty-of-natural-sciences/department-of-mathematics/math-finance/Bergs-Hinrik-_00449457.pdf
+      13. Neural Rough Differential Equations for Long Time Series, accessed on February 11, 2026, https://proceedings.mlr.press/v139/morrill21b.html
+      14. Log Neural Controlled Differential Equations: The Lie Brackets Make a Difference - GitHub, accessed on February 12, 2026, https://raw.githubusercontent.com/mlresearch/v235/main/assets/walker24a/walker24a.pdf
+      15. Comprehensive Review of Neural Differential Equations for Time Series Analysis - arXiv, accessed on February 12, 2026, https://arxiv.org/html/2502.09885v1
+      16. Change Point Detection in Financial Market Using Topological Data Analysis - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2079-8954/13/10/875
+      17. Enhancing financial time series forecasting through topological data analysis - RIUMA, accessed on February 11, 2026, https://riuma.uma.es/entities/publication/9a1ffef9-bfbe-41d7-bd2b-3d513f9a117f
+      18. Topological Machine Learning for Financial Crisis Detection: Early Warning Signals from Persistent Homology - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2073-431X/14/10/408
+      19. Topology Unveiled: A New Horizon for Economic and Financial Modeling - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2227-7390/13/2/325
+      20. Mathematics, Volume 13, Issue 24 (December-2 2025) – 149 articles - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2227-7390/13/24
+      21. Daily Papers - Hugging Face, accessed on February 11, 2026, https://huggingface.co/papers?q=embedding%20norm%20inflation
+      22. Hyperbolic Category Discovery - Visual AI Lab, accessed on February 11, 2026, https://visual-ai.github.io/hypcd/
+      23. Hyperbolic Category Discovery - CVF Open Access, accessed on February 11, 2026, https://openaccess.thecvf.com/content/CVPR2025/papers/Liu_Hyperbolic_Category_Discovery_CVPR_2025_paper.pdf
+      24. A Survey on Alternative Data in Finance and Business: Emerging Applications and Theory Analysis - SSRN, accessed on February 11, 2026, https://papers.ssrn.com/sol3/Delivery.cfm/SSRN_ID4148628_code5320003.pdf?abstractid=4148628
+      25. (PDF) Social Media and Personal Finance - ResearchGate, accessed on February 11, 2026, https://www.researchgate.net/publication/371159282_Social_Media_and_Personal_Finance
+      26. Social Media for Personal Finances: A New Trend for Millennials and Gen Z - Federal Reserve Bank of Kansas City, accessed on February 11, 2026, https://www.kansascityfed.org/research/payments-system-research-briefings/social-media-for-personal-finances-a-new-trend-for-millennials-and-gen-z/
+      27. Best practices for studies using digital data donation - PMC, accessed on February 11, 2026, https://pmc.ncbi.nlm.nih.gov/articles/PMC11971172/
+      28. OA A framework for privacy preserving digital trace data collection through data donation - AUP-Online, accessed on February 11, 2026, https://www.aup-online.com/content/journals/10.5117/CCR2022.2.002.BOES?crawler=true
+      29. Email Marketing Trends for 2026: Insights to Boost Every Send - Litmus, accessed on February 11, 2026, https://www.litmus.com/blog/trends-in-email-marketing
+      30. Marketing & AI Predictions That Will Shape Search, Strategy and Spend in 2026 - WSI, accessed on February 12, 2026, https://www.wsiworld.com/blog/marketing-ai-predictions-that-will-shape-search-strategy-and-spend-in-2026
+      31. How Email Services Build Hidden Profiles From Your Messages: The Complete Privacy Guide - Mailbird, accessed on February 11, 2026, https://www.getmailbird.com/how-email-services-build-hidden-profiles-privacy-guide/
+      32. (PDF) Securing local LLMs for academic research: a human-system integration analysis and evolution of TAUCHI-GPT - ResearchGate, accessed on February 11, 2026, https://www.researchgate.net/publication/398450674_Securing_local_LLMs_for_academic_research_a_human-system_integration_analysis_and_evolution_of_TAUCHI-GPT
+      33. Towards Pervasive Distributed Agentic Generative AI - A State of The Art - arXiv, accessed on February 11, 2026, https://arxiv.org/html/2506.13324v2
+      34. Privacy-Preserving Aggregation in Federated Learning: A Survey - ResearchGate, accessed on February 11, 2026, https://www.researchgate.net/publication/362031752_Privacy-Preserving_Aggregation_in_Federated_Learning_A_Survey
+      35. Mathematical finance | Business and Management | Research Starters - EBSCO, accessed on February 11, 2026, https://www.ebsco.com/research-starters/business-and-management/mathematical-finance
+      36. Overview and Perspectives of Chaos Theory and Its Applications in Economics, accessed on February 11, 2026, https://www.researchgate.net/publication/376871728_Overview_and_Perspectives_of_Chaos_Theory_and_Its_Applications_in_Economics
+      37. Quantitative Portfolio Management: Review and Outlook - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2227-7390/12/18/2897
+      38. Enhancing portfolio management using artificial intelligence: literature review - PMC, accessed on February 11, 2026, https://pmc.ncbi.nlm.nih.gov/articles/PMC11033520/
+      39. Hey Kelly, Optimize My Portfolio - Medium, accessed on February 11, 2026, https://medium.com/@jlevi.nyc/hey-kelly-optimize-my-portfolio-64e835fbced9
+      40. A Mathematical Model of Financial Bubbles: A Behavioral Approach - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2227-7390/11/19/4102
+      41. Nonlinear Dynamics and Chaos Theory in Financial Modeling: A Computational Perspective - Hilaris Publisher, accessed on February 11, 2026, https://www.hilarispublisher.com/open-access/nonlinear-dynamics-and-chaos-theory-in-financial-modeling-a-computational-perspective.pdf
+      42. An introduction to optimal transport and its application to mathematical finance - University of Michigan, accessed on February 11, 2026, https://lsa.umich.edu/content/dam/math-assets/logm/wn2026/mathematical%20finance.pdf
+      43. Optimal Transport and Learning in Fair Resource Allocation - ResearchGate, accessed on February 11, 2026, https://www.researchgate.net/publication/395708529_Optimal_Transport_and_Learning_in_Fair_Resource_Allocation
+      44. Pydantic AI vs LangGraph: Features, Integrations, and Pricing Compared - ZenML Blog, accessed on February 11, 2026, https://www.zenml.io/blog/pydantic-ai-vs-langgraph
+      45. A Detailed Comparison of Top 6 AI Agent Frameworks in 2026 - Turing, accessed on February 12, 2026, https://www.turing.com/resources/ai-agent-frameworks
+      46. Agentic AI Frameworks: A Quick Comparison Guide - Arkon Data, accessed on February 11, 2026, https://www.arkondata.com/en/post/agentic-ai-frameworks-a-quick-comparison-guide
+      47. Agno vs LangGraph: Best Framework to Build Multi-Agent Systems - ZenML Blog, accessed on February 11, 2026, https://www.zenml.io/blog/agno-vs-langgraph
+      48. Every AI Engineer is talking about Agno - Here's why? - Tinz Twins Hub, accessed on February 11, 2026, https://tinztwinshub.com/software-engineering/every-ai-engineer-is-talking-about-agno/
+      49. Evaluating the Effectiveness of Time Series Transformers for Demand Forecasting in Retail, accessed on February 11, 2026, https://www.mdpi.com/2227-7390/12/17/2728
+      50. Research reveals that social media influences spending, but leads to buyer's remorse, accessed on February 11, 2026, https://homeofdirectcommerce.com/news/research-reveals-that-social-media-influences-spending-but-leads-to-buyers-remorse/
+      51. A Comprehensive Analysis of Privacy-Preserving Solutions Developed for Online Social Networks - MDPI, accessed on February 11, 2026, https://www.mdpi.com/2079-9292/11/13/1931
+      52. (PDF) Privacy-Preserving Tools and Technologies: Government Adoption and Challenges, accessed on February 11, 2026, https://www.researchgate.net/publication/388916139_Privacy-Preserving_Tools_and_Technologies_Government_Adoption_and_Challenges
+      53. [Quick Review] Hyperbolic Category Discovery - Liner, accessed on February 11, 2026, https://liner.com/review/hyperbolic-category-discovery
