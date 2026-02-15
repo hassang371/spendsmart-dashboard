@@ -10,7 +10,12 @@ const API_BASE =
 
 export interface HealthResponse {
   status: string;
-  engines: {
+  services?: {
+    api: string;
+    redis: string;
+    celery: string;
+  };
+  engines?: {
     ingestion: string;
     forecasting: string;
   };

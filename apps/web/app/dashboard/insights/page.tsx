@@ -235,22 +235,20 @@ export default function AIInsightsPage() {
 
         {/* Gateway Status Badge */}
         <div
-          className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur-md transition-colors duration-300 ${
-            checkingHealth
+          className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur-md transition-colors duration-300 ${checkingHealth
               ? 'border-border bg-muted text-muted-foreground'
               : gatewayOnline
                 ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
                 : 'border-destructive/20 bg-destructive/10 text-destructive'
-          }`}
+            }`}
         >
           <div
-            className={`h-1.5 w-1.5 rounded-full ${
-              checkingHealth
+            className={`h-1.5 w-1.5 rounded-full ${checkingHealth
                 ? 'animate-pulse bg-muted-foreground'
                 : gatewayOnline
                   ? 'bg-emerald-500 animate-pulse'
                   : 'bg-destructive'
-            }`}
+              }`}
           />
           {checkingHealth ? 'Connecting...' : gatewayOnline ? 'Engine Online' : 'Engine Offline'}
         </div>
@@ -292,15 +290,21 @@ export default function AIInsightsPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Ingestion</span>
+                  <span className="text-xs text-muted-foreground">API</span>
                   <span className="text-xs font-mono font-bold text-foreground">
-                    {healthData.engines.ingestion}
+                    {healthData.services?.api || healthData.engines?.ingestion || 'unknown'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Forecasting</span>
+                  <span className="text-xs text-muted-foreground">Redis</span>
                   <span className="text-xs font-mono font-bold text-foreground">
-                    {healthData.engines.forecasting}
+                    {healthData.services?.redis || 'unknown'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Celery</span>
+                  <span className="text-xs font-mono font-bold text-foreground">
+                    {healthData.services?.celery || 'unknown'}
                   </span>
                 </div>
               </div>
@@ -540,11 +544,10 @@ export default function AIInsightsPage() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
-              className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed transition-all duration-300 ${
-                isDragOver
+              className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed transition-all duration-300 ${isDragOver
                   ? 'border-primary bg-primary/5 scale-[1.01]'
                   : 'border-border bg-muted/30 hover:border-primary/40 hover:bg-muted/50'
-              }`}
+                }`}
             >
               <input
                 ref={fileInputRef}
