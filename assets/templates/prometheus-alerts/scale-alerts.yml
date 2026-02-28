@@ -1,0 +1,48 @@
+groups:
+  - name: scale-api-alerts
+    rules:
+      # Critical Alerts
+      - alert: ApiDown
+        expr: up{job="scale-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "API Service is down"
+          description: "API has been unreachable for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High Error Rate (> 5%)"
+          description: "More than 5% of API requests are failing with 5xx over the last 5 minutes."
+
+      # Warning Alerts
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API Latency"
+          description: "95th percentile latency is above 2 seconds over the last 5 minutes."
+
+      - alert: WorkerQueueBackedUp
+        expr: celery_queue_length{queue="celery"} > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: data-engineering
+        annotations:
+          summary: "Celery worker queue is backed up"
+          description: "There are more than 100 pending Celery tasks in the queue."

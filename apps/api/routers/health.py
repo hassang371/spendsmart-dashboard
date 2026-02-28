@@ -23,7 +23,8 @@ async def health_liveness():
 
     This is the fast probe. Kubernetes/load balancers should use this.
     """
-    return {"status": "healthy", "service": "api"}
+    version = settings.APP_VERSION if settings else "unknown"
+    return {"status": "healthy", "service": "api", "version": version}
 
 
 @router.get("/health/ready")
