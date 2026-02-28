@@ -1,0 +1,51 @@
+/* Override CSS that hides elements before JavaScript loads */
+
+/* Show navigation immediately (don't wait for JS animation) */
+#navContainer {
+  transform: translate(0px, 0%) !important;
+}
+
+/* Show hero content immediately */
+.main-w .section:nth-child(1) [data-hero-content] {
+  opacity: 1 !important;
+}
+
+/* Ensure page wrapper has proper layout */
+.page-w {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Fix any layout constraints */
+.main-w {
+  width: 100%;
+}
+
+/* Menu open state - fullscreen overlay */
+#navContainer.is--open {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(0, 0, 0, 0.98) !important;
+  z-index: 9999 !important;
+  transform: translate(0px, 0%) !important;
+}
+
+#navContainer.is--open .nav-inner {
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+}
+
+#navContainer.is--open .nav-inner-list {
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 3rem !important;
+}
+
+#navContainer.is--open .button-main {
+  font-size: 2rem !important;
+}
