@@ -39,16 +39,55 @@ async def lifespan(app: FastAPI):
         log_level=settings.log_level,
         json_output=(os.getenv("ENVIRONMENT", "development") == "production"),
     )
-    logger.info("app_starting", version="0.3.0")
+    logger.info("app_starting", version="0.4.0")
     yield
     logger.info("app_stopping")
 
 
+# OpenAPI tag metadata for interactive docs
+TAGS_METADATA = [
+    {
+        "name": "ingestion",
+        "description": "CSV/Excel file upload, parsing, and fingerprinting.",
+    },
+    {
+        "name": "categorization",
+        "description": "Transaction classification using HypCD model.",
+    },
+    {
+        "name": "forecasting",
+        "description": "Financial forecasting and predictions.",
+    },
+    {
+        "name": "training",
+        "description": "ML model training job management.",
+    },
+    {
+        "name": "anomaly",
+        "description": "Anomaly detection and alerts (TDA-based).",
+    },
+    {
+        "name": "accounts",
+        "description": "User transactions (paginated + filtered), profile, and settings.",
+    },
+    {
+        "name": "health",
+        "description": "Liveness and readiness probes.",
+    },
+]
+
 app = FastAPI(
     title="SCALE API Gateway",
-    description="Bridges the Python intelligence layer to the Next.js frontend.",
-    version="0.3.0",
+    description=(
+        "AI-powered financial platform API. Provides transaction management, "
+        "ML-based categorization, forecasting, and anomaly detection."
+    ),
+    version="0.4.0",
     lifespan=lifespan,
+    openapi_tags=TAGS_METADATA,
+    license_info={
+        "name": "MIT",
+    },
 )
 
 # Register RFC 7807 error handlers (ARCH-02 fix)
