@@ -5,12 +5,22 @@ Provides both user-scoped and service-role Supabase clients.
 
 Fixes BUG-06: documents the empty refresh token pattern and validates
 JWT expiry upfront rather than letting it fail silently.
+
+M3: Adds JWT expiry check via base64 decode of the payload claim.
+The signature is NOT verified here (Supabase handles that); we only
+check the 'exp' claim to return a clear 401 on expired tokens.
 """
 
 import os
+import json
+import time
+import base64
+import structlog
 
 from fastapi import Depends, Header, HTTPException
 from supabase import Client, create_client
+
+logger = structlog.get_logger()
 
 
 def _get_supabase_url() -> str:
@@ -27,10 +37,38 @@ def _get_supabase_anon_key() -> str:
     return key
 
 
-async def get_user_token(authorization: str = Header(default="")) -> str:
-    """Extract Bearer token from Authorization header.
+def _decode_jwt_payload(token: str) -> dict:
+    """Decode JWT payload without verifying the signature.
 
-    Returns the raw JWT string.
+    Used only for pre-flight checks (e.g. expiry). Supabase performs
+    full cryptographic verification when the token is used in a query.
+
+    Raises ValueError if the token is structurally malformed.
+    """
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("Not a valid JWT structure")
+        # Base64url decode (add padding if necessary)
+        payload_b64 = parts[1]
+        padding = 4 - len(payload_b64) % 4
+        if padding != 4:
+            payload_b64 += "=" * padding
+        payload_bytes = base64.urlsafe_b64decode(payload_b64)
+        return json.loads(payload_bytes)
+    except Exception as exc:
+        raise ValueError(f"Failed to decode JWT payload: {exc}") from exc
+
+
+async def get_user_token(authorization: str = Header(default="")) -> str:
+    """Extract and pre-validate Bearer token from Authorization header.
+
+    Checks:
+    1. Header format is "Bearer <token>"
+    2. Token is structurally a JWT
+    3. Token has not expired (exp claim)
+
+    Returns the raw JWT string for use with Supabase client.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -44,6 +82,23 @@ async def get_user_token(authorization: str = Header(default="")) -> str:
             status_code=401,
             detail="Missing bearer token",
         )
+
+    # Pre-flight expiry check (full verification delegated to Supabase)
+    try:
+        payload = _decode_jwt_payload(token)
+        exp = payload.get("exp")
+        if exp is not None and time.time() > exp:
+            logger.warning("jwt_expired", exp=exp)
+            raise HTTPException(
+                status_code=401,
+                detail="Token has expired. Please sign in again.",
+            )
+    except HTTPException:
+        raise
+    except ValueError:
+        # Malformed JWT — let Supabase return the definitive error
+        logger.warning("jwt_malformed_payload")
+
     return token
 
 

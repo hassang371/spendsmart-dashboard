@@ -24,6 +24,10 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         description="Comma-separated allowed origins for CORS",
     )
+    PRODUCTION_ORIGINS: str = Field(
+        default="",
+        description="Comma-separated production origins. Overrides ALLOWED_ORIGINS if ENVIRONMENT=production",
+    )
 
     # Redis
     REDIS_URL: str = Field(
@@ -46,8 +50,20 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins(self) -> list[str]:
-        """Parse comma-separated origins into a list."""
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        """Parse comma-separated origins into a list.
+        
+        M3 Fix: Enforces strict CORS in production. Triggers warning if * is used.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        origins_str = self.PRODUCTION_ORIGINS if self.ENVIRONMENT == "production" and self.PRODUCTION_ORIGINS else self.ALLOWED_ORIGINS
+        origins = [o.strip() for o in origins_str.split(",") if o.strip()]
+        
+        if self.ENVIRONMENT == "production" and "*" in origins:
+            logger.warning("SECURITY RISK: Wildcard (*) CORS origin allowed in production!")
+            
+        return origins
 
     @property
     def log_level(self) -> str:
