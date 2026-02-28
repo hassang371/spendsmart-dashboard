@@ -101,7 +101,7 @@ Canonical implementation: `apps/api/domains/ingestion/service.py:generate_finger
 
 ### Error Handling
 
-All API errors return RFC 7807 Problem Details format:
+All API errors return RFC 7807 Problem Details format (ARCH-02).
 
 ```json
 {
@@ -112,6 +112,13 @@ All API errors return RFC 7807 Problem Details format:
 }
 ```
 
+### Security Hardening (M3)
+
+- **Rate Limiting:** Redis-backed sliding window per user limit (`core/rate_limiter.py`).
+- **Headers Middleware:** X-Frame, HSTS, CSP, nosniff enforced on all responses (`core/security_headers.py`).
+- **Payload Limits:** Strict 10MB limit via `ContentSizeLimitMiddleware` preventing DoS payloads.
+- **Production CORS:** Environment checks in `core/config.py` reject wildcard origins unless in `.env.development`.
+
 ### Frontend API Client
 
 All backend calls go through `apps/web/lib/api/client.ts` — centralized fetch wrapper with auth token injection. The Next.js API routes have been deleted.
@@ -119,13 +126,13 @@ All backend calls go through `apps/web/lib/api/client.ts` — centralized fetch 
 ## Database
 
 - **Supabase/Postgres** with RLS enabled
-- `transactions` table: user_id, amount, description, merchant_name, category, fingerprint, raw_data (JSONB)
+- `transactions` table: user_id, amount, description, merchant_name, category, fingerprint, raw_data (JSONB). 5 optimization indexes implemented (M2).
 - `training_jobs` table: status tracking for async training
 - `uploaded_files` table: deduplication by file hash
 
 ## Testing
 
-51 tests across core + 6 domain modules. TDD workflow (red-green-refactor).
+122 backend tests across core + 6 domain modules. TDD workflow (red-green-refactor) strictly enforced.
 
 ```bash
 python -m pytest apps/api/ -v

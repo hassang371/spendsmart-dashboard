@@ -6,17 +6,25 @@ apps/api/domains/. Old routers kept temporarily for backward compat.
 Fixes:
 - ARCH-03: CORS origins from config (was hardcoded to localhost:3000).
 - ARCH-02: RFC 7807 error handler registered globally.
+
+M3 Security Hardening:
+- SecurityHeadersMiddleware: X-Frame-Options, X-Content-Type-Options, HSTS, CSP
+- CORS: explicit methods/headers allowlist + 24h preflight cache
+- ContentSizeLimitMiddleware: reject oversized request bodies (prevent DoS)
 """
 
 import os
 import structlog
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from apps.api.core.config import settings
 from apps.api.core.errors import register_error_handlers
 from apps.api.core.logging import setup_logging
+from apps.api.core.security_headers import SecurityHeadersMiddleware
 
 # Domain routers (new)
 from apps.api.domains.ingestion.router import router as ingestion_router
@@ -30,6 +38,38 @@ from apps.api.domains.accounts.router import router as accounts_router
 from apps.api.routers import health
 
 logger = structlog.get_logger()
+
+
+MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests with Content-Length exceeding the configured limit.
+
+    Prevents DoS via oversized payloads. CSV uploads are capped at 10 MB
+    which is sufficient for thousands of transaction rows.
+    """
+
+    def __init__(self, app, max_bytes: int = MAX_REQUEST_BODY_BYTES):
+        super().__init__(app)
+        self._max_bytes = max_bytes
+
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > self._max_bytes:
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "type": "about:blank",
+                    "title": "Content Too Large",
+                    "status": 413,
+                    "detail": (
+                        f"Request body exceeds maximum allowed size of "
+                        f"{self._max_bytes // (1024 * 1024)} MB."
+                    ),
+                },
+            )
+        return await call_next(request)
 
 
 @asynccontextmanager
@@ -93,13 +133,22 @@ app = FastAPI(
 # Register RFC 7807 error handlers (ARCH-02 fix)
 register_error_handlers(app)
 
-# CORS — ARCH-03 fix: configurable origins from environment
+# Security headers — M3: X-Frame-Options, X-Content-Type-Options, CSP, etc.
+# Middleware is applied in reverse registration order (last added = outermost).
+is_production = settings.ENVIRONMENT == "production"
+app.add_middleware(SecurityHeadersMiddleware, production=is_production)
+
+# Request size limit — M3: reject bodies > 10 MB before they hit domain logic
+app.add_middleware(ContentSizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
+
+# CORS — ARCH-03 fix + M3 hardening: explicit allowlist, preflight cache
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    max_age=86400,  # Cache preflight for 24 hours
 )
 
 # --- Domain routers (new modular architecture) ---
