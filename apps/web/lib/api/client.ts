@@ -31,7 +31,7 @@ class ApiError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body, token, headers = {} } = options;
 
   const requestHeaders: Record<string, string> = {

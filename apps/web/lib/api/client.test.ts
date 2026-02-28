@@ -1,14 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   ApiError,
-  apiHealthCheck,
-  apiIngestFile,
-  apiForecastPredict,
-  apiSafeToSpend,
-  apiClassifyDescriptions,
-  apiSubmitFeedback,
-  apiUploadTrainingData,
-  apiGetLatestTrainingJob,
+  healthApi,
+  ingestionApi,
+  forecastApi,
+  categorizationApi,
+  trainingApi,
 } from './client';
 
 // Mock global fetch
@@ -18,7 +15,7 @@ global.fetch = mockFetch;
 describe('API Client', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000';
+    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000/api/v1';
   });
 
   describe('ApiError', () => {
@@ -28,13 +25,14 @@ describe('API Client', () => {
         status: 404,
         statusText: 'Not Found',
         text: () => Promise.resolve(JSON.stringify({ detail: 'Not found' })),
+        json: () => Promise.resolve({ detail: 'Not found' }),
       });
 
-      await expect(apiHealthCheck()).rejects.toThrow('Not found');
+      await expect(healthApi.check()).rejects.toThrow('Not found');
     });
   });
 
-  describe('apiHealthCheck', () => {
+  describe('healthApi.check', () => {
     it('should return health status', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -45,17 +43,14 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiHealthCheck();
+      const result = await healthApi.check();
 
       expect(result.status).toBe('healthy');
       expect(result.engines?.ingestion).toBe('ready');
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:8000/api/v1/health',
         expect.objectContaining({
-          headers: expect.objectContaining({
-            Accept: 'application/json',
-          }),
-          signal: expect.any(AbortSignal),
+          method: 'GET',
         })
       );
     });
@@ -66,13 +61,14 @@ describe('API Client', () => {
         status: 503,
         statusText: 'Service Unavailable',
         text: () => Promise.resolve('Service down'),
+        json: () => Promise.reject(new Error('not json')),
       });
 
-      await expect(apiHealthCheck()).rejects.toThrow(ApiError);
+      await expect(healthApi.check()).rejects.toThrow(ApiError);
     });
   });
 
-  describe('apiIngestFile', () => {
+  describe('ingestionApi', () => {
     it('should upload file successfully', async () => {
       const mockFile = new File(['test'], 'test.csv', { type: 'text/csv' });
 
@@ -85,7 +81,7 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiIngestFile(mockFile);
+      const result = await ingestionApi.uploadCSV(mockFile, 'test-token');
 
       expect(result.count).toBe(1);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -93,30 +89,16 @@ describe('API Client', () => {
         expect.objectContaining({
           method: 'POST',
           body: expect.any(FormData),
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-token',
+          }),
         })
       );
     });
-
-    it('should include password if provided', async () => {
-      const mockFile = new File(['test'], 'test.xlsx', {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ transactions: [], count: 0 }),
-      });
-
-      await apiIngestFile(mockFile, 'secret123');
-
-      const callArgs = mockFetch.mock.calls[0];
-      const formData = callArgs[1].body as FormData;
-      expect(formData.get('password')).toBe('secret123');
-    });
   });
 
-  describe('apiForecastPredict', () => {
-    it('should get forecast without auth', async () => {
+  describe('forecastApi', () => {
+    it('should get forecast prediction', async () => {
       const mockFile = new File(['test'], 'test.csv', { type: 'text/csv' });
 
       mockFetch.mockResolvedValueOnce({
@@ -130,34 +112,22 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiForecastPredict(mockFile);
+      const result = await forecastApi.predict(mockFile, 'target-token');
 
       expect(result.horizon_days).toBe(7);
       expect(result.predictions).toHaveLength(1);
-    });
-
-    it('should include auth token if provided', async () => {
-      const mockFile = new File(['test'], 'test.csv', { type: 'text/csv' });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ predictions: [], horizon_days: 7, model: 'test', note: '' }),
-      });
-
-      await apiForecastPredict(mockFile, 'test-token');
-
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
+        'http://localhost:8000/api/v1/forecast/predict',
         expect.objectContaining({
+          method: 'POST',
+          body: expect.any(FormData),
           headers: expect.objectContaining({
-            Authorization: 'Bearer test-token',
+            Authorization: 'Bearer target-token',
           }),
         })
       );
     });
-  });
 
-  describe('apiSafeToSpend', () => {
     it('should get safe to spend amount', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -172,31 +142,14 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiSafeToSpend();
+      const result = await forecastApi.safeToSpend('auth-token');
 
       expect(result.safe_amount).toBe(5000);
       expect(result.confidence).toBe(0.95);
-    });
-
-    it('should include auth token if provided', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            safe_amount: 0,
-            currency: 'USD',
-            horizon_days: 7,
-            confidence: 0,
-            model: '',
-            note: '',
-          }),
-      });
-
-      await apiSafeToSpend('auth-token');
-
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
+        'http://localhost:8000/api/v1/forecast/safe-to-spend',
         expect.objectContaining({
+          method: 'GET',
           headers: expect.objectContaining({
             Authorization: 'Bearer auth-token',
           }),
@@ -205,8 +158,8 @@ describe('API Client', () => {
     });
   });
 
-  describe('apiClassifyDescriptions', () => {
-    it('should classify descriptions', async () => {
+  describe('categorizationApi', () => {
+    it('should classify descriptions in batch', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -216,34 +169,26 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiClassifyDescriptions(['Starbucks Coffee', 'Uber Ride']);
+      const result = await categorizationApi.classifyBatch(
+        ['Starbucks Coffee', 'Uber Ride'],
+        'token'
+      );
 
       expect(result['Starbucks Coffee']).toBe('Food & Drink');
       expect(result['Uber Ride']).toBe('Transportation');
-    });
-
-    it('should send POST request with descriptions', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-
-      await apiClassifyDescriptions(['test']);
-
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
+        'http://localhost:8000/api/v1/categorization/classify/batch',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
+            Authorization: 'Bearer token',
           }),
-          body: JSON.stringify({ descriptions: ['test'] }),
+          body: JSON.stringify({ descriptions: ['Starbucks Coffee', 'Uber Ride'] }),
         })
       );
     });
-  });
 
-  describe('apiSubmitFeedback', () => {
     it('should submit category corrections', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -254,13 +199,24 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiSubmitFeedback({ Starbucks: 'Food & Drink' });
+      const result = await categorizationApi.submitFeedback({ Starbucks: 'Food & Drink' }, 'token');
 
       expect(result.status).toBe('success');
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/categorization/feedback',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer token',
+          }),
+          body: JSON.stringify({ corrections: { Starbucks: 'Food & Drink' } }),
+        })
+      );
     });
   });
 
-  describe('apiUploadTrainingData', () => {
+  describe('trainingApi', () => {
     it('should upload training file', async () => {
       const mockFile = new File(['test'], 'training.csv', { type: 'text/csv' });
 
@@ -275,33 +231,22 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiUploadTrainingData(mockFile);
+      const result = await trainingApi.upload(mockFile, 'auth-token');
 
       expect(result.job_id).toBe('job-123');
       expect(result.transaction_count).toBe(100);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/training/upload',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.any(FormData),
+          headers: expect.objectContaining({
+            Authorization: 'Bearer auth-token',
+          }),
+        })
+      );
     });
 
-    it('should include password and auth token if provided', async () => {
-      const mockFile = new File(['test'], 'training.xlsx', {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({ status: 'success', message: '', job_id: '', transaction_count: 0 }),
-      });
-
-      await apiUploadTrainingData(mockFile, 'password123', 'auth-token');
-
-      const callArgs = mockFetch.mock.calls[0];
-      const formData = callArgs[1].body as FormData;
-      expect(formData.get('password')).toBe('password123');
-      expect(callArgs[1].headers.Authorization).toBe('Bearer auth-token');
-    });
-  });
-
-  describe('apiGetLatestTrainingJob', () => {
     it('should get latest training job', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -315,7 +260,7 @@ describe('API Client', () => {
           }),
       });
 
-      const result = await apiGetLatestTrainingJob();
+      const result = await trainingApi.getLatest('auth-token');
 
       expect(result?.id).toBe('job-123');
       expect(result?.status).toBe('completed');
@@ -328,34 +273,23 @@ describe('API Client', () => {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
-        text: () => Promise.resolve(JSON.stringify({ detail: 'Invalid file format' })),
+        text: () => Promise.resolve(JSON.stringify({ detail: 'Invalid request format' })),
+        json: () => Promise.resolve({ detail: 'Invalid request format' }),
       });
 
-      await expect(apiHealthCheck()).rejects.toThrow('Invalid file format');
+      await expect(healthApi.check()).rejects.toThrow('Invalid request format');
     });
 
-    it('should use status text if JSON parse fails', async () => {
+    it('should use default error if no JSON detail', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
         text: () => Promise.resolve('Plain text error'),
+        json: () => Promise.reject(new Error('not json')),
       });
 
-      await expect(apiHealthCheck()).rejects.toThrow('API 500: Internal Server Error');
-    });
-
-    it('should handle network errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network failure'));
-
-      await expect(apiHealthCheck()).rejects.toThrow('Network failure');
-    });
-
-    it('should handle timeout errors', async () => {
-      const abortError = new DOMException('The operation was aborted', 'AbortError');
-      mockFetch.mockRejectedValueOnce(abortError);
-
-      await expect(apiHealthCheck()).rejects.toThrow('API request timed out');
+      await expect(healthApi.check()).rejects.toThrow('Unknown error');
     });
   });
 });
