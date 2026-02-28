@@ -5,7 +5,7 @@ import pandas as pd
 # We expect to create a function `prepare_transaction_payload` in `apps.api.routers.training`
 # or a new utility module. For now, let's assume it's in `apps.api.routers.training`.
 
-from apps.api.routers.training import prepare_transaction_payload
+from apps.api.domains.training.router import prepare_transaction_payload
 
 
 def test_prepare_transaction_payload_structure():
