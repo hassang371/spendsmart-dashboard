@@ -125,8 +125,8 @@ All backend calls go through `apps/web/lib/api/client.ts` — centralized fetch 
 
 ## Testing
 
-39 tests across core + 6 domain modules. TDD workflow (red-green-refactor).
+51 tests across core + 6 domain modules. TDD workflow (red-green-refactor).
 
 ```bash
-python -m pytest apps/api/core/tests/ apps/api/domains/ apps/api/tests/ -v
+python -m pytest apps/api/ -v
 ```

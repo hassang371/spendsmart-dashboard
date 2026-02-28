@@ -6,23 +6,12 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
-from apps.api.deps import get_user_client
+from apps.api.core.auth import get_user_client
 
 client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def mock_classifier(monkeypatch):
-    """Mock HypCDClassifier to avoid loading the full model during tests."""
 
-    class MockClassifier:
-        def predict_batch(self, texts):
-            return [("Food", 0.8, torch.zeros(1, 384)) for _ in texts]
-
-    monkeypatch.setattr(
-        "apps.api.routers.ingestion.get_classifier",
-        lambda: MockClassifier(),
-    )
 
 
 @pytest.fixture(autouse=True)
