@@ -3,25 +3,23 @@
 ## Phase
 
 Milestone 1 — COMPLETE ✅
+Git cleanup — COMPLETE ✅
 Milestone 2 — NOT STARTED
 
-## M1 Completion Summary
+## Git State
 
-- Commit: 8601b4b (65 files, +2315/-2800)
-- 13/15 audit issues fixed (BUG-05, IMP-01, IMP-02 deferred)
-- 39 tests pass, zero failures
-- Modular monolith: 6 domain modules + core infrastructure
-- Old routers deleted, Next.js API routes deleted
-- CLAUDE.md rewritten, model files relocated
+- **Current branch:** `development` (a212354)
+- **Branches:** `development` (tracking origin/development), `main` (tracking origin/main)
+- **Working tree:** 0 dirty files
+- **Remote:** 2 branches only (main, development)
+- **Pushed:** `development` pushed to origin
 
-## M2 Scope (from architecture/docs/05_task_checklist.md)
+## M1 Completion
+
+- Commit 8601b4b: M1 core restructure (13/15 audit fixes, 39 tests)
+- Commit a212354: workspace cleanup (skills, docs, assets)
+
+## M2 Scope
 
 - API Design: pagination, filtering, OpenAPI, versioning
 - Database Optimization: indexes, batch upsert, autovacuum
-- IMP-02: API versioning strategy
-
-## Key Files for M2
-
-- apps/api/domains/\*/schemas.py — enrich with OpenAPI examples
-- apps/api/domains/\*/router.py — add pagination/filtering
-- apps/api/core/ — add pagination.py, filtering.py, versioning.py
