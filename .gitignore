@@ -29,6 +29,14 @@ __pycache__/
 .DS_Store
 *.pem
 .worktrees/
+.agents/
+.claude/
+.gemini/
+.vscode/
+references/
+misc/
+scripts/
+tools/
 
 # Debug
 npm-debug.log*
@@ -40,7 +48,7 @@ yarn-error.log*
 .env
 .env.local
 .env*.local
-!.env.example
+.env.example
 
 # Vercel
 .vercel
