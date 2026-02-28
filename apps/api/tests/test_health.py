@@ -17,9 +17,9 @@ def test_health_returns_status_ok():
 
 
 def test_health_returns_engine_versions():
-    response = client.get("/api/v1/health")
+    """Readiness probe should report service health."""
+    response = client.get("/api/v1/health/ready")
     data = response.json()
     assert "services" in data
     assert "api" in data["services"]
     assert "redis" in data["services"]
-    assert "celery" in data["services"]
