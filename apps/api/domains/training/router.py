@@ -57,7 +57,7 @@ def prepare_transaction_payload(row, user_id: str) -> dict:
         "description": desc,
         "merchant_name": merchant,
         "category": "Uncategorized",
-        "type": "expense" if amount < 0 else "income",
+        "type": "debit" if amount < 0 else "credit",
         "fingerprint": fingerprint,
         "raw_data": raw_data,
     }
