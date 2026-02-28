@@ -1,0 +1,6 @@
+date,description,amount,type,category
+2023-10-01,Starbucks,5.50,Debit,Food & Drink
+2023-10-02,Salary,2500.00,Credit,Income
+2023-10-03,Uber,15.20,Debit,Transport
+2023-10-04,Amazon,45.99,Debit,Shopping
+2023-10-05,Rent,1200.00,Debit,Bills

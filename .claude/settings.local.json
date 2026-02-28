@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:assets.slater.app)",
+      "Bash(cd:*)"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+torch
+pytorch-forecasting
+pytorch-lightning
+pandas
+numpy
+pytest
+scikit-learn
