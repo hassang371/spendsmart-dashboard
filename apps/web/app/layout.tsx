@@ -21,10 +21,24 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'SCALE',
-  description: 'Finance. Leveled Up.',
+  title: 'SCALE — Personal Financing Made Easy',
+  description: 'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
+  openGraph: {
+    title: 'SCALE — Personal Financing Made Easy',
+    description: 'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
+    images: ['/slush/6870e4e53832c8115a855885_slush_opengraph.jpg'],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SCALE — Personal Financing Made Easy',
+    description: 'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
+    images: ['/slush/6870e4e53832c8115a855885_slush_opengraph.jpg'],
+  },
   icons: {
-    icon: '/slush/6870becddb972b0b143dfe65_Slush_Logo_3D_Blue.avif',
+    icon: '/slush/680905cfdc45073838364973_favicon.svg',
+    shortcut: '/slush/680905cfdc45073838364973_favicon.svg',
+    apple: '/slush/680905cfdc45073838364974_webclip.svg',
   },
 };
 

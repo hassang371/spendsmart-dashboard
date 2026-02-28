@@ -1,0 +1,261 @@
+# Codebase Audit Report: Flaws, Bugs & Improvements
+
+**Date:** 2026-02-27
+**Project:** SCALE APP
+
+---
+
+## Part 1: Critical Bugs & Logic Errors
+
+These are issues that will cause incorrect behavior or failures in production.
+
+---
+
+### 🔴 BUG-01: Training Job Status Never Updates to "completed" or "failed"
+
+**Files:** [training.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/training.py), [training_tasks.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/tasks/training_tasks.py)
+
+**Problem:** The `train_model_task` Celery task returns a result dict with `status: "completed"` or `status: "failed"`, but **it never writes that status back to the `training_jobs` table in Supabase**. The frontend polls `GET /training/status/{job_id}`, which reads from the database. Since the Celery worker doesn't have a Supabase client and never updates the DB, the job will be stuck at `"queued"` forever from the user's perspective.
+
+**Impact:** Users will never see their training jobs finish. The UI will spin indefinitely.
+
+**Suggestion:** The Celery task needs a Supabase **service-role client** (not a user JWT client) to update the `training_jobs` row with `status`, `metrics`, and `checkpoint_path` upon completion or failure.
+
+---
+
+### 🔴 BUG-02: Inconsistent Fingerprinting Causes Duplicate Transactions
+
+**Files:** [import_transactions.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/packages/ingestion_engine/import_transactions.py) (Python), [route.ts](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/web/app/api/import/route.ts) (Next.js)
+
+**Problem:** Two completely different fingerprinting algorithms exist:
+
+- **Python** (`generate_fingerprint`): `SHA256(date|amount|merchant_uppercased)`
+- **Next.js** (`buildFingerprint`): `SHA256(date|amount|merchant|description|payment_method|reference)` — all uppercased with 6 fields.
+
+The same transaction imported via the Python API vs. the Next.js `/api/import` route will produce **different fingerprints**, defeating the entire deduplication system. Re-uploading the same file through different paths will create duplicates.
+
+**Impact:** Data corruption. Users will see duplicate transactions.
+
+**Suggestion:** Consolidate fingerprinting logic into a single, shared definition and use the same algorithm on both sides.
+
+---
+
+### 🔴 BUG-03: `classify.py` Router Conflicts with `ingestion.py` Router
+
+**Files:** [classify.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/classify.py#L44), [ingestion.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/ingestion.py#L137)
+
+**Problem:** Both routers register a `POST /classify` endpoint under the same `/api/v1` prefix. FastAPI will only serve one of them (the last one registered). Currently, `classify.router` is registered after `ingestion.router` in `main.py`, so the Pydantic-typed `ClassifyRequest` version from `classify.py` will shadow the dict-based one from `ingestion.py`.
+
+**Impact:** One of the two classify endpoints is unreachable. If the frontend expects the dict-based version (from `ingestion.py`), classification calls will fail with a 422 validation error.
+
+**Suggestion:** Rename one endpoint (e.g., `/classify/trained` for the model-checkpoint version in `classify.py`).
+
+---
+
+### 🔴 BUG-04: `classify.py` Batch Endpoint is an N+1 Celery Anti-Pattern
+
+**File:** [classify.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/classify.py#L95-L136)
+
+**Problem:** The `/classify/batch` endpoint dispatches a **separate Celery task for each description** in a loop, then calls `.get(timeout=30)` synchronously on each one. For 100 descriptions, this means 100 Redis round-trips, 100 Celery task pickups, and 100 blocking waits. This is extremely slow and will likely timeout.
+
+```python
+for desc in request.descriptions:
+    result = classify_transaction_task.delay(...).get(timeout=30)  # Blocks!
+```
+
+**Impact:** Batch classification is unusably slow. A batch of 50+ items will likely exceed HTTP timeout limits.
+
+**Suggestion:** Either run inference directly in-process (it's fast PyTorch inference, no need for Celery), or use Celery's `group()` primitive to dispatch tasks in parallel and collect results.
+
+---
+
+### 🟡 BUG-05: In-Memory Rate Limiting is Per-Process and Resets on Restart
+
+**File:** [ingestion.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/ingestion.py#L26)
+
+**Problem:** The rate limiter uses an in-memory `defaultdict(deque)`. This is:
+
+1. **Per-process**: If Uvicorn runs with multiple workers, each worker has its own counter. Rate limits are effectively multiplied by the number of workers.
+2. **Volatile**: Restarts wipe all rate-limit state, allowing immediate abuse.
+3. **Unbounded**: The `_request_windows` dict grows indefinitely with new users — it's a subtle memory leak.
+
+**Impact:** Rate limiting is unreliable and can be bypassed. Memory grows over time.
+
+**Suggestion:** Move rate limiting to Redis (which is already available) or use a proper middleware like `slowapi`.
+
+---
+
+### 🟡 BUG-06: `supabase_client.py` Passes Empty String as Refresh Token
+
+**File:** [supabase_client.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/supabase_client.py#L29)
+
+```python
+client.auth.set_session(access_token, "")
+```
+
+**Problem:** Passing an empty string `""` as the refresh token is a hack. While it works for short-lived requests, it means the client can never refresh an expired token. If the user's JWT has expired, the request will fail with a 401 and no refresh will be attempted.
+
+**Impact:** Requests may fail for users whose tokens are near expiry.
+
+**Suggestion:** This is acceptable for a stateless API gateway where each request carries a fresh token, but it should be documented. Consider validating token expiry upfront and returning a clear error.
+
+---
+
+### 🟡 BUG-07: `forecast.py` Imports a Potentially Missing Function
+
+**File:** [forecast.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/forecast.py#L12)
+
+```python
+from packages.ingestion_engine.import_transactions import parse_csv_content
+```
+
+**Problem:** The `parse_csv_content` function exists in `import_transactions.py`, but it takes an `IO` (file-like object), not bytes. The forecast router decodes bytes to a `StringIO` stream and passes it correctly, so this works. However, some inline comments in the code itself express confusion about this (`"But wait, parse_file takes bytes"`), suggesting the author was uncertain. The bigger issue is that `parse_csv_content` uses `_normalize_dataframe` which drops extended columns, while `parse_file` preserves them — an inconsistency.
+
+**Impact:** Forecast ingestion may silently lose metadata columns compared to the training upload path.
+
+---
+
+## Part 2: Architectural Flaws
+
+---
+
+### 🟠 ARCH-01: Dual Import Paths Create Divergent Data
+
+**Files:** Next.js `POST /api/import` vs. FastAPI `POST /api/v1/training/upload`
+
+**Problem:** There are two completely separate pathways to insert transactions:
+
+1. **Next.js** `/api/import`: Frontend parses the file client-side, sends structured JSON, Next.js validates with Zod, and inserts directly into Supabase. Uses the 6-field fingerprint.
+2. **FastAPI** `/api/v1/training/upload`: FastAPI receives raw file, parses with Python/Pandas, and inserts into Supabase. Uses the 3-field fingerprint.
+
+These two paths produce transactions with **different fingerprints, different `raw_data` structures, and different `type` values** (`credit`/`debit` vs. `expense`/`income`).
+
+**Suggestion:** Choose one canonical import path and deprecate the other. The FastAPI path is richer (it does AI categorization), while the Next.js path is simpler (Zod validation). Consider routing all imports through FastAPI.
+
+---
+
+### 🟠 ARCH-02: No Unified Error Handling or Logging Strategy
+
+**Problem:** Error handling is ad-hoc across routers:
+
+- Some use `logger.error()` (training, classify).
+- Some use `print()` (forecast).
+- Some swallow exceptions silently (forecast TFT fallback).
+- Error messages are generic (`"Failed to parse file"`, `"Database error"`) and don't help with debugging.
+
+**Suggestion:** Implement a centralized exception handler middleware in FastAPI. Standardize on `logger` everywhere. Include request IDs for traceability.
+
+---
+
+### 🟠 ARCH-03: No CORS Configuration for Production
+
+**File:** [main.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/main.py#L13-L19)
+
+```python
+allow_origins=["http://localhost:3000"],
+```
+
+**Problem:** CORS only allows `localhost:3000`. When deployed, the Vercel frontend (e.g., `https://scale-app.vercel.app`) will be **blocked by CORS** from calling the FastAPI backend.
+
+**Suggestion:** Make `allow_origins` configurable via environment variable. Add the production domain.
+
+---
+
+### 🟠 ARCH-04: HypCD Classifier is Re-instantiated on Every Request
+
+**File:** [ingestion.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/ingestion.py#L28-L29)
+
+```python
+def get_classifier():
+    return HypCDClassifier()
+```
+
+**Problem:** A new `HypCDClassifier` instance is created for every single API call. If model initialization involves loading a PyTorch model from disk, this adds significant latency per request and wastes memory.
+
+**Suggestion:** Use FastAPI's dependency injection with a singleton pattern, or initialize the classifier once at module level / app startup using `@app.on_event("startup")`.
+
+---
+
+### 🟠 ARCH-05: `google-generativeai` Still in Requirements
+
+**File:** [requirements.txt](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/requirements.txt#L10)
+
+**Problem:** `google-generativeai>=0.3.0` is still listed as a dependency despite the project having migrated away from Gemini to HypCD for categorization. This adds unnecessary package weight and potential security surface.
+
+**Suggestion:** Remove `google-generativeai` from `requirements.txt`.
+
+---
+
+## Part 3: Areas for Improvement
+
+---
+
+### 💡 IMP-01: Missing Database Migrations System
+
+**Problem:** Schema changes are managed via raw `.sql` files in `architecture/`. There's no migration runner, no version tracking, and no rollback capability. Schema changes are likely applied manually.
+
+**Suggestion:** Adopt Supabase migrations (via `supabase db diff` and `supabase db push`) or a Python migration tool like Alembic.
+
+---
+
+### 💡 IMP-02: No API Versioning Strategy
+
+**Problem:** All endpoints are under `/api/v1`, but there's no mechanism to introduce `/api/v2` without breaking clients. The Next.js frontend hardcodes paths.
+
+**Suggestion:** Use a shared constants file or environment variable for the API base URL, making version bumps a single-line change.
+
+---
+
+### 💡 IMP-03: `CLAUDE.md` is Stale
+
+**Problem:** As noted in the earlier Codebase State Report, this file describes an older `dashboard/` + `tools/` structure and doesn't reflect the current monorepo with `apps/web`, `apps/api`, and `packages/`.
+
+**Suggestion:** Rewrite `CLAUDE.md` to reflect the current architecture or generate it from the system design report.
+
+---
+
+### 💡 IMP-04: No Input Validation on FastAPI Endpoints Using `dict`
+
+**Files:** [ingestion.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/ingestion.py) (`/classify`, `/feedback`, `/discover`)
+
+**Problem:** Several endpoints accept `body: dict` instead of Pydantic models. This means:
+
+- No automatic validation or documentation in Swagger.
+- No type safety.
+- Potential for unexpected `KeyError` at runtime.
+
+**Suggestion:** Define Pydantic `BaseModel` schemas for all request bodies (like `classify.py` already does).
+
+---
+
+### 💡 IMP-05: Health Check Blocks on Celery Inspect
+
+**File:** [health.py](file:///Users/hassangameryt/Documents/Antigravity/SCALE%20APP/apps/api/routers/health.py#L34-L42)
+
+**Problem:** `celery_app.control.inspect().stats()` broadcasts to all workers and waits for responses. If workers are slow or down, this call blocks the health check endpoint for several seconds, which can cause cascading failures with orchestrators like Kubernetes that rely on fast health probes.
+
+**Suggestion:** Set a short timeout on the inspect call (e.g., 2 seconds), or check Celery health via a Redis ping instead.
+
+---
+
+## Summary Table
+
+| ID      | Severity    | Category        | Issue                                                |
+| ------- | ----------- | --------------- | ---------------------------------------------------- |
+| BUG-01  | 🔴 Critical | Logic           | Training job status never updates in DB              |
+| BUG-02  | 🔴 Critical | Data            | Inconsistent fingerprinting between Python & Next.js |
+| BUG-03  | 🔴 Critical | Routing         | Duplicate `POST /classify` endpoint                  |
+| BUG-04  | 🔴 Critical | Performance     | N+1 Celery calls in batch classify                   |
+| BUG-05  | 🟡 Medium   | Security        | In-memory rate limiting is unreliable                |
+| BUG-06  | 🟡 Medium   | Auth            | Empty refresh token in Supabase client               |
+| BUG-07  | 🟡 Medium   | Data            | Forecast parser drops metadata columns               |
+| ARCH-01 | 🟠 High     | Architecture    | Dual import paths create divergent data              |
+| ARCH-02 | 🟠 High     | Ops             | No unified error handling / logging                  |
+| ARCH-03 | 🟠 High     | Deployment      | CORS blocks production frontend                      |
+| ARCH-04 | 🟠 High     | Performance     | Classifier re-instantiated per request               |
+| ARCH-05 | 🟠 Medium   | Hygiene         | Stale `google-generativeai` dependency               |
+| IMP-01  | 💡 Low      | DevOps          | No database migration system                         |
+| IMP-02  | 💡 Low      | Maintainability | No API versioning strategy                           |
+| IMP-03  | 💡 Low      | Docs            | `CLAUDE.md` is stale                                 |
+| IMP-04  | 💡 Medium   | Validation      | `dict` bodies instead of Pydantic models             |
+| IMP-05  | 💡 Medium   | Reliability     | Health check blocks on Celery inspect                |
