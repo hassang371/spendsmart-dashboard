@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     )
 
     # App
-    APP_VERSION: str = Field(default="0.3.0", description="Application version")
+    APP_VERSION: str = Field(default="0.5.0", description="Application version")
 
     # Sentry (optional)
     SENTRY_DSN: str = Field(default="", description="Sentry DSN for error tracking")

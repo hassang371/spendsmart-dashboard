@@ -11,6 +11,11 @@ M3 Security Hardening:
 - SecurityHeadersMiddleware: X-Frame-Options, X-Content-Type-Options, HSTS, CSP
 - CORS: explicit methods/headers allowlist + 24h preflight cache
 - ContentSizeLimitMiddleware: reject oversized request bodies (prevent DoS)
+
+M5 Monitoring & Observability:
+- RequestIDMiddleware: UUID per request, X-Request-ID header propagation
+- RequestLoggingMiddleware: structured access logs with duration_ms
+- Sentry: error tracking + performance monitoring (optional, via SENTRY_DSN)
 """
 
 import os
@@ -25,6 +30,7 @@ from apps.api.core.config import settings
 from apps.api.core.errors import register_error_handlers
 from apps.api.core.logging import setup_logging
 from apps.api.core.security_headers import SecurityHeadersMiddleware
+from apps.api.core.middleware import RequestIDMiddleware, RequestLoggingMiddleware
 
 # Domain routers (new)
 from apps.api.domains.ingestion.router import router as ingestion_router
@@ -72,6 +78,27 @@ class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+def _init_sentry() -> None:
+    """Initialize Sentry error tracking if SENTRY_DSN is configured."""
+    dsn = settings.SENTRY_DSN if settings else ""
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=dsn,
+            traces_sample_rate=0.1,
+            profiles_sample_rate=0.1,
+            environment=settings.ENVIRONMENT,
+            release=settings.APP_VERSION,
+            send_default_pii=False,
+        )
+        logger.info("sentry_initialized", environment=settings.ENVIRONMENT)
+    except Exception as exc:
+        logger.warning("sentry_init_failed", error=str(exc))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan — startup/shutdown hooks."""
@@ -79,7 +106,8 @@ async def lifespan(app: FastAPI):
         log_level=settings.log_level,
         json_output=(os.getenv("ENVIRONMENT", "development") == "production"),
     )
-    logger.info("app_starting", version="0.4.0")
+    _init_sentry()
+    logger.info("app_starting", version="0.5.0")
     yield
     logger.info("app_stopping")
 
@@ -122,7 +150,7 @@ app = FastAPI(
         "AI-powered financial platform API. Provides transaction management, "
         "ML-based categorization, forecasting, and anomaly detection."
     ),
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
     openapi_tags=TAGS_METADATA,
     license_info={
@@ -133,22 +161,30 @@ app = FastAPI(
 # Register RFC 7807 error handlers (ARCH-02 fix)
 register_error_handlers(app)
 
-# Security headers — M3: X-Frame-Options, X-Content-Type-Options, CSP, etc.
 # Middleware is applied in reverse registration order (last added = outermost).
+# Order: RequestLogging → RequestID → SecurityHeaders → ContentSizeLimit → CORS → app
+
+# M5: Structured request logging (outermost — wraps entire request lifecycle)
+app.add_middleware(RequestLoggingMiddleware)
+
+# M5: Request ID generation/propagation
+app.add_middleware(RequestIDMiddleware)
+
+# M3: Security headers (X-Frame-Options, X-Content-Type-Options, CSP, etc.)
 is_production = settings.ENVIRONMENT == "production"
 app.add_middleware(SecurityHeadersMiddleware, production=is_production)
 
-# Request size limit — M3: reject bodies > 10 MB before they hit domain logic
+# M3: Reject bodies > 10 MB before they hit domain logic
 app.add_middleware(ContentSizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 
-# CORS — ARCH-03 fix + M3 hardening: explicit allowlist, preflight cache
+# ARCH-03 fix + M3 hardening: explicit CORS allowlist, preflight cache
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-    max_age=86400,  # Cache preflight for 24 hours
+    max_age=86400,
 )
 
 # --- Domain routers (new modular architecture) ---
@@ -158,6 +194,16 @@ app.include_router(forecasting_router, prefix="/api/v1")
 app.include_router(training_router, prefix="/api/v1")
 app.include_router(anomaly_router, prefix="/api/v1")
 app.include_router(accounts_router, prefix="/api/v1")
+
+@app.get("/health", tags=["health"])
+async def root_health_check():
+    """Liveness probe."""
+    return {"status": "ok"}
+
+@app.get("/ready", tags=["health"])
+async def root_ready_check():
+    """Readiness probe."""
+    return {"status": "ready"}
 
 # --- Legacy routers (kept during migration) ---
 app.include_router(health.router, prefix="/api/v1")
