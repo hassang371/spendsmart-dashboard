@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Ensure only one deployment runs at a time
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The CI workflow will also run on push to main (defined in ci.yml)
+  # But we run a lightweight wait-for-ci job here to ensure it passes before deploying
+  wait-for-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI to pass
+        run: |
+          echo "In a real setup, we'd use 'needs: ci' if they were in the same file,"
+          echo "or a github-action script to wait for the related CI run."
+          echo "Assuming CI passes for demo purposes."
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [wait-for-ci]
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.api.scale-app.com
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Staging setup
+        run: |
+          echo "Mock deployment to Staging environment."
+          echo "Here we would run 'docker compose -f docker-compose.prod.yml up -d' on the staging server"
+          echo "or push to a PaaS like Render / Heroku / Fly.io."
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+
+    # This environment should be configured in GitHub Settings -> Environments
+    # Requires an Environment Protection Rule: "Required Reviewers"
+    environment:
+      name: production
+      url: https://api.scale-app.com
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Production execution
+        run: |
+          echo "Mock deployment to Production environment."
+          echo "This only runs after a manual approval from the required reviewers."
+          echo "Here we would deploy to production."

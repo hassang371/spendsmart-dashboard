@@ -1,0 +1,53 @@
+# git and environment
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env_venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.pre-commit-config.yaml
+celerybeat-schedule
+*.log
+
+# Node/Frontend
+node_modules/
+dist/
+build/
+.next/
+apps/web/
+
+# IDE/System
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+.macos
+Thumbs.db
+
+# Project specifics
+models/
+misc/
+architecture/
+.agents/
+.claude/
+.gemini/
+QUICKSTART.md
+CLAUDE.md

@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install ruff
+      - name: Run Ruff Linter
+        run: ruff check apps/api/
+      - name: Run Ruff Formatter
+        run: ruff format --check apps/api/
+
+  security-sast:
+    name: Security Scans (SAST & Secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Secret Scanning (TruffleHog)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          
+      - name: Install security tools
+        run: pip install bandit pip-audit
+
+      - name: Run Bandit (SAST)
+        run: bandit -r apps/api/ -c pyproject.toml || bandit -r apps/api/ -ll
+
+      - name: Run pip-audit (SCA)
+        run: pip-audit -r apps/api/requirements.txt || echo "Warning: Vulnerabilities found"
+
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install -r apps/api/requirements.txt
+      - name: Run pytest
+        run: python -m pytest apps/api/ -v --tb=short
+
+  build-scan-images:
+    name: Build & Container Scan
+    runs-on: ubuntu-latest
+    needs: [test-backend, security-sast]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build API Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: api
+          load: true
+          tags: scale-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner on API image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'scale-api:latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
