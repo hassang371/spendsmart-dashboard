@@ -78,3 +78,15 @@ def test_no_old_category_skips_merchant_batch(app_client):
     data = response.json()
     # Either no key (legacy) or 0 — both acceptable as long as no crash
     assert data.get("merchant_updated", 0) == 0
+
+
+def test_fine_tuning_triggered_after_merchant_batch():
+    """After merchant-batch reclassification, supervised fine-tuning must be triggered."""
+    from apps.api.domains.accounts import router as accounts_module
+    import inspect
+
+    src = inspect.getsource(accounts_module.update_transaction)
+    assert "_run_supervised_finetuning_bg" in src, (
+        "update_transaction must enqueue _run_supervised_finetuning_bg — "
+        "supervised fine-tuning not triggered after reclassification"
+    )
