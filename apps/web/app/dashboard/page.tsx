@@ -14,23 +14,13 @@ import { motion, Variants } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { supabase } from '../../lib/supabase/client';
+import { accountsApi, type Transaction } from '../../lib/api/client';
 
 function firstNameFromDisplayName(value: string): string {
   const cleaned = value.trim().replace(/\s+/g, ' ');
   if (!cleaned) return 'there';
   return cleaned.split(' ')[0] || 'there';
 }
-
-// Types
-type Transaction = {
-  id: string;
-  description: string;
-  amount: number;
-  transaction_date: string;
-  category: string;
-  type?: string;
-  merchant_name?: string;
-};
 
 type TrendData = {
   date: string;
@@ -87,29 +77,49 @@ export default function OverviewPage() {
         }
       }
 
-      const { data: txData, error: txError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('transaction_date', { ascending: false });
+      try {
+        // Get auth token for API call
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          router.replace('/login');
+          return;
+        }
 
-      if (txError) {
-        console.error('Error fetching transactions:', txError);
+        // Fetch transactions via FastAPI backend
+        const allItems: Transaction[] = [];
+        let cursor: string | undefined;
+        let hasMore = true;
+        const MAX_PAGES = 50; // Guard: cap at 5,000 transactions (50 × 100)
+        let pagesFetched = 0;
+
+        // Paginate to get all transactions (overview needs all for calculations)
+        while (hasMore && pagesFetched < MAX_PAGES) {
+          const response = await accountsApi.getTransactions(session.access_token, {
+            limit: 100,
+            cursor,
+          });
+          allItems.push(...response.items);
+          hasMore = response.has_more && !!response.next_cursor;
+          cursor = response.next_cursor ?? undefined;
+          pagesFetched++;
+        }
+
+        setData(allItems);
+        sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            timestamp: Date.now(),
+            rows: allItems,
+          })
+        );
+      } catch (err) {
+        console.error('Error fetching transactions:', err);
         setError('Unable to load financial data.');
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const rows = (txData ?? []) as Transaction[];
-      setData(rows);
-      sessionStorage.setItem(
-        cacheKey,
-        JSON.stringify({
-          timestamp: Date.now(),
-          rows,
-        })
-      );
-      setLoading(false);
     };
 
     fetchData();

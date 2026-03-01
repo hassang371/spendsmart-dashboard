@@ -5,25 +5,13 @@ import { useRouter } from 'next/navigation';
 import { motion, Variants } from 'framer-motion';
 import { Loader2, Activity } from 'lucide-react';
 import { supabase } from '../../../lib/supabase/client';
+import { accountsApi, type Transaction } from '../../../lib/api/client';
 
 import { MonthlyComparison } from './components/MonthlyComparison';
 import { SpendingHeatmap } from './components/SpendingHeatmap';
 import { CategoryDistribution } from './components/CategoryDistribution';
 import { MerchantLeaderboard } from './components/MerchantLeaderboard';
 import { AnalyticsEmptyState } from './components/AnalyticsEmptyState';
-
-// Types
-type Transaction = {
-  id: string;
-  description: string;
-  amount: number;
-  transaction_date: string;
-  category: string;
-  type?: 'credit' | 'debit';
-  merchant_name?: string;
-  status?: string;
-  payment_method?: string;
-};
 
 const ANALYTICS_CACHE_TTL_MS = 60 * 1000; // 1 minute cache
 
@@ -59,24 +47,41 @@ export default function AnalyticsPage() {
           }
         }
 
-        const { data: txData, error: txError } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('transaction_date', { ascending: false });
-
-        if (txError) throw txError;
-
-        if (txData) {
-          setTransactions(txData);
-          sessionStorage.setItem(
-            cacheKey,
-            JSON.stringify({
-              timestamp: Date.now(),
-              rows: txData,
-            })
-          );
+        // Get auth token for API call
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          router.replace('/login');
+          return;
         }
+
+        // Fetch all transactions via FastAPI backend
+        const allItems: Transaction[] = [];
+        let cursor: string | undefined;
+        let hasMore = true;
+        const MAX_PAGES = 50; // Guard: cap at 5,000 transactions (50 × 100)
+        let pagesFetched = 0;
+
+        while (hasMore && pagesFetched < MAX_PAGES) {
+          const response = await accountsApi.getTransactions(session.access_token, {
+            limit: 100,
+            cursor,
+          });
+          allItems.push(...response.items);
+          hasMore = response.has_more && !!response.next_cursor;
+          cursor = response.next_cursor ?? undefined;
+          pagesFetched++;
+        }
+
+        setTransactions(allItems);
+        sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            timestamp: Date.now(),
+            rows: allItems,
+          })
+        );
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Failed to load analytics data.';
         setError(message);
@@ -156,19 +161,19 @@ export default function AnalyticsPage() {
 
       <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 lg:grid-cols-12 lg:grid-rows-2">
         <motion.div variants={itemVariants} className="lg:col-span-4 lg:row-span-1 min-h-0">
-          <MonthlyComparison transactions={transactions} />
+          <MonthlyComparison transactions={transactions as any} />
         </motion.div>
 
         <motion.div variants={itemVariants} className="lg:col-span-8 lg:row-span-1 min-h-0">
-          <SpendingHeatmap transactions={transactions} />
+          <SpendingHeatmap transactions={transactions as any} />
         </motion.div>
 
         <motion.div variants={itemVariants} className="lg:col-span-5 lg:row-span-1 min-h-0">
-          <CategoryDistribution transactions={transactions} />
+          <CategoryDistribution transactions={transactions as any} />
         </motion.div>
 
         <motion.div variants={itemVariants} className="lg:col-span-7 lg:row-span-1 min-h-0">
-          <MerchantLeaderboard transactions={transactions} />
+          <MerchantLeaderboard transactions={transactions as any} />
         </motion.div>
       </div>
     </motion.div>

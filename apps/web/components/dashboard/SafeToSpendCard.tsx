@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Loader2, Activity, AlertCircle, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { apiSafeToSpend, type SafeToSpendResponse } from '../../lib/api/client';
+import { forecastApi, type SafeToSpendResponse } from '../../lib/api/client';
 import { getBrowserSupabaseClient } from '../../lib/supabase/client';
 
 export default function SafeToSpendCard() {
@@ -20,9 +20,10 @@ export default function SafeToSpendCard() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const result = await apiSafeToSpend(token);
+      if (!session?.access_token) {
+        throw new Error('Session expired. Please sign in again.');
+      }
+      const result = await forecastApi.safeToSpend(session.access_token);
       setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
