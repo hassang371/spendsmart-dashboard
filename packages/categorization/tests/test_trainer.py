@@ -39,3 +39,16 @@ def test_train_step_reduces_loss_over_steps():
     for _ in range(5):
         last_loss = trainer.train_step(batch, lambda_weight=0.5)
     assert isinstance(last_loss, float)
+
+
+def test_lambda_schedule_ramps_then_holds():
+    """Lambda must start near 0 and ramp to 0.5 over first 20% of epochs."""
+    import pytest
+    from packages.categorization.adapter_manager import _lambda_schedule
+
+    # 10 epochs → warmup = int(0.2 * 10) = 2
+    assert _lambda_schedule(0, 10) == pytest.approx(0.0, abs=0.01)
+    assert _lambda_schedule(1, 10) == pytest.approx(0.25, abs=0.01)
+    # After warmup (epoch >= 2), holds at 0.5
+    assert _lambda_schedule(2, 10) == pytest.approx(0.5, abs=0.01)
+    assert _lambda_schedule(9, 10) == pytest.approx(0.5, abs=0.01)
