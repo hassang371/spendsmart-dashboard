@@ -184,6 +184,104 @@ async def discover_categories(
         raise HTTPException(status_code=500, detail="GCD failed")
 
 
+@router.get("/metrics")
+async def get_classification_metrics(client: Client = Depends(get_user_client)):
+    """Compute classification accuracy metrics using manually-corrected transactions.
+
+    Ground truth: transactions where is_manual=True.
+    Returns per-class F1, confidence histogram, and rule vs. model split.
+    Requires at least 1 manually corrected transaction.
+    """
+    from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+    import numpy as np
+
+    user_response = client.auth.get_user()
+    if not user_response or not user_response.user:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+
+    user_id = user_response.user.id
+
+    try:
+        result = (
+            client.table("transactions")
+            .select("description,category")
+            .eq("user_id", user_id)
+            .eq("is_manual", True)
+            .execute()
+        )
+        labeled = result.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB query failed: {e}")
+
+    if not labeled:
+        raise HTTPException(
+            status_code=404,
+            detail="No labeled data. Correct some transactions first to generate metrics.",
+        )
+
+    descriptions = [r["description"] for r in labeled if r.get("description")]
+    true_categories = [r["category"] for r in labeled if r.get("description")]
+
+    if not descriptions:
+        raise HTTPException(status_code=400, detail="No valid descriptions in labeled data")
+
+    try:
+        predictions = classify_batch_in_process(descriptions)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Classification failed: {e}")
+
+    pred_categories = [p["category"] for p in predictions]
+    confidences = [p["confidence"] for p in predictions]
+    paths = [p.get("path", "unknown") for p in predictions]
+
+    classifier = get_classifier()
+    label_names = classifier.labels
+    label2idx = {label: i for i, label in enumerate(label_names)}
+
+    y_true = np.array([label2idx.get(c, len(label_names) - 1) for c in true_categories])
+    y_pred = np.array([label2idx.get(c, len(label_names) - 1) for c in pred_categories])
+
+    acc = float(accuracy_score(y_true, y_pred))
+    precision, recall, f1, support = precision_recall_fscore_support(
+        y_true, y_pred,
+        labels=list(range(len(label_names))),
+        zero_division=0,
+    )
+
+    per_class = {
+        label_names[i]: {
+            "precision": float(precision[i]),
+            "recall":    float(recall[i]),
+            "f1":        float(f1[i]),
+            "support":   int(support[i]),
+        }
+        for i in range(len(label_names))
+        if support[i] > 0
+    }
+
+    bucket_keys = ["0.0-0.2", "0.2-0.4", "0.4-0.6", "0.6-0.8", "0.8-1.0"]
+    buckets: dict[str, int] = {k: 0 for k in bucket_keys}
+    for c in confidences:
+        idx = min(int(c / 0.2), 4)
+        buckets[bucket_keys[idx]] += 1
+
+    split: dict[str, int] = {"keyword_rule": 0, "hypffn": 0, "novel_cluster": 0}
+    for p in paths:
+        if p in split:
+            split[p] += 1
+        else:
+            split["hypffn"] += 1
+
+    return {
+        "overall_accuracy": acc,
+        "per_class": per_class,
+        "confidence_histogram": buckets,
+        "rule_vs_model_split": split,
+        "total_corrections": len(labeled),
+        "novel_categories_discovered": sum(1 for p in predictions if p.get("is_novel")),
+    }
+
+
 @router.get("/models")
 async def list_models(client: Client = Depends(get_user_client)):
     """List available trained models for the user."""

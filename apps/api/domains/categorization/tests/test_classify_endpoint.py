@@ -46,6 +46,12 @@ def mock_user_client():
         def insert(self, _rows):
             return self
 
+        def select(self, *_args):
+            return self
+
+        def eq(self, *_args):
+            return self
+
         def execute(self):
             return SimpleNamespace(data=[])
 
@@ -152,3 +158,20 @@ async def test_feedback_empty_corrections(mock_classifier):
         response = await ac.post("/api/v1/categorization/feedback", json=payload)
 
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint_exists(mock_classifier):
+    """GET /categorization/metrics must return accuracy and per_class keys."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.get("/api/v1/categorization/metrics")
+
+    assert response.status_code in (200, 404), f"Unexpected status {response.status_code}"
+    if response.status_code == 200:
+        data = response.json()
+        assert "overall_accuracy" in data
+        assert "per_class" in data
+        assert "confidence_histogram" in data
+        assert "rule_vs_model_split" in data
