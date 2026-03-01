@@ -115,6 +115,12 @@ async def forecast_predict(
 @router.get("/safe-to-spend")
 async def safe_to_spend(client: Client = Depends(get_user_client)):
     """Returns predicted safe-to-spend amount for the authenticated user."""
+    # Auth check first — extract user_id once for all downstream use
+    user_response = client.auth.get_user()
+    if not user_response or not user_response.user:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+    user_id = user_response.user.id
+
     horizon = 7
     lookback_days = 90
 
@@ -155,9 +161,6 @@ async def safe_to_spend(client: Client = Depends(get_user_client)):
     confidence = round(min(days_of_data / lookback_days, 1.0), 2)
     recent = daily_df.tail(min(30, len(daily_df)))
 
-    user_resp = client.auth.get_user()
-    user_id = user_resp.user.id if user_resp and user_resp.user else None
-
     model_name = "statistical_mvp"
     model_note = f"Based on {days_of_data} days of transaction history."
 
@@ -167,31 +170,33 @@ async def safe_to_spend(client: Client = Depends(get_user_client)):
     avg_daily_spend = (
         float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
     )
-    safe_amount = round((avg_daily_income - avg_daily_spend) * horizon, 2)
+    net = (avg_daily_income - avg_daily_spend) * horizon
+    safe_amount = round(max(0.0, net), 2)
+    projected_overspend = round(max(0.0, -net), 2)
     forecast_breakdown = []
 
-    if user_id:
-        try:
-            tft_model = load_model(client, user_id)
-            if tft_model and len(daily_df) >= 60:
-                pred_data = predict_with_tft(tft_model, df, horizon=horizon)
-                if "forecast" in pred_data:
-                    forecast = pred_data["forecast"]
-                    total_predicted_spend_p90 = sum(
-                        day.get("p90", 0) for day in forecast
-                    )
-                    total_predicted_income = avg_daily_income * horizon
-                    safe_amount = round(
-                        total_predicted_income - total_predicted_spend_p90, 2
-                    )
-                    model_name = "tft_v1"
-                    model_note = "AI prediction (TFT) for spending, statistical avg for income."
-                    forecast_breakdown = forecast
-        except Exception as e:
-            logger.warning("tft_inference_failed", error=str(e))
+    try:
+        tft_model = load_model(client, user_id)
+        if tft_model and len(daily_df) >= 60:
+            pred_data = predict_with_tft(tft_model, df, horizon=horizon)
+            if "forecast" in pred_data:
+                forecast = pred_data["forecast"]
+                total_predicted_spend_p90 = sum(
+                    day.get("p90", 0) for day in forecast
+                )
+                total_predicted_income = avg_daily_income * horizon
+                tft_net = total_predicted_income - total_predicted_spend_p90
+                safe_amount = round(max(0.0, tft_net), 2)
+                projected_overspend = round(max(0.0, -tft_net), 2)
+                model_name = "tft_v1"
+                model_note = "AI prediction (TFT) for spending, statistical avg for income."
+                forecast_breakdown = forecast
+    except Exception as e:
+        logger.warning("tft_inference_failed", error=str(e))
 
     return {
         "safe_amount": safe_amount,
+        "projected_overspend": projected_overspend,
         "currency": "INR",
         "horizon_days": horizon,
         "confidence": confidence,
