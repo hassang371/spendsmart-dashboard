@@ -184,3 +184,29 @@ class HypCDTrainer:
             negatives[i] = valid_negs[perm[:n_neg]]
         
         return negatives
+
+    def train_epochs(
+        self,
+        batches: list[dict],
+        total_epochs: int = 10,
+    ) -> list[float]:
+        """Run N epochs with dynamic lambda schedule (§3.6.2).
+
+        Args:
+            batches: List of {"original": Tensor, "augmented": Tensor} dicts
+            total_epochs: Number of epochs to train
+
+        Returns:
+            List of per-epoch average loss values
+        """
+        from packages.categorization.adapter_manager import _lambda_schedule
+
+        epoch_losses = []
+        for epoch in range(total_epochs):
+            lw = _lambda_schedule(epoch, total_epochs)
+            batch_losses = [self.train_step(b, lambda_weight=lw) for b in batches]
+            avg = sum(batch_losses) / len(batch_losses) if batch_losses else 0.0
+            epoch_losses.append(avg)
+
+        return epoch_losses
+
