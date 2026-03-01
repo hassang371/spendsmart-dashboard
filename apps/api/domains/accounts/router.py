@@ -26,12 +26,39 @@ logger = structlog.get_logger()
 
 # --- Request schemas ---
 
+def _extract_merchant_keyword(description: str) -> str | None:
+    """Extract the most distinctive word from a cleaned transaction description.
+
+    Used to find all related transactions for merchant-batch reclassification.
+    Returns None if no keyword with length > 3 is found.
+    """
+    from packages.categorization.cleaner import clean_description
+    from packages.categorization.rules import KeywordMatcher
+
+    matcher = KeywordMatcher()
+    cleaned = clean_description(description).lower()
+    for keyword in matcher.rules.keys():
+        if keyword in cleaned:
+            return keyword
+
+    # Fallback: first word with length > 3
+    for word in cleaned.split():
+        if len(word) > 3:
+            return word
+
+    return None
+
+
 class TransactionUpdate(BaseModel):
     """Updateable fields for a single transaction."""
     category: Optional[str] = Field(default=None, description="New category")
     amount: Optional[float] = Field(default=None, description="New amount (for income flip)")
     original_category: Optional[str] = Field(
         default=None, description="Backfill original category if missing"
+    )
+    old_category: Optional[str] = Field(
+        default=None,
+        description="Previous category — used for merchant-batch reclassification",
     )
 
 
@@ -143,11 +170,11 @@ async def update_transaction(
     update: TransactionUpdate = Body(...),
     client: Client = Depends(get_user_client),
 ):
-    """Update a single transaction (category, amount, etc.).
+    """Update a single transaction and auto-reclassify all matching merchant transactions.
 
-    Replaces the frontend's direct `supabase.from('transactions').update(...)`.
-    Handles income auto-flip: when category changes to/from 'Income',
-    the amount sign is automatically adjusted.
+    When category changes and old_category is provided, all transactions from the
+    same merchant that had the old category are automatically updated to the new
+    category and marked is_manual=True (merchant-batch reclassification).
     """
     user_response = client.auth.get_user()
     if not user_response or not user_response.user:
@@ -155,10 +182,10 @@ async def update_transaction(
 
     user_id = user_response.user.id
 
-    # Build update dict (only non-None fields)
-    updates = {}
+    updates: dict = {}
     if update.category is not None:
         updates["category"] = update.category
+        updates["is_manual"] = True
     if update.amount is not None:
         updates["amount"] = update.amount
     if update.original_category is not None:
@@ -178,7 +205,40 @@ async def update_transaction(
         if not result.data:
             raise HTTPException(status_code=404, detail="Transaction not found")
 
-        return {"status": "ok", "transaction": result.data[0]}
+        tx = result.data[0]
+        merchant_updated = 0
+
+        # Merchant-batch reclassification: auto-update all matching transactions
+        if update.category and update.old_category:
+            description = tx.get("description", "")
+            keyword = _extract_merchant_keyword(description)
+
+            if keyword:
+                try:
+                    batch_result = (
+                        client.table("transactions")
+                        .update({"category": update.category, "is_manual": True})
+                        .eq("user_id", user_id)
+                        .eq("category", update.old_category)
+                        .ilike("description", f"%{keyword}%")
+                        .execute()
+                    )
+                    merchant_updated = len(batch_result.data) if batch_result.data else 0
+                    logger.info(
+                        "merchant_batch_reclassified",
+                        keyword=keyword,
+                        old=update.old_category,
+                        new=update.category,
+                        count=merchant_updated,
+                    )
+                except Exception as e:
+                    logger.warning("merchant_batch_failed", error=str(e))
+
+        return {
+            "status": "ok",
+            "transaction": tx,
+            "merchant_updated": merchant_updated,
+        }
     except HTTPException:
         raise
     except Exception as e:
