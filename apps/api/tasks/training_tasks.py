@@ -111,11 +111,21 @@ def train_model_task(
     except Exception as exc:
         logger.error(f"Training job {job_id} failed: {exc}")
 
+        retry_count = self.request.retries
+        max_retries = self.max_retries
+
+        if retry_count < max_retries:
+            # Update DB so users see retry progress instead of stuck "running"
+            _update_job_status(
+                job_id,
+                status="running",
+                error=f"Attempt {retry_count + 1}/{max_retries + 1} failed: {exc}. Retrying...",
+            )
+
         try:
             self.retry(exc=exc)
         except MaxRetriesExceededError:
             logger.error(f"Max retries exceeded for job {job_id}")
-            # BUG-01 fix: Update DB with failed status
             _update_job_status(
                 job_id,
                 status="failed",

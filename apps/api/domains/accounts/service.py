@@ -42,11 +42,15 @@ def list_user_transactions(
     )
 
     # Apply cursor position if provided
+    # True keyset pagination: rows where (created_at < cursor_date) OR
+    # (created_at = cursor_date AND id < cursor_id).
+    # This handles batch-imported transactions with identical timestamps correctly.
     if pagination.cursor:
         cursor_date, cursor_id = decode_cursor(pagination.cursor)
-        # Keyset pagination: fetch rows "before" the cursor
-        # Using composite (created_at, id) ordering
-        query = query.lt("created_at", cursor_date)
+        query = query.or_(
+            f"created_at.lt.{cursor_date},"
+            f"and(created_at.eq.{cursor_date},id.lt.{cursor_id})"
+        )
 
     # Apply user filters
     query = apply_filters(query, filters)
