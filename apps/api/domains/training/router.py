@@ -171,16 +171,30 @@ async def get_training_status(
     job_id: str,
     client: Client = Depends(get_user_client),
 ):
-    """Get training job status by ID."""
+    """Get training job status by ID.
+
+    Only returns the job if it belongs to the authenticated user (prevents IDOR).
+    """
+    user_response = client.auth.get_user()
+    if not user_response or not user_response.user:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+
+    user_id = user_response.user.id
+
     try:
         res = (
             client.table("training_jobs")
             .select("*")
             .eq("id", job_id)
+            .eq("user_id", user_id)
             .single()
             .execute()
         )
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Training job not found")
         return res.data
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("status_fetch_failed", job_id=job_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to fetch training status")

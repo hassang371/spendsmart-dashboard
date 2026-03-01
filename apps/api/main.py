@@ -46,14 +46,14 @@ from apps.api.routers import health
 logger = structlog.get_logger()
 
 
-MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_REQUEST_BODY_BYTES = 500 * 1024 * 1024  # 500 MB (large Excel files)
 
 
 class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
     """Reject requests with Content-Length exceeding the configured limit.
 
-    Prevents DoS via oversized payloads. CSV uploads are capped at 10 MB
-    which is sufficient for thousands of transaction rows.
+    Prevents DoS via oversized payloads. Uploads capped at 500 MB
+    to support large bank statement files (250k+ rows).
     """
 
     def __init__(self, app, max_bytes: int = MAX_REQUEST_BODY_BYTES):
@@ -108,6 +108,21 @@ async def lifespan(app: FastAPI):
     )
     _init_sentry()
     logger.info("app_starting", version="0.5.0")
+
+    # Eagerly initialize the HypCD/BERT classifier in background thread
+    # so the first import doesn't wait ~80s for model loading.
+    import asyncio
+
+    async def _warmup_classifier():
+        try:
+            from apps.api.domains.categorization.service import get_classifier
+            await asyncio.to_thread(get_classifier)
+            logger.info("classifier_warmed_up")
+        except Exception as e:
+            logger.warning("classifier_warmup_failed", error=str(e))
+
+    asyncio.create_task(_warmup_classifier())
+
     yield
     logger.info("app_stopping")
 
@@ -174,7 +189,9 @@ app.add_middleware(RequestIDMiddleware)
 is_production = settings.ENVIRONMENT == "production"
 app.add_middleware(SecurityHeadersMiddleware, production=is_production)
 
-# M3: Reject bodies > 10 MB before they hit domain logic
+# M3: Reject bodies > 500 MB before they hit domain logic (large bank statement files).
+# Note: only checks Content-Length header; chunked uploads are bounded by
+# the router-level MAX_UPLOAD_BYTES check instead.
 app.add_middleware(ContentSizeLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 
 # ARCH-03 fix + M3 hardening: explicit CORS allowlist, preflight cache
