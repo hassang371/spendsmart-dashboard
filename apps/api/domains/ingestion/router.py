@@ -84,11 +84,12 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, str]:
     return result
 
 
-def _classify_and_update_transactions(user_id: str, fps_to_desc: dict) -> None:
+def _classify_and_update_transactions(user_id: str, fps_to_desc: dict, token: str) -> None:
     """Background task: classify inserted transactions and patch their categories.
 
     Runs after the HTTP response is sent so /import responds in milliseconds.
-    Uses the service-role client (bypasses RLS) to write back to Supabase.
+    Uses the user's JWT (passed from the request) so no SUPABASE_SERVICE_KEY
+    is required — RLS still enforces user isolation.
     """
     unique_descs = list({desc for desc in fps_to_desc.values() if desc.strip()})
     if not unique_descs:
@@ -111,10 +112,12 @@ def _classify_and_update_transactions(user_id: str, fps_to_desc: dict) -> None:
         return
 
     try:
-        from apps.api.core.auth import get_service_client
-        svc = get_service_client()
+        from supabase import create_client
+        from apps.api.core.auth import _get_supabase_url, _get_supabase_anon_key
+        client = create_client(_get_supabase_url(), _get_supabase_anon_key())
+        client.auth.set_session(token, "")
         for category, fps in category_to_fps.items():
-            svc.table("transactions").update(
+            client.table("transactions").update(
                 {"category": category}
             ).eq("user_id", user_id).in_("fingerprint", fps).execute()
         logger.info(
@@ -416,8 +419,11 @@ async def import_file(
                     skipped += 1
 
     # --- Enqueue background classification (patches categories after response) ---
+    # Extract the JWT from the Authorization header so the background task can
+    # create a user-scoped Supabase client without needing SUPABASE_SERVICE_KEY.
     if fps_to_desc:
-        background_tasks.add_task(_classify_and_update_transactions, user_id, fps_to_desc)
+        token = request.headers.get("Authorization", "")[7:].strip()
+        background_tasks.add_task(_classify_and_update_transactions, user_id, fps_to_desc, token)
 
     logger.info(
         "import_complete",
