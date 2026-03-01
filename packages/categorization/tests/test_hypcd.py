@@ -249,3 +249,55 @@ def test_hypcd_classifier_predict_batch():
     for r in results:
         assert "category" in r
         assert "confidence" in r
+
+
+def test_predict_batch_returns_depth_and_norm():
+    """predict_batch output must include 'depth', 'norm', and 'path' keys (§3.8)."""
+    from packages.categorization.hypcd import HypCDClassifier
+    from packages.categorization.backends.cloud import CloudBackend
+
+    backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
+    classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)
+    results = classifier.predict_batch(["swiggy order"])
+    r = results[0]
+    assert "depth" in r, "Missing 'depth' key — §3.8 hierarchy extraction not implemented"
+    assert "norm" in r, "Missing 'norm' key — §3.8 hierarchy extraction not implemented"
+    assert "path" in r, "Missing 'path' key — prediction path not tracked"
+    assert r["depth"] in ("macro", "micro")
+    assert isinstance(r["norm"], float)
+
+
+def test_predict_batch_low_confidence_routes_to_novel(monkeypatch):
+    """Predictions with confidence < 0.5 must be routed to GCD (§3.7)."""
+    import torch
+    from geoopt import PoincareBall
+    from packages.categorization.hypcd import HypCDClassifier
+    from packages.categorization.backends.cloud import CloudBackend
+
+    backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
+    classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)
+
+    # Force HypFFN to output uniform probabilities → max conf ≈ 1/5 = 0.2 < 0.5
+    def _zero_logits(self, x):
+        return PoincareBall(c=1.0).expmap0(torch.zeros(x.shape[0], 5, device=x.device))
+
+    monkeypatch.setattr(classifier.classifier.__class__, "forward", _zero_logits)
+    # Suppress keyword rules so model path runs
+    monkeypatch.setattr(classifier.rule_matcher, "predict", lambda t: None)
+
+    results = classifier.predict_batch(["some unknown merchant xyz"])
+    r = results[0]
+    assert r["is_novel"] is True, "Low-confidence result must be marked is_novel=True"
+    assert r["path"] == "novel_cluster"
+
+
+def test_predict_batch_keyword_path_label():
+    """Keyword-matched predictions must have path='keyword_rule'."""
+    from packages.categorization.hypcd import HypCDClassifier
+    from packages.categorization.backends.cloud import CloudBackend
+
+    backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
+    classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)
+    # "swiggy" is a keyword rule → Food
+    results = classifier.predict_batch(["swiggy order"])
+    assert results[0]["path"] == "keyword_rule"
