@@ -17,14 +17,23 @@ CREATE TABLE IF NOT EXISTS transactions (
     status TEXT DEFAULT 'completed',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     raw_data JSONB,
-    
+    fingerprint TEXT,
+    type TEXT DEFAULT 'debit',
+    original_category TEXT,
+
     -- Constraints
-    CONSTRAINT transactions_amount_check CHECK (amount != 0)
+    -- No CHECK on amount: cancelled transactions have amount=0
 );
 
 -- 2. Indexes
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, transaction_date);
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
+-- Cursor-based pagination orders by (user_id, created_at DESC)
+CREATE INDEX IF NOT EXISTS idx_transactions_user_created ON transactions(user_id, created_at DESC);
+-- Fingerprint deduplication unique constraint (used by upsert and import dedup)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_user_fingerprint
+    ON transactions(user_id, fingerprint)
+    WHERE fingerprint IS NOT NULL;
 
 -- 3. RLS Policies
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
@@ -45,6 +54,58 @@ ON transactions FOR UPDATE
 USING (auth.uid() = user_id);
 
 -- Policy: Users can delete own transactions
-CREATE POLICY "Users can delete own transactions" 
-ON transactions FOR DELETE 
+CREATE POLICY "Users can delete own transactions"
+ON transactions FOR DELETE
+USING (auth.uid() = user_id);
+
+-- 4. Uploaded Files Table (deduplication by file hash)
+CREATE TABLE IF NOT EXISTS uploaded_files (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    file_hash TEXT NOT NULL,
+    filename TEXT,
+    upload_type TEXT DEFAULT 'import',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, file_hash)
+);
+
+ALTER TABLE uploaded_files ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own uploaded files"
+ON uploaded_files FOR ALL
+USING (auth.uid() = user_id);
+
+-- 5. Training Jobs Table
+CREATE TABLE IF NOT EXISTS training_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'pending',
+    celery_task_id TEXT,
+    logs TEXT,
+    metrics JSONB,
+    checkpoint_path TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE training_jobs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own training jobs"
+ON training_jobs FOR SELECT
+USING (auth.uid() = user_id);
+-- Service role manages all training job updates (Celery workers bypass RLS)
+CREATE POLICY "Service role can manage training jobs"
+ON training_jobs FOR ALL
+USING (true);
+
+-- 6. Classification Jobs Table
+CREATE TABLE IF NOT EXISTS classification_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'pending',
+    logs TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE classification_jobs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own classification jobs"
+ON classification_jobs FOR SELECT
 USING (auth.uid() = user_id);

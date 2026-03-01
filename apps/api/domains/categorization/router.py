@@ -206,7 +206,6 @@ async def list_models(client: Client = Depends(get_user_client)):
             stat = os.stat(filepath)
             models.append({
                 "name": filename,
-                "path": filepath,
                 "size_mb": round(stat.st_size / (1024 * 1024), 2),
                 "created_at": stat.st_mtime,
             })
