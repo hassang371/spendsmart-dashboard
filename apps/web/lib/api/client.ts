@@ -129,6 +129,7 @@ export interface TransactionUpdatePayload {
   category?: string;
   amount?: number;
   original_category?: string;
+  old_category?: string;
 }
 
 export interface BatchUpdateItem {
