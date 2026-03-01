@@ -130,6 +130,45 @@ def _classify_and_update_transactions(user_id: str, fps_to_desc: dict, token: st
         logger.warning("bg_category_update_failed", user_id=user_id, error=str(e))
 
 
+def _run_contrastive_pretraining_bg(
+    user_id: str,
+    descriptions: list[str],
+    token: str,
+) -> None:
+    """Background task: unsupervised contrastive pretraining on imported transactions.
+
+    Runs after /import completes. No labels required — uses augmented positive pairs.
+    Updates the per-user adapter (projector weights) and persists to Supabase Storage.
+    """
+    if len(descriptions) < 4:
+        return
+
+    try:
+        from apps.api.domains.categorization.service import get_classifier
+        from packages.categorization.adapter_manager import AdapterManager
+
+        classifier = get_classifier()
+        mgr = AdapterManager()
+
+        user_state = mgr.load_user_adapter(user_id)
+        if user_state:
+            try:
+                classifier.load_state_dict(user_state)
+            except Exception:
+                pass
+
+        mgr.run_contrastive_pretraining(classifier, descriptions, epochs=3)
+        mgr.save_user_adapter(user_id, classifier.state_dict())
+
+        logger.info(
+            "contrastive_pretraining_complete",
+            user_id=user_id,
+            descriptions=len(descriptions),
+        )
+    except Exception as e:
+        logger.warning("contrastive_pretraining_failed", user_id=user_id, error=str(e))
+
+
 def _build_transaction_row(
     row: dict,
     user_id: str,
@@ -424,6 +463,13 @@ async def import_file(
     if fps_to_desc:
         token = request.headers.get("Authorization", "")[7:].strip()
         background_tasks.add_task(_classify_and_update_transactions, user_id, fps_to_desc, token)
+
+        # Enqueue contrastive pretraining (updates projector weights from unlabeled data)
+        unique_descs = list({desc for desc in fps_to_desc.values() if desc.strip()})
+        if unique_descs:
+            background_tasks.add_task(
+                _run_contrastive_pretraining_bg, user_id, unique_descs, token
+            )
 
     logger.info(
         "import_complete",
