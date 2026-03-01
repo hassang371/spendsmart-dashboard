@@ -14,7 +14,7 @@ class CloudBackend(BackendBase):
     Deployed on Modal with GPU acceleration.
     """
 
-    def __init__(self, model_name: str = "bert-base-uncased", dim: int = 768):
+    def __init__(self, model_name: str = "ProsusAI/finbert", dim: int = 768):
         """
         Initialize BERT backend.
 
