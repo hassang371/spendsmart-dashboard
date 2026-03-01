@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+
 import {
   Search,
   Filter,
@@ -41,8 +40,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase/client';
-import { apiClassifyDescriptions, apiSubmitFeedback } from '../../../lib/api/client';
-import { parseSbiDescription } from '../../../lib/parsers/sbi';
+import { accountsApi, categorizationApi, ingestionApi } from '../../../lib/api/client';
 
 type TransactionRow = {
   id: string;
@@ -58,20 +56,6 @@ type TransactionRow = {
   type: string;
   created_at: string;
   raw_data?: Record<string, any>;
-};
-
-type InsertTransaction = {
-  user_id: string;
-  transaction_date: string;
-  amount: number;
-  currency: string;
-  description: string;
-  merchant_name: string;
-  category: string;
-  original_category?: string | null;
-  payment_method: string;
-  status: string;
-  raw_data: Record<string, unknown>;
 };
 
 type RelativeRange =
@@ -95,8 +79,6 @@ type FilterState = {
   maxAmount: string;
   paymentMethod: 'all' | string;
 };
-
-type ImportFileKind = 'csv' | 'excel' | 'json' | 'text' | 'pdf' | 'unknown';
 
 const defaultFilters: FilterState = {
   year: 'all',
@@ -127,50 +109,9 @@ const monthLookup: Record<string, number> = {
   dec: 11,
 };
 
-const FETCH_PAGE_SIZE = 1000;
-const MAX_FETCH_PAGES = 10;
-const MAX_FETCH_ROWS = 10000;
-const FETCH_REQUEST_TIMEOUT_MS = 12000;
-const MAX_FETCH_DURATION_MS = 45000;
 const TRANSACTIONS_CACHE_TTL_MS = 60 * 1000;
 const INITIAL_VISIBLE_COUNT = 50;
 const LOAD_MORE_STEP = 50;
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`${label} timed out. Please try again.`)),
-          timeoutMs
-        );
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-function normalizeHeader(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function toText(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
-function parseAmount(value: string): number | null {
-  const cleaned = value
-    .replace(/INR/gi, '')
-    .replace(/[₹,\s\u00a0]/g, '')
-    .replace(/[()]/g, '');
-  if (!cleaned) return null;
-  const parsed = Number.parseFloat(cleaned);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function normalizeStatus(value: string): string {
   const status = value.trim().toLowerCase();
@@ -188,563 +129,6 @@ function toTitleCase(value: string): string {
     .filter(Boolean)
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
-}
-
-const knownMerchants: [string, string[]][] = [
-  ['Swiggy Instamart', ['swiggy instamart', 'instamart']],
-  ['Swiggy', ['swiggy']],
-  ['Zomato', ['zomato', 'zomatofo']],
-  ['Uber', ['uber', 'uber india']],
-  ['Ola', ['ola', 'olacabs']],
-  ['Rapido', ['rapido']],
-  ['Blinkit', ['blinkit', 'grofers']],
-  ['Zepto', ['zepto']],
-  ['BigBasket', ['bigbasket', 'big basket']],
-  ['Amazon', ['amazon', 'amzn']],
-  ['Flipkart', ['flipkart']],
-  ['Myntra', ['myntra']],
-  ['Ajio', ['ajio']],
-  ['Netflix', ['netflix']],
-  ['Spotify', ['spotify']],
-  ['Youtube', ['youtube', 'google oct']],
-  ['Apple', ['apple.com', 'itunes']],
-  ['Google', ['google']],
-  ['Jio', ['jio', 'reliance jio']],
-  ['Airtel', ['airtel']],
-  ['Vodafone', ['vi', 'vodafone']],
-  ['Mcdonalds', ['mcdonalds', 'mcdonald']],
-  ['Starbucks', ['starbucks']],
-  ['KFC', ['kfc']],
-  ['Burger King', ['burger king']],
-  ["Domino's", ['dominos', "domino's"]],
-  ['Pizza Hut', ['pizza hut']],
-  ['Subway', ['subway']],
-];
-
-// Keyword-based category classifier (client-side fallback when HypCD API is unavailable)
-const categoryKeywords: [string, string[]][] = [
-  [
-    'Food',
-    [
-      'swiggy',
-      'zomato',
-      'food',
-      'restaurant',
-      'dining',
-      'blinkit',
-      'zepto',
-      'bigbasket',
-      'grofers',
-      'mcdonalds',
-      'starbucks',
-      'kfc',
-      'burger king',
-      'dominos',
-      'pizza hut',
-      'subway',
-      'grocery',
-      'groceries',
-    ],
-  ],
-  [
-    'Transport',
-    [
-      'uber',
-      'ola',
-      'rapido',
-      'taxi',
-      'cab',
-      'bus',
-      'train',
-      'metro',
-      'fuel',
-      'petrol',
-      'diesel',
-      'parking',
-    ],
-  ],
-  [
-    'Utilities',
-    [
-      'electricity',
-      'water',
-      'gas',
-      'airtel',
-      'jio',
-      'vodafone',
-      'broadband',
-      'wifi',
-      'bescom',
-      'bill',
-      'recharge',
-    ],
-  ],
-  ['Shopping', ['amazon', 'flipkart', 'myntra', 'ajio', 'shopping', 'clothing', 'meesho']],
-  [
-    'Entertainment',
-    [
-      'netflix',
-      'spotify',
-      'youtube',
-      'hotstar',
-      'prime video',
-      'movie',
-      'cinema',
-      'gaming',
-      'xbox',
-      'playstation',
-    ],
-  ],
-  ['Health', ['medical', 'doctor', 'pharmacy', 'hospital', 'gym', 'apollo', 'health']],
-  ['Education', ['course', 'tuition', 'school', 'college', 'udemy', 'coursera', 'education']],
-  ['Finance', ['investment', 'loan', 'insurance', 'mutual fund', 'zerodha', 'groww', 'emi', 'sip']],
-  [
-    'People',
-    ['sent to', 'received from', 'upi transfer', 'upi received', 'transfer to', 'friend', 'family'],
-  ],
-];
-
-function classifyByKeywords(description: string, merchant: string): string {
-  const text = `${description} ${merchant}`.toLowerCase();
-  for (const [category, keywords] of categoryKeywords) {
-    for (const kw of keywords) {
-      if (kw.length <= 4 ? new RegExp(`\\b${kw}\\b`).test(text) : text.includes(kw)) {
-        return category;
-      }
-    }
-  }
-  return 'Uncategorized';
-}
-
-function isNoiseSegment(value: string): boolean {
-  const cleaned = value.trim();
-  if (!cleaned) return true;
-  const upper = cleaned.toUpperCase();
-
-  if (/^[A-Z0-9._-]{10,}$/.test(upper)) return true;
-  if (/^[0-9]{6,}$/.test(upper)) return true;
-  if (/^ICI[A-Z0-9]+$/.test(upper)) return true;
-  if (/^[A-Z]{2,5}\d{6,}$/.test(upper)) return true;
-
-  const noiseWords = [
-    'UPI',
-    'IMPS',
-    'NEFT',
-    'RTGS',
-    'ACH',
-    'NACH',
-    'CREDIT',
-    'DEBIT',
-    'PAYMENT',
-    'TRANSFER',
-    'BANK',
-    'AXIS BANK',
-    'HDFC BANK',
-    'SBI',
-    'ICICI',
-    'YES BANK',
-    'KOTAK',
-    'WDL',
-    'TFR',
-    'POS',
-    'MB',
-  ];
-  return noiseWords.includes(upper);
-}
-
-function extractReadableDescription(raw: string): string {
-  const source = raw.trim();
-  if (!source) return 'Imported transaction';
-
-  const lower = source.toLowerCase();
-
-  // Strategy 1: Known Merchant Matching (Highest Priority)
-  for (const [official, aliases] of knownMerchants) {
-    if (aliases.some(alias => lower.includes(alias))) {
-      return official;
-    }
-  }
-
-  const normalizedSource = source.replace(/\s+/g, ' ').trim();
-
-  // Strategy 2: Specific UPI/P2P Patterns (High Precision)
-  // Pattern: WDL TFR UPI/DR/{digits}/{NAME}/{BANK}/...
-  const upiMatch = normalizedSource.match(
-    /(?:UPI|UPVDR|UPS|IMPS|NEFT)(?:\/|-)(?:DR|CR)?(?:\/|-)?\d+(?:\/|-)([^/]+)(?:\/|-)/i
-  );
-  if (upiMatch && upiMatch[1]) {
-    const potentialName = upiMatch[1].trim();
-    const cleanName = potentialName.replace(/[0-9._-]+$/, '').trim();
-    if (cleanName.length > 2 && !/^\d+$/.test(cleanName)) {
-      // Check known merchants first
-      const ln = cleanName.toLowerCase();
-      for (const [official, aliases] of knownMerchants) {
-        if (aliases.some(a => ln.includes(a))) return official;
-      }
-      return toTitleCase(cleanName);
-    }
-  }
-
-  // Strategy 2.5: POS ATM PURCH patterns (SBI specific)
-  // "POS ATM PURCH OTHPG 3157043273 36Swiggy 911311221" → "Swiggy"
-  const posMatch = normalizedSource.match(
-    /POS\s+ATM\s+PURCH\s+\w+\s+\d+\s*\n?\s*\d*([A-Za-z*]+[A-Za-z\s]*)/i
-  );
-  if (posMatch && posMatch[1]) {
-    let merchant = posMatch[1].replace(/^\d+/, '').replace(/\*/g, '').trim();
-    // Remove trailing numeric IDs
-    merchant = merchant.replace(/\s+\d+$/, '').trim();
-    if (merchant.length > 2) {
-      const lm = merchant.toLowerCase();
-      for (const [official, aliases] of knownMerchants) {
-        if (aliases.some(a => lm.includes(a))) return official;
-      }
-      return toTitleCase(merchant);
-    }
-  }
-
-  // Strategy 2.6: DEP TFR VISA-IN-RMT patterns (SBI refund)
-  // "DEP TFR VISA-IN-RMT:300710245915SWIGGY" → "Swiggy"
-  const depMatch = normalizedSource.match(/DEP\s+TFR\s+VISA-IN-RMT:[0-9]+([A-Za-z]+)/i);
-  if (depMatch && depMatch[1]) {
-    const name = depMatch[1].trim();
-    const ln = name.toLowerCase();
-    for (const [official, aliases] of knownMerchants) {
-      if (aliases.some(a => ln.includes(a))) return official;
-    }
-    if (name.length > 2) return toTitleCase(name);
-  }
-
-  // Strategy 2.7: ATM WDL patterns
-  // "ATM WDL ATM CASH 1957 SP OFFICE DARGAMITTA, NELLORE" → "ATM Withdrawal"
-  if (/ATM\s+WDL/i.test(normalizedSource)) {
-    return 'ATM Withdrawal';
-  }
-
-  // Strategy 2.8: CASH DEPOSIT / CEMTEX DEP patterns
-  if (/CASH\s+DEPOSIT/i.test(normalizedSource)) {
-    return 'Cash Deposit';
-  }
-  if (/CEMTEX\s+DEP/i.test(normalizedSource)) {
-    // "CEMTEX DEP 00000004413 040623 PHONEPE RECHARGE" → try to find merchant after IDs
-    const cemtexClean = normalizedSource
-      .replace(/CEMTEX\s+DEP/i, '')
-      .replace(/\b\d+\b/g, '')
-      .trim();
-    if (cemtexClean.length > 2) {
-      const lc = cemtexClean.toLowerCase();
-      for (const [official, aliases] of knownMerchants) {
-        if (aliases.some(a => lc.includes(a))) return official;
-      }
-      return toTitleCase(cemtexClean);
-    }
-    return 'Cash Deposit';
-  }
-
-  // Strategy 2.9: INB (Internet Banking) patterns
-  // "WDL TFR INB Amazon Seller Services..." → "Amazon"
-  if (/\bINB\b/i.test(normalizedSource)) {
-    const inbClean = normalizedSource
-      .replace(/\b(WDL|TFR|INB)\b/gi, '')
-      .replace(/\bAT\s+\d+.*/i, '')
-      .trim();
-    if (inbClean.length > 2) {
-      const lc = inbClean.toLowerCase();
-      for (const [official, aliases] of knownMerchants) {
-        if (aliases.some(a => lc.includes(a))) return official;
-      }
-      return toTitleCase(inbClean);
-    }
-  }
-
-  // Strategy 3: Heuristic Cleaning
-  if (normalizedSource.includes('/')) {
-    const parts = normalizedSource
-      .split(/[\/|>]/)
-      .map(part => part.trim())
-      .filter(Boolean);
-
-    for (const part of parts) {
-      if (isNoiseSegment(part)) continue;
-      if (part.length < 3) continue;
-      if (/@/.test(part)) continue;
-      return toTitleCase(part.replace(/[._-]+/g, ' '));
-    }
-  }
-
-  if (/^[A-Z]{2,5}\.[A-Z0-9-]{8,}$/i.test(normalizedSource)) {
-    return 'Card/UPI transaction';
-  }
-
-  // Strategy 4: Aggressive Cleaning
-  const trimmed = normalizedSource
-    .replace(
-      /\b(UPI|IMPS|NEFT|RTGS|ACH|NACH|WDL|TFR|POS|MB|DR|CR|DEP|OTHPG|SBIPG|PURCH|ATM)\b/gi,
-      ''
-    )
-    .replace(/[0-9]+/g, ' ')
-    .replace(/[^a-zA-Z\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!trimmed) return 'Imported transaction';
-  if (trimmed.length <= 64) return toTitleCase(trimmed);
-  return `${toTitleCase(trimmed.slice(0, 61).trim())}...`;
-}
-
-function parseDateValue(value: string): string | null {
-  const raw = value.trim();
-  if (!raw) return null;
-
-  const slashDateTime = raw.match(
-    /^\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*$/
-  );
-  if (slashDateTime) {
-    const day = Number.parseInt(slashDateTime[1], 10);
-    const month = Number.parseInt(slashDateTime[2], 10) - 1;
-    const yearRaw = Number.parseInt(slashDateTime[3], 10);
-    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
-    const hour = Number.parseInt(slashDateTime[4] ?? '0', 10);
-    const minute = Number.parseInt(slashDateTime[5] ?? '0', 10);
-    const second = Number.parseInt(slashDateTime[6] ?? '0', 10);
-    const date = new Date(year, month, day, hour, minute, second);
-    if (!Number.isNaN(date.getTime())) return date.toISOString();
-  }
-
-  const dashDateTime = raw.match(
-    /^\s*(\d{1,2})-(\d{1,2})-(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*$/
-  );
-  if (dashDateTime) {
-    const day = Number.parseInt(dashDateTime[1], 10);
-    const month = Number.parseInt(dashDateTime[2], 10) - 1;
-    const yearRaw = Number.parseInt(dashDateTime[3], 10);
-    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
-    const hour = Number.parseInt(dashDateTime[4] ?? '0', 10);
-    const minute = Number.parseInt(dashDateTime[5] ?? '0', 10);
-    const second = Number.parseInt(dashDateTime[6] ?? '0', 10);
-    const date = new Date(year, month, day, hour, minute, second);
-    if (!Number.isNaN(date.getTime())) return date.toISOString();
-  }
-
-  const googleLike = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4}),\s*(\d{1,2}):(\d{2})$/);
-  if (googleLike) {
-    const day = Number.parseInt(googleLike[1], 10);
-    const monthName = googleLike[2].toLowerCase();
-    const year = Number.parseInt(googleLike[3], 10);
-    const hour = Number.parseInt(googleLike[4], 10);
-    const minute = Number.parseInt(googleLike[5], 10);
-    const month = monthLookup[monthName.slice(0, 4)] ?? monthLookup[monthName.slice(0, 3)];
-    if (month !== undefined) {
-      const date = new Date(year, month, day, hour, minute);
-      if (!Number.isNaN(date.getTime())) return date.toISOString();
-    }
-  }
-
-  const direct = new Date(raw.replace('Sept', 'Sep'));
-  if (!Number.isNaN(direct.getTime())) return direct.toISOString();
-
-  const iso = new Date(raw.replace(' ', 'T').replace('Sept', 'Sep'));
-  if (!Number.isNaN(iso.getTime())) return iso.toISOString();
-  return null;
-}
-
-function detectImportFileKind(fileName: string): ImportFileKind {
-  const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
-  if (extension === 'csv' || extension === 'tsv') return 'csv';
-  if (extension === 'xls' || extension === 'xlsx' || extension === 'xlsm') return 'excel';
-  if (extension === 'json') return 'json';
-  if (extension === 'txt') return 'text';
-  if (extension === 'pdf') return 'pdf';
-  return 'unknown';
-}
-
-function normalizeSpreadsheetRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  if (!rows.length) return rows;
-
-  // Known header keywords that indicate a real data header row
-  const HEADER_KEYWORDS = [
-    'date',
-    'txn',
-    'transaction',
-    'value',
-    'description',
-    'narration',
-    'debit',
-    'credit',
-    'amount',
-    'withdrawal',
-    'deposit',
-    'balance',
-    'ref',
-    'chq',
-    'cheque',
-    'particulars',
-    'remark',
-  ];
-
-  const looksLikeHeaderValue = (val: string): boolean => {
-    const lower = val.toLowerCase().trim();
-    return HEADER_KEYWORDS.some(kw => lower.includes(kw));
-  };
-
-  const firstKeys = Object.keys(rows[0]);
-  const allKeysEmpty = firstKeys.length > 0 && firstKeys.every(key => key.startsWith('__EMPTY'));
-
-  // Check if XLSX already extracted good headers (no __EMPTY, and keys look like real headers)
-  const existingHeadersLookGood = !allKeysEmpty && firstKeys.some(key => looksLikeHeaderValue(key));
-
-  if (existingHeadersLookGood) return rows;
-
-  // Headers are bad (all __EMPTY or metadata-as-headers like bank name / customer name).
-  // Scan through rows to find the actual header row by looking for known keywords in cell values.
-  let headerRowIndex = -1;
-  const maxScanRows = Math.min(rows.length, 30); // Don't scan beyond first 30 rows
-
-  for (let i = 0; i < maxScanRows; i++) {
-    const row = rows[i];
-    const values = Object.values(row).map(v => toText(v));
-    const headerMatchCount = values.filter(v => looksLikeHeaderValue(v)).length;
-    // At least 2 header-looking values → this is likely the header row
-    if (headerMatchCount >= 2) {
-      headerRowIndex = i;
-      break;
-    }
-  }
-
-  if (headerRowIndex === -1) {
-    // Fallback: if all keys are __EMPTY, use the first row values as headers (original behavior)
-    if (allKeysEmpty) {
-      const dynamicHeaders = firstKeys.map((key, index) => {
-        const value = toText(rows[0][key]);
-        return value || `column_${index + 1}`;
-      });
-      return rows
-        .slice(1)
-        .map(row => {
-          const normalized: Record<string, unknown> = {};
-          firstKeys.forEach((key, index) => {
-            normalized[dynamicHeaders[index]] = row[key];
-          });
-          return normalized;
-        })
-        .filter(row => Object.values(row).some(value => toText(value) !== ''));
-    }
-    return rows;
-  }
-
-  // Found the header row — use its values as column names
-  const headerRow = rows[headerRowIndex];
-  const newHeaders = firstKeys.map((key, index) => {
-    const value = toText(headerRow[key]);
-    return value || `column_${index + 1}`;
-  });
-
-  // Everything after the header row is data
-  return rows
-    .slice(headerRowIndex + 1)
-    .map(row => {
-      const normalized: Record<string, unknown> = {};
-      firstKeys.forEach((key, index) => {
-        normalized[newHeaders[index]] = row[key];
-      });
-      return normalized;
-    })
-    .filter(row => Object.values(row).some(value => toText(value) !== ''));
-}
-
-function parseTableText(text: string): Record<string, unknown>[] {
-  const lines = text
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-
-  if (!lines.length) return [];
-
-  const delimiters = [',', '\t', '|', ';'];
-  let selectedDelimiter = ',';
-  let bestScore = -1;
-  const headerLine = lines[0];
-  for (const delimiter of delimiters) {
-    const score = headerLine.split(delimiter).length;
-    if (score > bestScore) {
-      bestScore = score;
-      selectedDelimiter = delimiter;
-    }
-  }
-
-  const parsed = Papa.parse<Record<string, unknown>>(lines.join('\n'), {
-    header: true,
-    skipEmptyLines: true,
-    delimiter: selectedDelimiter,
-  });
-
-  return parsed.data;
-}
-
-async function parseFileRows(
-  file: File
-): Promise<{ rows: Record<string, unknown>[]; fileKind: ImportFileKind }> {
-  const fileKind = detectImportFileKind(file.name);
-
-  if (fileKind === 'csv') {
-    const text = await file.text();
-    const rows = parseTableText(text);
-    return { rows, fileKind };
-  }
-
-  if (fileKind === 'excel') {
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array', cellDates: false, raw: false });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) return { rows: [], fileKind };
-
-    const worksheet = workbook.Sheets[sheetName];
-    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-      defval: '',
-      raw: false,
-    });
-    return { rows: normalizeSpreadsheetRows(rawRows), fileKind };
-  }
-
-  if (fileKind === 'json') {
-    const text = await file.text();
-    let json: unknown;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      throw new Error('Invalid JSON file. Please check the file format.');
-    }
-
-    let rawRows: unknown[] = [];
-    if (Array.isArray(json)) {
-      rawRows = json;
-    } else if (
-      json &&
-      typeof json === 'object' &&
-      Array.isArray((json as { transactions?: unknown[] }).transactions)
-    ) {
-      rawRows = (json as { transactions: unknown[] }).transactions;
-    }
-
-    // Validate that each row is a plain object
-    const validRows = rawRows.filter(
-      (row): row is Record<string, unknown> =>
-        row !== null && typeof row === 'object' && !Array.isArray(row)
-    );
-
-    if (rawRows.length > 0 && validRows.length === 0) {
-      throw new Error('JSON file contains no valid transaction objects.');
-    }
-
-    return { rows: validRows, fileKind };
-  }
-
-  if (fileKind === 'text' || fileKind === 'pdf') {
-    const text = await file.text();
-    return { rows: parseTableText(text), fileKind };
-  }
-
-  return { rows: [], fileKind };
 }
 
 function categoryIcon(category: string) {
@@ -867,6 +251,7 @@ export default function TransactionsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const categoryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -959,29 +344,10 @@ export default function TransactionsPage() {
   }, [isFilterOpen, editingCategoryTxId]);
 
   const fetchTransactions = useCallback(async () => {
-    const userLookup = await withTimeout<{
-      data: { user: { id: string } | null };
-      error: { message?: string } | null;
-    }>(
-      supabase.auth
-        .getUser()
-        .then(
-          (result: {
-            data: { user: { id: string } | null };
-            error: { message: string } | null;
-          }) => ({
-            data: { user: result.data.user ? { id: result.data.user.id } : null },
-            error: result.error ? { message: result.error.message } : null,
-          })
-        ),
-      8000,
-      'User session lookup'
-    );
-
     const {
       data: { user },
       error: userError,
-    } = userLookup;
+    } = await supabase.auth.getUser();
 
     if (userError || !user) {
       router.replace('/login');
@@ -989,6 +355,15 @@ export default function TransactionsPage() {
     }
 
     setUserId(user.id);
+
+    // Get auth token
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      router.replace('/login');
+      return;
+    }
 
     const cacheKey = `transactions-cache:${user.id}`;
     const cachedRaw = sessionStorage.getItem(cacheKey);
@@ -1007,117 +382,67 @@ export default function TransactionsPage() {
       }
     }
 
-    const allRows: Record<string, unknown>[] = [];
-    const seenIds = new Set<string>();
-    const seenPageSignatures = new Set<string>();
-    const startedAt = Date.now();
-    let from = 0;
-    let pagesFetched = 0;
-    let truncated = false;
+    // Fetch all transactions via FastAPI backend with pagination
+    const allItems: TransactionRow[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
 
-    while (true) {
-      if (pagesFetched >= MAX_FETCH_PAGES || allRows.length >= MAX_FETCH_ROWS) {
-        truncated = true;
-        break;
+    while (hasMore) {
+      const response = await accountsApi.getTransactions(session.access_token, {
+        limit: 100,
+        cursor,
+      });
+      // Map API response items to TransactionRow
+      for (const item of response.items) {
+        allItems.push({
+          id: item.id,
+          user_id: item.user_id,
+          transaction_date: item.transaction_date || new Date().toISOString(),
+          amount: item.amount,
+          description: item.description || 'Imported transaction',
+          merchant_name: item.merchant_name || 'Unknown Merchant',
+          category: item.category || 'Uncategorized',
+          original_category: item.original_category,
+          payment_method: item.payment_method || 'Cash',
+          status: item.status || 'completed',
+          type: item.type || (item.amount >= 0 ? 'credit' : 'debit'),
+          created_at: item.created_at || new Date().toISOString(),
+          raw_data: item.raw_data as Record<string, any>,
+        });
       }
-
-      if (Date.now() - startedAt > MAX_FETCH_DURATION_MS) {
-        truncated = true;
-        break;
-      }
-
-      const to = from + FETCH_PAGE_SIZE - 1;
-      const pageResponse = await withTimeout<{
-        data: Record<string, unknown>[];
-        errorMessage: string | null;
-      }>(
-        supabase
-          .from('transactions')
-          .select(
-            'id,user_id,transaction_date,amount,description,merchant_name,category,original_category,payment_method,status,currency,type,created_at,raw_data'
-          )
-          .eq('user_id', user.id)
-          .order('transaction_date', { ascending: false })
-          .range(from, to)
-          .then((response: { data: unknown[] | null; error: { message: string } | null }) => ({
-            data: (response.data ?? []) as Record<string, unknown>[],
-            errorMessage: response.error?.message ?? null,
-          })),
-        FETCH_REQUEST_TIMEOUT_MS,
-        'Transactions fetch'
-      );
-
-      const txError = pageResponse.errorMessage;
-
-      if (txError) throw new Error(txError);
-
-      const pageRows = pageResponse.data;
-      if (!pageRows.length) break;
-
-      const firstId = toText(pageRows[0]?.id);
-      const lastId = toText(pageRows[pageRows.length - 1]?.id);
-      const pageSignature = `${firstId}|${lastId}|${pageRows.length}`;
-      if (seenPageSignatures.has(pageSignature)) {
-        break;
-      }
-      seenPageSignatures.add(pageSignature);
-
-      let newRowsAdded = 0;
-      for (const row of pageRows) {
-        const rowId = toText(row.id);
-        if (rowId && seenIds.has(rowId)) continue;
-        if (rowId) seenIds.add(rowId);
-        allRows.push(row);
-        newRowsAdded += 1;
-      }
-
-      if (newRowsAdded === 0 || pageRows.length < FETCH_PAGE_SIZE) break;
-
-      from += FETCH_PAGE_SIZE;
-      pagesFetched += 1;
+      hasMore = response.has_more;
+      cursor = response.next_cursor ?? undefined;
     }
 
-    const mappedTransactions = allRows.map(row => {
-      const merchantName = toText(row.merchant_name);
-      const rawDescription = toText(row.description) || merchantName || 'Imported transaction';
-      // Trust the merchant_name if it exists (set by API with proper extraction)
-      // Only run extractReadableDescription on raw description as fallback
-      const displayDescription = merchantName || extractReadableDescription(rawDescription);
-
-      return {
-        id: toText(row.id) ?? '',
-        user_id: toText(row.user_id) ?? '',
-        transaction_date: toText(row.transaction_date) ?? new Date().toISOString(),
-        amount: Number(row.amount) || 0,
-        description: displayDescription,
-        merchant_name: merchantName || 'Unknown Merchant',
-        category: toText(row.category) || 'Uncategorized',
-        original_category: toText(row.original_category),
-        payment_method: toText(row.payment_method) || 'Cash',
-        status: toText(row.status) || 'completed',
-        type: toText(row.type) || (Number(row.amount) >= 0 ? 'credit' : 'debit'),
-        created_at: toText(row.created_at) || new Date().toISOString(),
-        raw_data: (row.raw_data as Record<string, any>) || {},
-      };
-    });
-
-    setTransactions(mappedTransactions);
+    setTransactions(allItems);
     sessionStorage.setItem(
       cacheKey,
       JSON.stringify({
         timestamp: Date.now(),
-        rows: mappedTransactions,
+        rows: allItems,
       })
     );
-
-    if (truncated) {
-      setMessage(
-        `Loaded ${allRows.length.toLocaleString(
-          'en-IN'
-        )} recent transactions. Narrow filters or refresh to load more.`
-      );
-    }
   }, [router]);
+
+  // Poll for category updates after import — background classification takes a few seconds.
+  // Stops after 15 polls (30s) or on unmount.
+  const startCategoryPolling = useCallback(() => {
+    if (categoryPollRef.current) clearInterval(categoryPollRef.current);
+    let polls = 0;
+    categoryPollRef.current = setInterval(async () => {
+      polls++;
+      await fetchTransactions();
+      if (polls >= 15) {
+        clearInterval(categoryPollRef.current!);
+        categoryPollRef.current = null;
+      }
+    }, 2000);
+  }, [fetchTransactions]);
+
+  // Cleanup poll on unmount
+  useEffect(() => () => {
+    if (categoryPollRef.current) clearInterval(categoryPollRef.current);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -1352,13 +677,19 @@ export default function TransactionsPage() {
     setReclassifying(true);
     try {
       const allTxs = [reclassifyTarget, ...reclassifySimilar];
-      const ids = allTxs.map(t => t.id);
 
-      for (const tx of allTxs) {
-        const updates: { category: string; amount?: number; original_category?: string } = {
+      // Get auth token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const accessToken = session?.access_token as string;
+
+      // Build batch update items with income auto-flip
+      const batchUpdates = allTxs.map(tx => {
+        const updates: { id: string; category: string; amount?: number } = {
+          id: tx.id,
           category: reclassifyCategory,
         };
-        if (!tx.original_category) updates.original_category = tx.category;
         if (reclassifyCategory.toLowerCase() === 'income' && tx.amount < 0) {
           updates.amount = Math.abs(tx.amount);
         } else if (
@@ -1368,15 +699,26 @@ export default function TransactionsPage() {
         ) {
           updates.amount = -Math.abs(tx.amount);
         }
-        await supabase.from('transactions').update(updates).eq('id', tx.id).eq('user_id', userId);
-      }
+        return updates;
+      });
 
-      const idSet = new Set(ids);
+      // Batch update via API
+      await accountsApi.batchUpdateTransactions(batchUpdates, accessToken);
+
+      const idSet = new Set(allTxs.map(t => t.id));
       setTransactions(prev =>
-        prev.map(t => (idSet.has(t.id) ? { ...t, category: reclassifyCategory } : t))
+        prev.map(t => {
+          if (!idSet.has(t.id)) return t;
+          const isIncome = reclassifyCategory.toLowerCase() === 'income';
+          let newAmt = t.amount;
+          if (isIncome && t.amount < 0) newAmt = Math.abs(t.amount);
+          else if (!isIncome && t.amount > 0 && t.category?.toLowerCase() === 'income')
+            newAmt = -Math.abs(t.amount);
+          return { ...t, category: reclassifyCategory, amount: newAmt };
+        })
       );
 
-      // Send feedback to HypCD
+      // Submit feedback for active learning (async, non-blocking)
       const corrections: Record<string, string> = {};
       for (const tx of allTxs) {
         if (tx.category !== reclassifyCategory) {
@@ -1384,31 +726,9 @@ export default function TransactionsPage() {
         }
       }
       if (Object.keys(corrections).length > 0) {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        apiSubmitFeedback(corrections, session?.access_token).catch(err =>
-          console.warn('Feedback failed:', err)
-        );
-      }
-
-      // Log to training_corrections
-      const trainingData = allTxs
-        .filter(tx => tx.category !== reclassifyCategory)
-        .map(tx => ({
-          user_id: userId,
-          transaction_id: tx.id,
-          description: tx.description,
-          original_category: tx.category,
-          corrected_category: reclassifyCategory,
-        }));
-      if (trainingData.length > 0) {
-        supabase
-          .from('training_corrections')
-          .insert(trainingData)
-          .then(({ error }: { error: any }) => {
-            if (error) console.warn('Failed to log corrections:', error);
-          });
+        categorizationApi
+          .submitFeedback(corrections, accessToken)
+          .catch(err => console.warn('Feedback failed:', err));
       }
 
       setMessage(`Reclassified ${allTxs.length} transaction(s).`);
@@ -1428,25 +748,27 @@ export default function TransactionsPage() {
       const tx = transactions.find(t => t.id === editingCategoryTxId);
       if (!tx) throw new Error('Transaction not found');
 
+      // Get auth token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const accessToken = session?.access_token as string;
+
       const isIncome = editingCategoryValue.toLowerCase() === 'income';
       const currentAmount = tx.amount;
 
       // Auto-flip logic
       let newAmount = currentAmount;
       if (isIncome && currentAmount < 0) {
-        newAmount = Math.abs(currentAmount); // Convert to positive
+        newAmount = Math.abs(currentAmount);
       } else if (!isIncome && currentAmount > 0 && tx.category?.toLowerCase() === 'income') {
-        newAmount = -Math.abs(currentAmount); // Convert to negative if moving AWAY from income
+        newAmount = -Math.abs(currentAmount);
       }
 
       const updates: { category: string; amount?: number; original_category?: string } = {
         category: editingCategoryValue,
       };
 
-      // If original_category is missing (e.g. older tx), backfill it with the *current* category before changing it.
-      // Actually, if it's null, it implies the *current* value IS the original (or we missed backfilling).
-      // The migration backfilled it. So we rely on it being there.
-      // But if it's somehow null, we should probably set it to the OLD category value.
       if (!tx.original_category) {
         updates.original_category = tx.category;
       }
@@ -1455,13 +777,8 @@ export default function TransactionsPage() {
         updates.amount = newAmount;
       }
 
-      const { error: updateError } = await supabase
-        .from('transactions')
-        .update(updates)
-        .eq('id', editingCategoryTxId)
-        .eq('user_id', userId);
-
-      if (updateError) throw updateError;
+      // Update via API
+      await accountsApi.updateTransaction(editingCategoryTxId, updates, accessToken);
 
       setTransactions(prev =>
         prev.map(t =>
@@ -1478,28 +795,11 @@ export default function TransactionsPage() {
       setMessage('Category updated.');
       setEditingCategoryTxId(null);
 
-      // Active Learning: Log correction asynchronously
+      // Active Learning: Submit feedback to backend (handles training_corrections too)
       if (tx && tx.category !== editingCategoryValue) {
-        supabase
-          .from('training_corrections')
-          .insert({
-            user_id: userId,
-            transaction_id: editingCategoryTxId,
-            description: tx.description,
-            original_category: tx.category,
-            corrected_category: editingCategoryValue,
-          })
-          .then(({ error }: { error: any }) => {
-            if (error) console.warn('Failed to log training correction:', error);
-          });
-
-        // Send feedback to HypCD
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        apiSubmitFeedback({ [tx.description]: editingCategoryValue }, session?.access_token).catch(
-          err => console.warn('Feedback failed:', err)
-        );
+        categorizationApi
+          .submitFeedback({ [tx.description]: editingCategoryValue }, accessToken)
+          .catch(err => console.warn('Feedback failed:', err));
       }
 
       // Prompt reclassification of similar transactions
@@ -1538,11 +838,8 @@ export default function TransactionsPage() {
     window.setTimeout(tryScroll, 0);
   };
 
-  /* Consolidated handleDataImport */
-  const handleDataImport = async (
-    file: File,
-    password?: string
-  ): Promise<number> => {
+  /* Consolidated handleDataImport — now delegates entirely to the backend */
+  const handleDataImport = async (file: File, password?: string): Promise<number> => {
     if (!userId) throw new Error('No authenticated user found.');
 
     // Auth Check
@@ -1552,273 +849,13 @@ export default function TransactionsPage() {
     if (!session?.access_token) throw new Error('Session expired.');
     const accessToken = session.access_token;
 
-    // Compute hash
-    const fileBuffer = await file.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', fileBuffer);
-    const fileHash = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    setImportProgress(10);
 
-    // Detect format & Parse locally
-    let parsedRows: Record<string, unknown>[] = [];
-    let fileToProcess = file;
+    // Send file to backend — it handles ALL parsing, classification, dedup, and insertion
+    const result = await ingestionApi.importFile(file, accessToken, password);
 
-    // Server-side decrypt for password-protected Excel files
-    if (password && detectImportFileKind(file.name) === 'excel') {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('password', password);
-
-      const resp = await fetch('/api/decrypt-xlsx', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData,
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        // Throw with specific message to trigger password modal logic if needed,
-        // though here we likely already HAVE a password if we are in this block.
-        // If password was wrong, API returns 400.
-        throw new Error(err.error || 'Failed to decrypt file');
-      }
-
-      const decryptedBlob = await resp.blob();
-      fileToProcess = new File([decryptedBlob], file.name, { type: file.type });
-    }
-
-    try {
-      const parsed = await parseFileRows(fileToProcess);
-      parsedRows = parsed.rows;
-    } catch (err: any) {
-      if (
-        err.message &&
-        (err.message.toLowerCase().includes('password') ||
-          err.message.toLowerCase().includes('encrypted'))
-      ) {
-        // If we already tried with a password, it means the password was wrong
-        if (password) {
-          throw new Error('Incorrect password. Please try again.');
-        }
-        // Otherwise, we need to ask for one
-        setPendingFile(file);
-        setIsPasswordModalOpen(true);
-        throw err;
-      }
-      throw err;
-    }
-
-    if (!parsedRows.length) throw new Error(`No rows found in ${file.name}`);
-
-    // Helper: Map Row
-    const mapRowToInsert = (row: Record<string, unknown>): InsertTransaction | null => {
-      const normalized = new Map<string, string>();
-      for (const [key, value] of Object.entries(row))
-        normalized.set(normalizeHeader(key), toText(value));
-
-      const amountRaw = parseAmount(normalized.get('amount') ?? '');
-      const date =
-        parseDateValue(normalized.get('date') ?? '') ||
-        parseDateValue(normalized.get('transactiondate') ?? '');
-      if (!date) return null;
-
-      const type = (normalized.get('type') ?? 'expense').toLowerCase();
-      const withdrawal =
-        parseAmount(normalized.get('withdrawal') ?? '') ||
-        parseAmount(normalized.get('debit') ?? '') ||
-        0;
-      const deposit =
-        parseAmount(normalized.get('deposit') ?? '') ||
-        parseAmount(normalized.get('credit') ?? '') ||
-        0;
-
-      let amount = amountRaw;
-      if (withdrawal > 0 || deposit > 0) {
-        amount = deposit > 0 ? Math.abs(deposit) : -Math.abs(withdrawal);
-      } else if (/income|credit|deposit/.test(type)) {
-        amount = Math.abs(amount || 0);
-      } else {
-        amount = -Math.abs(amount || 0);
-      }
-
-      const rawDescRaw =
-        toText(normalized.get('description')) || toText(normalized.get('details')) || 'Imported';
-      // Collapse newlines and excess whitespace (SBI statements embed \n in descriptions)
-      const rawDesc = rawDescRaw
-        .replace(/\s*\n\s*/g, ' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-
-      // Merchant: check multiple possible column names
-      const rawMerchant =
-        toText(normalized.get('merchant')) ||
-        toText(normalized.get('merchantname')) ||
-        toText(normalized.get('product')) ||
-        toText(normalized.get('merchantcategory')) ||
-        toText(normalized.get('seller')) ||
-        toText(normalized.get('vendor'));
-
-      // Payment method: check column directly
-      const rawPaymentMethod =
-        toText(normalized.get('paymentmethod')) ||
-        toText(normalized.get('mode')) ||
-        toText(normalized.get('paymenttype'));
-
-      // *** SBI PARSER ***
-      const sbiResult = parseSbiDescription(rawDesc);
-
-      // Description: Use clean description from parser, or fallback to readable
-      const cleanDesc =
-        sbiResult.type !== 'unknown'
-          ? sbiResult.cleanDescription
-          : extractReadableDescription(rawDesc) || rawDesc;
-
-      // Merchant: Use parser merchant if known, else column, else extract from description
-      let merchant = sbiResult.merchant !== 'Unknown' ? sbiResult.merchant : rawMerchant || '';
-      if (!merchant) {
-        // Try to extract merchant from the clean description using known merchant list
-        const descLower = cleanDesc.toLowerCase();
-        for (const [official, aliases] of knownMerchants) {
-          if (aliases.some(a => descLower.includes(a))) {
-            merchant = official;
-            break;
-          }
-        }
-        if (!merchant) merchant = 'Unknown';
-      }
-
-      // Payment method: prefer column value, then SBI parser, then infer from description
-      let paymentMethod = rawPaymentMethod || (sbiResult.type !== 'unknown' ? sbiResult.type : '');
-      if (!paymentMethod) {
-        const descLower = rawDesc.toLowerCase();
-        if (/\bupi\b|upvdr|upi\//.test(descLower)) paymentMethod = 'upi';
-        else if (/\bpos\b|pos atm/.test(descLower)) paymentMethod = 'pos';
-        else if (/\batm\b|atm wdl|atm cash/.test(descLower)) paymentMethod = 'atm';
-        else if (/\bneft\b/.test(descLower)) paymentMethod = 'neft';
-        else if (/\bimps\b/.test(descLower)) paymentMethod = 'imps';
-        else if (/\binb\b|internet banking/.test(descLower)) paymentMethod = 'inb';
-        else if (/visa|mastercard|rupay/.test(descLower)) paymentMethod = 'card';
-        else paymentMethod = 'unknown';
-      }
-
-      const category = 'Uncategorized';
-
-      return {
-        user_id: userId,
-        transaction_date: date,
-        amount: amount || 0,
-        currency: 'INR',
-        description: cleanDesc,
-        merchant_name: merchant,
-        category: category,
-        original_category: null,
-        payment_method: paymentMethod,
-        status: 'completed',
-        raw_data: {
-          ...row,
-          ...sbiResult.meta,
-          sbi_type: sbiResult.type,
-        },
-      };
-    };
-
-    // Build Batch & Fingerprints
-    const existingFingerprints = new Set(
-      transactions.map(
-        t =>
-          `${t.transaction_date.slice(0, 19)}|${Number(t.amount).toFixed(2)}|${(
-            t.description || ''
-          ).toLowerCase()}|${(t.merchant_name || '').toLowerCase()}`
-      )
-    );
-    const newFingerprints = new Set<string>();
-    const batch: InsertTransaction[] = [];
-    let importedCount = 0;
-
-    for (const row of parsedRows) {
-      const tx = mapRowToInsert(row);
-      if (!tx) continue;
-
-      const fp = `${tx.transaction_date.slice(0, 19)}|${Number(tx.amount).toFixed(2)}|${(
-        tx.description || ''
-      ).toLowerCase()}|${(tx.merchant_name || '').toLowerCase()}`;
-      if (existingFingerprints.has(fp) || newFingerprints.has(fp)) continue;
-      newFingerprints.add(fp);
-      batch.push(tx);
-    }
-
-    // Classify descriptions using HypCD, fall back to keyword classifier
-    if (batch.length > 0) {
-      let usedApi = false;
-      try {
-        const uniqueDescs = [...new Set(batch.map(tx => tx.description).filter(Boolean))];
-        if (uniqueDescs.length > 0) {
-          const categoryMap = await apiClassifyDescriptions(uniqueDescs, accessToken);
-          for (const tx of batch) {
-            const predicted = categoryMap[tx.description];
-            if (predicted) tx.category = predicted;
-          }
-          usedApi = true;
-        }
-      } catch (classifyErr) {
-        console.warn('HypCD API unavailable, using keyword classifier:', classifyErr);
-      }
-
-      // Fallback: keyword classifier for any still-Uncategorized transactions
-      if (!usedApi) {
-        for (const tx of batch) {
-          if (tx.category === 'Uncategorized') {
-            tx.category = classifyByKeywords(tx.description, tx.merchant_name);
-          }
-        }
-      }
-    }
-
-    // Insert Batch
-    const insertBatch = async (batchToWrite: InsertTransaction[]) => {
-      if (!batchToWrite.length) return;
-
-      const response = await fetch('/api/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          transactions: batchToWrite,
-          filename: file.name,
-          file_hash: fileHash,
-        }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        console.error('[insertBatch] Import failed:', response.status, errBody);
-        throw new Error(errBody?.error || `Batch import failed (${response.status})`);
-      }
-
-      const body = await response.json().catch(() => ({}));
-      importedCount += typeof body?.inserted === 'number' ? body.inserted : 0;
-    };
-
-    // Chunking & Upload
-    const CHUNK_SIZE = 2500;
-    const CONCURRENCY = 3;
-    const chunks = [];
-    for (let i = 0; i < batch.length; i += CHUNK_SIZE) {
-      chunks.push(batch.slice(i, i + CHUNK_SIZE));
-    }
-
-    setImportProgress(10); // Start
-    for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-      const activeBatch = chunks.slice(i, i + CONCURRENCY);
-      await Promise.all(
-        activeBatch.map(async chunk => {
-          await insertBatch(chunk);
-        })
-      );
-      const processedCount = Math.min((i + CONCURRENCY) * CHUNK_SIZE, batch.length);
-      setImportProgress(10 + Math.round((processedCount / batch.length) * 90));
-    }
-
-    return importedCount;
+    setImportProgress(100);
+    return result.inserted;
   };
 
   const onSelectFile: React.ChangeEventHandler<HTMLInputElement> = async event => {
@@ -1830,8 +867,6 @@ export default function TransactionsPage() {
 
     const file = event.target.files?.[0];
     if (!file) return;
-
-    // fileKind check removed as handled by parseFileRows logic later
 
     setSaving(true);
     setImportProgress(0);
@@ -1846,6 +881,7 @@ export default function TransactionsPage() {
       setSaving(false);
       setImportProgress(null);
       event.target.value = '';
+      if (count > 0) startCategoryPolling();
     } catch (importError) {
       const msg = importError instanceof Error ? importError.message : 'Import failed.';
 
@@ -1881,6 +917,7 @@ export default function TransactionsPage() {
       const count = await handleDataImport(file, password);
       await fetchTransactions();
       setMessage(`Imported ${count} transactions.`);
+      if (count > 0) startCategoryPolling();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Import failed');
     } finally {
