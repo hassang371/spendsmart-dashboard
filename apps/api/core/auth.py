@@ -20,10 +20,16 @@ import structlog
 from fastapi import Depends, Header, HTTPException
 from supabase import Client, create_client
 
+from apps.api.core.config import settings
+
 logger = structlog.get_logger()
 
 
 def _get_supabase_url() -> str:
+    # Use settings singleton (reads .env via Pydantic Settings)
+    if settings and settings.SUPABASE_URL:
+        return settings.SUPABASE_URL
+    # Fallback to direct env lookup
     url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
     if not url:
         raise RuntimeError("SUPABASE_URL is not configured")
@@ -31,6 +37,10 @@ def _get_supabase_url() -> str:
 
 
 def _get_supabase_anon_key() -> str:
+    # Use settings singleton (reads .env via Pydantic Settings)
+    if settings and settings.SUPABASE_ANON_KEY:
+        return settings.SUPABASE_ANON_KEY
+    # Fallback to direct env lookup
     key = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     if not key:
         raise RuntimeError("SUPABASE_ANON_KEY is not configured")
@@ -87,7 +97,8 @@ async def get_user_token(authorization: str = Header(default="")) -> str:
     try:
         payload = _decode_jwt_payload(token)
         exp = payload.get("exp")
-        if exp is not None and time.time() > exp:
+        CLOCK_SKEW_SECONDS = 30  # Tolerate up to 30s of clock drift
+        if exp is not None and time.time() > (exp + CLOCK_SKEW_SECONDS):
             logger.warning("jwt_expired", exp=exp)
             raise HTTPException(
                 status_code=401,
