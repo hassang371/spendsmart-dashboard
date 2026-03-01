@@ -40,9 +40,10 @@ def test_rich_anchors_initialization(classifier):
     }
     assert set(classifier.anchors.keys()) == expected_cats
 
-    # Verify shape of anchors (should be [1, 384])
+    # Anchors are now in hyperbolic space (projector output = proj_dim=128, not backend dim)
     for cat, tensor in classifier.anchors.items():
-        assert tensor.shape == (1, 384)
+        assert tensor.shape[0] == 1  # keepdim=True
+        assert tensor.shape[1] == 128  # default proj_dim
 
 
 def test_rich_anchors_logic():

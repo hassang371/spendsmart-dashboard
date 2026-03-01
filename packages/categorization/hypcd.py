@@ -1,11 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import structlog
 from typing import Dict, List, Optional
 from geoopt import PoincareBall
 
 from .cleaner import clean_description
 from .rules import KeywordMatcher
+
+logger = structlog.get_logger()
 
 
 class HyperbolicProjector(nn.Module):
@@ -316,6 +319,42 @@ class HypCDClassifier:
         self.rule_matcher = KeywordMatcher()
         self.anchors = self._initialize_anchors()
 
+        # Load checkpoint if available (global base or env override)
+        self._load_checkpoint()
+
+    def _load_checkpoint(self) -> None:
+        """Load global base checkpoint at startup.
+
+        Priority:
+          1. HYPCD_CHECKPOINT_PATH env var (explicit override)
+          2. AdapterManager: Supabase Storage models/global/base_model.pt
+          3. checkpoints/global/base_model.pt (local dev)
+          4. Silent skip (random init — first run)
+        """
+        import os
+        from packages.categorization.adapter_manager import AdapterManager
+
+        explicit = os.getenv("HYPCD_CHECKPOINT_PATH")
+        if explicit:
+            try:
+                state = torch.load(explicit, map_location=self.backend.device, weights_only=True)
+                self.load_state_dict(state)
+                logger.info("checkpoint_loaded", source="env_var", path=explicit)
+                return
+            except Exception as e:
+                logger.warning("checkpoint_load_failed", path=explicit, error=str(e))
+
+        mgr = AdapterManager()
+        state = mgr.load_global_base()
+        if state:
+            try:
+                self.load_state_dict(state)
+                logger.info("checkpoint_loaded", source="global_base")
+            except Exception as e:
+                logger.warning("checkpoint_load_failed", source="global_base", error=str(e))
+        else:
+            logger.debug("checkpoint_not_found", note="using_random_init")
+
     def to(self, device: torch.device | str):
         self.embedder.projector = self.embedder.projector.to(device)
         self.classifier = self.classifier.to(device)
@@ -363,7 +402,9 @@ class HypCDClassifier:
 
         anchors: Dict[str, torch.Tensor] = {}
         for category, phrases in seed_phrases.items():
-            embedded = self.backend.embed_batch(phrases)
+            # Use embedder (projector output) so anchors are in the same hyperbolic space
+            # as predict_batch embeddings (proj_dim, not backend dim)
+            embedded = self.embedder.embed_batch(phrases)
             anchors[category] = embedded.mean(dim=0, keepdim=True)
         return anchors
 
@@ -373,8 +414,37 @@ class HypCDClassifier:
             valid = [t for t in valid if t]
             if not valid:
                 continue
-            embedded = self.backend.embed_batch(valid)
+            embedded = self.embedder.embed_batch(valid)
             self.anchors[category] = embedded.mean(dim=0, keepdim=True)
+
+    def _classify_novel(self, embedding: torch.Tensor) -> dict:
+        """Route low-confidence embedding through anchor-based GCD (§3.7.2).
+
+        Uses pre-computed category anchors as proxy centroids.
+        Finds nearest anchor by hyperbolic distance.
+        """
+        from .clustering import HierarchyExtractor
+        extractor = HierarchyExtractor(self.manifold)
+        norm_val = extractor.compute_norm(embedding).item()
+
+        # Stack anchor embeddings — shape (K, D)
+        anchor_keys = list(self.anchors.keys())
+        anchor_vecs = torch.cat([self.anchors[k] for k in anchor_keys], dim=0)
+
+        # Hyperbolic distances from this embedding to each anchor
+        dists = self.manifold.dist(
+            embedding.unsqueeze(0).expand(len(anchor_keys), -1),
+            anchor_vecs,
+        )
+
+        min_idx = dists.argmin().item()
+        confidence = torch.exp(-dists[min_idx]).item()
+
+        return {
+            "category":   anchor_keys[min_idx],
+            "confidence": max(confidence, 0.05),
+            "norm":       norm_val,
+        }
 
     def predict(self, text: str) -> dict:
         """
@@ -408,11 +478,17 @@ class HypCDClassifier:
             rule_category = self.rule_matcher.predict(candidate)
             if rule_category:
                 embedding = self.embedder.embed_batch([candidate])[0]
+                from .clustering import HierarchyExtractor
+                _extractor = HierarchyExtractor(self.manifold)
+                norm_val = _extractor.compute_norm(embedding).item()
                 results[i] = {
-                    "category": rule_category,
+                    "category":  rule_category,
                     "confidence": 1.0,
                     "embedding": embedding,
-                    "is_novel": False,
+                    "is_novel":  False,
+                    "depth":     "macro" if norm_val < 0.5 else "micro",
+                    "norm":      norm_val,
+                    "path":      "keyword_rule",
                 }
             else:
                 model_texts.append(candidate)
@@ -428,10 +504,13 @@ class HypCDClassifier:
         if not isinstance(embeddings, torch.Tensor):
             for model_i, target_i in enumerate(model_indices):
                 results[target_i] = {
-                    "category": "Misc",
+                    "category":   "Misc",
                     "confidence": 0.0,
-                    "embedding": embeddings,
-                    "is_novel": False,
+                    "embedding":  embeddings,
+                    "is_novel":   False,
+                    "depth":      "macro",
+                    "norm":       0.0,
+                    "path":       "hypffn",
                 }
             return results
 
@@ -454,23 +533,51 @@ class HypCDClassifier:
                 confidences = confidences.unsqueeze(0)
                 indices = indices.unsqueeze(0)
 
+        # Import hierarchy extractor once for all results
+        from .clustering import HierarchyExtractor
+        _extractor = HierarchyExtractor(self.manifold)
+        CONFIDENCE_THRESHOLD = 0.5
+
         # Build results
         for model_i, (idx, conf) in enumerate(zip(indices, confidences)):
             target_i = model_indices[model_i]
             candidate = model_texts[model_i].lower()
+            embedding = embeddings[model_i]
+
+            # §3.7.1 confidence threshold — route novel to GCD
+            if conf.item() < CONFIDENCE_THRESHOLD:
+                novel = self._classify_novel(embedding)
+                results[target_i] = {
+                    "category":   novel["category"],
+                    "confidence": novel["confidence"],
+                    "embedding":  embedding,
+                    "is_novel":   True,
+                    "depth":      "boundary",
+                    "norm":       novel["norm"],
+                    "path":       "novel_cluster",
+                }
+                continue
+
             predicted = self.labels[idx.item()]
 
-            # Guardrail: avoid high-impact mislabeling of random merchant spends as salary.
+            # §3.1 Salary guardrail
             if predicted == "Salary" and not any(
                 token in candidate for token in ["salary", "payroll", "stipend", "credited", "wage"]
             ):
                 predicted = "Misc"
 
+            # §3.8 Hierarchy norm extraction
+            norm_val = _extractor.compute_norm(embedding).item()
+            depth = "macro" if norm_val < 0.5 else "micro"
+
             results[target_i] = {
-                "category": predicted,
+                "category":   predicted,
                 "confidence": conf.item(),
-                "embedding": embeddings[model_i],
-                "is_novel": False,
+                "embedding":  embedding,
+                "is_novel":   False,
+                "depth":      depth,
+                "norm":       norm_val,
+                "path":       "hypffn",
             }
 
         return results
