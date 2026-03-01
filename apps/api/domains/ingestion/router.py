@@ -10,7 +10,9 @@ Frontend Migration: Added POST /import for full end-to-end import
 import hashlib
 import structlog
 import numpy as np
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from collections import defaultdict
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from supabase import Client
 
 from apps.api.core.auth import get_user_client
@@ -80,6 +82,49 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, str]:
         result[desc] = matched
 
     return result
+
+
+def _classify_and_update_transactions(user_id: str, fps_to_desc: dict) -> None:
+    """Background task: classify inserted transactions and patch their categories.
+
+    Runs after the HTTP response is sent so /import responds in milliseconds.
+    Uses the service-role client (bypasses RLS) to write back to Supabase.
+    """
+    unique_descs = list({desc for desc in fps_to_desc.values() if desc.strip()})
+    if not unique_descs:
+        return
+
+    try:
+        category_map = _classify_descriptions(unique_descs)
+    except Exception as e:
+        logger.warning("bg_classify_failed", error=str(e))
+        return
+
+    # Group fingerprints by resolved category for batch updates
+    category_to_fps: dict = defaultdict(list)
+    for fp, desc in fps_to_desc.items():
+        category = category_map.get(desc, "Uncategorized")
+        if category != "Uncategorized":
+            category_to_fps[category].append(fp)
+
+    if not category_to_fps:
+        return
+
+    try:
+        from apps.api.core.auth import get_service_client
+        svc = get_service_client()
+        for category, fps in category_to_fps.items():
+            svc.table("transactions").update(
+                {"category": category}
+            ).eq("user_id", user_id).in_("fingerprint", fps).execute()
+        logger.info(
+            "bg_classify_complete",
+            user_id=user_id,
+            categories=len(category_to_fps),
+            total=len(fps_to_desc),
+        )
+    except Exception as e:
+        logger.warning("bg_category_update_failed", user_id=user_id, error=str(e))
 
 
 def _build_transaction_row(
@@ -172,6 +217,7 @@ async def ingest_csv(
 @router.post("/import")
 async def import_file(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     password: str = Form(None),
     client: Client = Depends(get_user_client),
@@ -314,31 +360,31 @@ async def import_file(
             "filename": filename,
         }
 
-    # --- Step 4: Classify descriptions ---
+    # --- Step 4: Collect unique descriptions for async classification ---
     unique_descs = list({
         str(row.get("description", "") or "")
         for row, _ in new_rows
         if str(row.get("description", "") or "").strip()
     })
-    category_map = _classify_descriptions(unique_descs)
 
-    # --- Track classification job ---
+    # --- Track classification job (async — categories patched after response) ---
     try:
         client.table("classification_jobs").insert({
             "user_id": user_id,
-            "status": "completed",
-            "logs": f"Classified {len(unique_descs)} unique descriptions from {filename}",
+            "status": "pending",
+            "logs": f"Queued async classification for {len(unique_descs)} descriptions from {filename}",
         }).execute()
     except Exception as e:
         logger.warning("classification_job_tracking_failed", error=str(e))
 
-    # --- Step 5: Build insert rows ---
+    # --- Step 5: Build insert rows (Uncategorized — classification is async) ---
     insert_rows = []
+    fps_to_desc: dict = {}
     cancelled_count = 0
     for row, fp in new_rows:
         desc = str(row.get("description", "") or "")
-        category = category_map.get(desc, "Uncategorized")
-        tx_row = _build_transaction_row(row, user_id, fp, category)
+        fps_to_desc[fp] = desc
+        tx_row = _build_transaction_row(row, user_id, fp)  # defaults to "Uncategorized"
 
         # Track cancelled transactions (amount=0, no money moved)
         if tx_row["amount"] == 0 or tx_row["amount"] == 0.0:
@@ -368,6 +414,10 @@ async def import_file(
                     inserted += 1
                 except Exception:
                     skipped += 1
+
+    # --- Enqueue background classification (patches categories after response) ---
+    if fps_to_desc:
+        background_tasks.add_task(_classify_and_update_transactions, user_id, fps_to_desc)
 
     logger.info(
         "import_complete",
