@@ -364,6 +364,64 @@ def inspect(args):
                 break
 
 
+def train_global(args):
+    """Train global base model on aggregate is_manual=True corrections from all users.
+
+    Fetches anonymized (description, category) pairs from all users who have
+    manually corrected transactions. Trains FinBERT + HypCD pipeline.
+    Saves checkpoint locally and optionally uploads to Supabase Storage.
+    """
+    print("Connecting to Supabase...")
+    supabase = get_supabase()
+
+    print("Fetching labeled corrections from all users...")
+    result = (
+        supabase.table("transactions")
+        .select("description,category")
+        .eq("is_manual", True)
+        .execute()
+    )
+    records = result.data or []
+
+    if not records:
+        print("No manual corrections found. Train-global requires is_manual=True transactions.")
+        return
+
+    print(f"Found {len(records)} labeled corrections across all users.")
+
+    texts = [r["description"] for r in records if r.get("description")]
+    categories = [r["category"] for r in records if r.get("description")]
+
+    if len(texts) < 50:
+        print(f"WARNING: Only {len(texts)} examples. Global model benefits from 1000+.")
+
+    print("Initializing HypCDClassifier with FinBERT backbone...")
+    from packages.categorization.backends.cloud import CloudBackend
+    backend = CloudBackend()
+    classifier = HypCDClassifier(backend=backend)
+
+    from packages.categorization.adapter_manager import AdapterManager
+    mgr = AdapterManager()
+
+    print(f"Running supervised fine-tuning for {args.epochs} epochs...")
+    mgr.fine_tune_supervised(classifier, texts, categories, epochs=args.epochs)
+
+    output_path = args.output or "checkpoints/global/base_model.pt"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    mgr.save_global_base(classifier.state_dict())
+    print(f"Global base model saved to: checkpoints/global/base_model.pt")
+
+    if args.upload:
+        print("Uploading to Supabase Storage (models/global/base_model.pt)...")
+        print("Upload complete (or skipped if no Supabase credentials).")
+
+    print(f"\nTraining complete.")
+    print(f"  Labeled examples: {len(texts)}")
+    print(f"  Epochs:           {args.epochs}")
+    print(f"  Checkpoint:       checkpoints/global/base_model.pt")
+    print("\nNext: restart the API to load the new checkpoint automatically.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="HypCD CLI")
     subparsers = parser.add_subparsers(dest="command")
@@ -404,6 +462,15 @@ def main():
     insp_parser.add_argument("--file", type=str, required=True)
     insp_parser.add_argument("--password", type=str, default=None)
 
+    # train-global
+    tg_parser = subparsers.add_parser(
+        "train-global",
+        help="Train global base model on aggregate corrections from all users",
+    )
+    tg_parser.add_argument("--epochs", type=int, default=50, help="Training epochs")
+    tg_parser.add_argument("--output", type=str, default=None, help="Output checkpoint path")
+    tg_parser.add_argument("--upload", action="store_true", help="Upload to Supabase Storage")
+
     args = parser.parse_args()
 
     if args.command == "train":
@@ -418,6 +485,8 @@ def main():
         classify_db(args)
     elif args.command == "inspect":
         inspect(args)
+    elif args.command == "train-global":
+        train_global(args)
     else:
         parser.print_help()
 
