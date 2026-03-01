@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BrainCircuit, Loader2, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
-import { apiGetLatestTrainingJob, type TrainingJob } from '../../lib/api/client';
+import { trainingApi, type TrainingJob } from '../../lib/api/client';
 import { getBrowserSupabaseClient } from '../../lib/supabase/client';
 
 export default function TrainingJobCard() {
@@ -16,9 +16,11 @@ export default function TrainingJobCard() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const latestJob = await apiGetLatestTrainingJob(token);
+      if (!session?.access_token) {
+        setJob(null);
+        return;
+      }
+      const latestJob = await trainingApi.getLatest(session.access_token);
       setJob(latestJob);
     } catch {
       setJob(null);
@@ -29,10 +31,16 @@ export default function TrainingJobCard() {
 
   useEffect(() => {
     fetchJob();
-    // Poll every 30 seconds
-    const interval = setInterval(fetchJob, 30000);
+    const interval = setInterval(() => {
+      // Stop polling once job reaches a terminal state
+      if (job?.status === 'completed' || job?.status === 'failed') {
+        clearInterval(interval);
+        return;
+      }
+      fetchJob();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [fetchJob]);
+  }, [fetchJob, job?.status]);
 
   if (loading) {
     return (

@@ -17,10 +17,11 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 
 import {
-  apiHealthCheck,
-  apiForecastPredict,
-  apiUploadTrainingData,
+  healthApi,
+  forecastApi,
+  trainingApi,
   type ForecastResponse,
+  type ForecastPrediction,
   type HealthResponse,
   type TrainingUploadResponse,
 } from '../../../lib/api/client';
@@ -104,7 +105,7 @@ export default function AIInsightsPage() {
   const checkGateway = useCallback(async () => {
     setCheckingHealth(true);
     try {
-      const data = await apiHealthCheck();
+      const data = await healthApi.check();
       setHealthData(data);
       setGatewayOnline(true);
     } catch {
@@ -133,9 +134,10 @@ export default function AIInsightsPage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const data = await apiForecastPredict(file, token);
+      if (!session?.access_token) {
+        throw new Error('Session expired. Please sign in again.');
+      }
+      const data = await forecastApi.predict(file, session.access_token);
       setForecast(data);
     } catch (err) {
       setForecastError(err instanceof Error ? err.message : 'Failed to generate forecast');
@@ -187,9 +189,10 @@ export default function AIInsightsPage() {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        const token = session?.access_token;
-
-        const data = await apiUploadTrainingData(file, trainingPassword || undefined, token);
+        if (!session?.access_token) {
+          throw new Error('Session expired. Please sign in again.');
+        }
+        const data = await trainingApi.upload(file, session.access_token, trainingPassword || undefined);
         setTrainingResult(data);
       } catch (err) {
         setTrainingError(err instanceof Error ? err.message : 'Failed to trigger training job');
@@ -235,20 +238,22 @@ export default function AIInsightsPage() {
 
         {/* Gateway Status Badge */}
         <div
-          className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur-md transition-colors duration-300 ${checkingHealth
+          className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur-md transition-colors duration-300 ${
+            checkingHealth
               ? 'border-border bg-muted text-muted-foreground'
               : gatewayOnline
                 ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
                 : 'border-destructive/20 bg-destructive/10 text-destructive'
-            }`}
+          }`}
         >
           <div
-            className={`h-1.5 w-1.5 rounded-full ${checkingHealth
+            className={`h-1.5 w-1.5 rounded-full ${
+              checkingHealth
                 ? 'animate-pulse bg-muted-foreground'
                 : gatewayOnline
                   ? 'bg-emerald-500 animate-pulse'
                   : 'bg-destructive'
-              }`}
+            }`}
           />
           {checkingHealth ? 'Connecting...' : gatewayOnline ? 'Engine Online' : 'Engine Offline'}
         </div>
@@ -477,7 +482,7 @@ export default function AIInsightsPage() {
                       radius={[6, 6, 0, 0]}
                       animationDuration={1200}
                     >
-                      {forecast.predictions.map((_, i) => (
+                      {forecast.predictions.map((_, i: number) => (
                         <Cell
                           key={`spend-${i}`}
                           fill="url(#spendGrad)"
@@ -493,7 +498,7 @@ export default function AIInsightsPage() {
                       radius={[6, 6, 0, 0]}
                       animationDuration={1200}
                     >
-                      {forecast.predictions.map((_, i) => (
+                      {forecast.predictions.map((_, i: number) => (
                         <Cell
                           key={`income-${i}`}
                           fill="url(#incomeGrad)"
@@ -515,7 +520,7 @@ export default function AIInsightsPage() {
                     <span className="font-mono text-red-400">
                       ₹
                       {forecast.predictions
-                        .reduce((s, p) => s + p.predicted_spend, 0)
+                        .reduce((s: number, p: ForecastPrediction) => s + p.predicted_spend, 0)
                         .toLocaleString('en-IN')}
                     </span>
                   </span>
@@ -527,7 +532,7 @@ export default function AIInsightsPage() {
                     <span className="font-mono text-emerald-400">
                       ₹
                       {forecast.predictions
-                        .reduce((s, p) => s + p.predicted_income, 0)
+                        .reduce((s: number, p: ForecastPrediction) => s + p.predicted_income, 0)
                         .toLocaleString('en-IN')}
                     </span>
                   </span>
@@ -544,10 +549,11 @@ export default function AIInsightsPage() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onClick={() => fileInputRef.current?.click()}
-              className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed transition-all duration-300 ${isDragOver
+              className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed transition-all duration-300 ${
+                isDragOver
                   ? 'border-primary bg-primary/5 scale-[1.01]'
                   : 'border-border bg-muted/30 hover:border-primary/40 hover:bg-muted/50'
-                }`}
+              }`}
             >
               <input
                 ref={fileInputRef}
