@@ -29,6 +29,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from apps.api.core.config import settings
 from apps.api.core.errors import register_error_handlers
 from apps.api.core.logging import setup_logging
+from apps.api.core.rate_limiter import RateLimiter, rate_limit_dependency
 from apps.api.core.security_headers import SecurityHeadersMiddleware
 from apps.api.core.middleware import RequestIDMiddleware, RequestLoggingMiddleware
 
@@ -108,6 +109,23 @@ async def lifespan(app: FastAPI):
     )
     _init_sentry()
     logger.info("app_starting", version="0.5.0")
+
+    # Initialize Redis-backed rate limiter for the /ingest/import endpoint
+    import redis as _redis
+    try:
+        _redis_client = _redis.from_url(
+            os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            decode_responses=True,
+            socket_connect_timeout=2,
+        )
+        _redis_client.ping()
+        app.state.import_rate_limiter = rate_limit_dependency(
+            RateLimiter(_redis_client, max_requests=10, window_seconds=60)
+        )
+        logger.info("rate_limiter_initialized", endpoint="/ingest/import")
+    except Exception as e:
+        logger.warning("rate_limiter_unavailable", error=str(e))
+        app.state.import_rate_limiter = None
 
     # Eagerly initialize the HypCD/BERT classifier in background thread
     # so the first import doesn't wait ~80s for model loading.

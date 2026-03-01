@@ -10,7 +10,7 @@ Frontend Migration: Added POST /import for full end-to-end import
 import hashlib
 import structlog
 import numpy as np
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from supabase import Client
 
 from apps.api.core.auth import get_user_client
@@ -171,6 +171,7 @@ async def ingest_csv(
 
 @router.post("/import")
 async def import_file(
+    request: Request,
     file: UploadFile = File(...),
     password: str = Form(None),
     client: Client = Depends(get_user_client),
@@ -186,6 +187,11 @@ async def import_file(
 
     Returns counts of inserted, skipped (duplicate), and total parsed rows.
     """
+    # Apply rate limit if limiter is configured on app state (10 req/min per user)
+    limiter = getattr(request.app.state, "import_rate_limiter", None)
+    if limiter:
+        await limiter(request)
+
     allowed_extensions = (".csv", ".tsv", ".xls", ".xlsx", ".xlsm", ".json", ".txt")
     filename = file.filename or ""
     if not any(filename.lower().endswith(ext) for ext in allowed_extensions):

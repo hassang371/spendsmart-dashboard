@@ -32,6 +32,9 @@ async def forecast_predict(
 
     BUG-07 fix: Uses parse_file() (preserves metadata columns) instead
     of parse_csv_content() (drops them via _normalize_dataframe).
+
+    IMP-05 fix: Auth check and duplicate-file check happen before any
+    parsing work, so duplicate uploads fail fast.
     """
     if (
         file.content_type
@@ -40,9 +43,32 @@ async def forecast_predict(
     ):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
+    # Auth check first — fail fast before reading file
+    user_response = client.auth.get_user()
+    if not user_response or not user_response.user:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+    user_id = user_response.user.id
+
     contents = await file.read()
     file_hash = hashlib.sha256(contents).hexdigest()
 
+    # Duplicate-file check BEFORE parsing (fail fast)
+    try:
+        client.table("uploaded_files").insert({
+            "user_id": user_id,
+            "file_hash": file_hash,
+            "filename": file.filename,
+            "upload_type": "forecast",
+        }).execute()
+    except Exception as e:
+        if "duplicate key" in str(e) or "23505" in str(e):
+            raise HTTPException(
+                status_code=400,
+                detail="This file has already been uploaded for forecasting.",
+            )
+        raise HTTPException(status_code=500, detail="Failed to register upload")
+
+    # Parse only after successful registration
     try:
         # BUG-07 fix: use parse_file instead of parse_csv_content
         df = parse_file(contents, file.filename)
@@ -57,25 +83,6 @@ async def forecast_predict(
         daily_df = loader.aggregate_daily()
     except Exception:
         raise HTTPException(status_code=400, detail="Failed to aggregate transactions")
-
-    # Register upload hash
-    try:
-        user_response = client.auth.get_user()
-        if not user_response or not user_response.user:
-            raise HTTPException(status_code=401, detail="Invalid bearer token")
-        client.table("uploaded_files").insert({
-            "user_id": user_response.user.id,
-            "file_hash": file_hash,
-            "filename": file.filename,
-            "upload_type": "forecast",
-        }).execute()
-    except Exception as e:
-        if "duplicate key" in str(e) or "23505" in str(e):
-            raise HTTPException(
-                status_code=400,
-                detail="This file has already been uploaded for forecasting.",
-            )
-        raise HTTPException(status_code=500, detail="Failed to register upload")
 
     # Statistical forecast
     horizon = 7
