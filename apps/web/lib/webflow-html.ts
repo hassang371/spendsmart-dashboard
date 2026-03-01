@@ -115,8 +115,8 @@ export const WEBFLOW_LANDING_HTML = `
                 </div>
               </div>
             </button>
-            <a data-barba-update="" data-button-theme="dark" data-button-accent="" href="https://my.slush.app/"
-              target="_blank" class="button-main w-inline-block"> <span class="button-main-inner full-h"> <span
+            <a data-barba-update="" data-button-theme="dark" data-button-accent="" href="/login"
+              class="button-main w-inline-block"> <span class="button-main-inner full-h"> <span
                   data-text="LOGIN" class="button-main-inner__back"></span>
                 <span class="button-main-inner__front"> <span class="button-main-inner__bg"></span>
                   <span class="button-main-inner__text"> <span> LOGIN
@@ -211,7 +211,7 @@ export const WEBFLOW_LANDING_HTML = `
                 </div>
               </div>
               <div data-wf--component-download-cta-buttons--variant="base" class="button-row">
-                <a data-button-accent="dark" data-load-stagger="" href="https://my.slush.app/" target="_blank"
+                <a data-button-accent="dark" data-load-stagger="" href="/login"
                   class="button-main download-button text-only w-inline-block"> <span class="button-main-inner full-h">
                     <span data-text="Launch App" class="button-main-inner__back"></span>
                     <span class="button-main-inner__front"> <span class="button-main-inner__bg is--white"></span>
@@ -418,7 +418,7 @@ export const WEBFLOW_LANDING_HTML = `
                   Replace your accountant with Agentic AI Infrastructure.
                 </h3>
                 <div data-wf--component-download-cta-buttons--variant="gap-small" class="button-row">
-                  <a data-button-accent="dark" data-load-stagger="" href="https://my.slush.app/" target="_blank"
+                  <a data-button-accent="dark" data-load-stagger="" href="/login"
                     class="button-main download-button text-only w-inline-block"> <span
                       class="button-main-inner full-h"> <span data-text="Launch App"
                         class="button-main-inner__back"></span>

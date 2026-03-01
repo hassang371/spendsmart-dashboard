@@ -30,17 +30,14 @@ from packages.categorization.data_loader import (
     BankStatementParser,
     InverseFrequencyMasking,
 )
-from packages.categorization.hyperbolic_nn import HyperbolicProjector
-from packages.categorization.trainer import HypCDTrainer
-from packages.categorization.discovery import HyperbolicKMeans
-from packages.categorization.hypcd import HypCDClassifier  # Added to top level
+from packages.categorization.training import HypCDTrainer
+from packages.categorization.clustering import HyperbolicKMeans
+from packages.categorization.hypcd import HypCDClassifier, HyperbolicProjector
 
 # Global config
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBED_DIM = 384
-PROJ_DIM = 2  # Visualization friendly, but maybe 32 better for perf
-HIDDEN_DIM = 16
-OUTPUT_DIM = 2  # If optimizing for 2D visualization
+PROJ_DIM = 128
 
 
 def train(args):
@@ -94,20 +91,13 @@ def train(args):
     # 4. Initialize Model
     # Input: 384 (BERT), Output: 2 (Hyperbolic)
     print("Initializing HypCD Model...")
-    projector = HyperbolicProjector(EMBED_DIM, PROJ_DIM)
-    # We might want a deeper network or just projector for visualization
-    # Let's use HypFFN wrapping the projector logic?
-    # Our HypFFN assumes input is on manifold.
-    # Let's create a wrapper that does: BERT_Emb -> Projector -> HypFFN (optional)
-    # For simple HypCD, Projector is enough to map to ball.
-    # But we want to train it. Trainer expects 'model(x)'.
-
-    # If we pass BERT embeddings to model, model should be Projector.
+    projector = HyperbolicProjector(input_dim=EMBED_DIM, hidden_dim=256, output_dim=PROJ_DIM)
     model = projector
 
     # 5. Train
     print("Starting Training...")
-    trainer = HypCDTrainer(model, lr=0.005)
+    from geoopt import PoincareBall
+    trainer = HypCDTrainer(projector=model, manifold=PoincareBall(c=1.0), lr=0.005)
     metrics = trainer.train(dataloader, epochs=args.epochs)
 
     print("Training Complete.")
@@ -192,18 +182,19 @@ def train_db(args):
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     # Initialize Projector
-    projector = HyperbolicProjector(EMBED_DIM, PROJ_DIM)
+    projector = HyperbolicProjector(input_dim=EMBED_DIM, hidden_dim=256, output_dim=PROJ_DIM)
     # Load existing if available?
     if os.path.exists("hypcd_model.pt"):
         try:
-            projector.load_state_dict(torch.load("hypcd_model.pt", map_location="cpu"))
+            projector.load_state_dict(torch.load("hypcd_model.pt", map_location="cpu", weights_only=True))
             print("Loaded existing model weights.")
-        except:
+        except Exception:
             print("Could not load existing weights, starting fresh.")
 
     # Train
     print("Starting Supervised Training...")
-    trainer = HypCDTrainer(projector, lr=0.005)
+    from geoopt import PoincareBall
+    trainer = HypCDTrainer(projector=projector, manifold=PoincareBall(c=1.0), lr=0.005)
     # Use train_supervised (Need to implement in Trainer)
     metrics = trainer.train_supervised(dataloader, epochs=args.epochs)
 
@@ -268,10 +259,10 @@ def predict(args):
     device = "cpu"
 
     # Load model
-    model = HyperbolicProjector(EMBED_DIM, PROJ_DIM)
+    model = HyperbolicProjector(input_dim=EMBED_DIM, hidden_dim=256, output_dim=PROJ_DIM)
     try:
-        model.load_state_dict(torch.load("hypcd_model.pt", map_location=device))
-    except:
+        model.load_state_dict(torch.load("hypcd_model.pt", map_location=device, weights_only=True))
+    except Exception:
         print("Model not found. Run train first.")
         return
 
@@ -311,10 +302,10 @@ def explore(args):
     bert = SentenceTransformer(MODEL_NAME, device=device)
     embs = bert.encode(texts, convert_to_tensor=True, show_progress_bar=True)
 
-    model = HyperbolicProjector(EMBED_DIM, PROJ_DIM)
+    model = HyperbolicProjector(input_dim=EMBED_DIM, hidden_dim=256, output_dim=PROJ_DIM)
     try:
-        model.load_state_dict(torch.load("hypcd_model.pt", map_location=device))
-    except:
+        model.load_state_dict(torch.load("hypcd_model.pt", map_location=device, weights_only=True))
+    except Exception:
         print("Model not found. Using random init.")
 
     model.to(device)
@@ -324,8 +315,10 @@ def explore(args):
         hyp_embs = model(embs)
 
     print(f"Running Hyperbolic K-Means on {len(texts)} transactions...")
-    kmeans = HyperbolicKMeans(n_clusters=args.clusters)
-    labels = kmeans.fit_predict(hyp_embs)
+    from geoopt import PoincareBall
+    kmeans = HyperbolicKMeans(n_clusters=args.clusters, manifold=PoincareBall(c=1.0))
+    kmeans.fit(hyp_embs)
+    labels, _, _ = kmeans.predict(hyp_embs)
 
     # Show clusters
     df["Cluster"] = labels.numpy()

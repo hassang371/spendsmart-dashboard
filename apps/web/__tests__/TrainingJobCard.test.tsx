@@ -1,11 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import TrainingJobCard from '../components/dashboard/TrainingJobCard';
-import { apiGetLatestTrainingJob } from '../lib/api/client';
+import { trainingApi } from '../lib/api/client';
 import { getBrowserSupabaseClient } from '../lib/supabase/client';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../lib/api/client', () => ({
-  apiGetLatestTrainingJob: vi.fn(),
+  trainingApi: {
+    getLatest: vi.fn(),
+  },
 }));
 
 vi.mock('../lib/supabase/client', () => ({
@@ -27,7 +29,7 @@ describe('TrainingJobCard', () => {
   });
 
   it('shows idle state when no job exists', async () => {
-    (apiGetLatestTrainingJob as any).mockResolvedValue(null);
+    (trainingApi.getLatest as any).mockResolvedValue(null);
     render(<TrainingJobCard />);
     await waitFor(() => {
       expect(screen.getByText(/model status/i)).toBeInTheDocument();
@@ -36,7 +38,7 @@ describe('TrainingJobCard', () => {
   });
 
   it('shows training state', async () => {
-    (apiGetLatestTrainingJob as any).mockResolvedValue({
+    (trainingApi.getLatest as any).mockResolvedValue({
       id: 'job-1',
       status: 'training',
       created_at: new Date().toISOString(),
@@ -49,7 +51,7 @@ describe('TrainingJobCard', () => {
   });
 
   it('shows completed state', async () => {
-    (apiGetLatestTrainingJob as any).mockResolvedValue({
+    (trainingApi.getLatest as any).mockResolvedValue({
       id: 'job-2',
       status: 'completed',
       created_at: new Date().toISOString(),
@@ -62,7 +64,7 @@ describe('TrainingJobCard', () => {
   });
 
   it('shows failed state', async () => {
-    (apiGetLatestTrainingJob as any).mockResolvedValue({
+    (trainingApi.getLatest as any).mockResolvedValue({
       id: 'job-3',
       status: 'failed',
       created_at: new Date().toISOString(),

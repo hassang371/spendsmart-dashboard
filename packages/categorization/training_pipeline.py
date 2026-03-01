@@ -475,7 +475,6 @@ class HypCDTrainingPipeline:
             backend=self.backend,
             num_classes=self.config.num_classes,
             proj_dim=self.config.proj_dim,
-            backend_type='cloud'
         )
         
         # Move to device

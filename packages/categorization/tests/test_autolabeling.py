@@ -35,8 +35,8 @@ class TestAutoLabeling:
 
     def test_hypcd_integration_rules(self):
         """Test that HypCD classifier prioritizes rules."""
-        from packages.categorization.backends.mobile import MobileBackend
-        backend = MobileBackend()
+        from packages.categorization.backends.cloud import CloudBackend
+        backend = CloudBackend()
         classifier = HypCDClassifier(backend=backend)
 
         # Should be caught by Rule Engine (Confidence 1.0)
@@ -50,8 +50,8 @@ class TestAutoLabeling:
 
     def test_hypcd_integration_cleaner(self):
         """Test that HypCD classifier cleans input before model prediction."""
-        from packages.categorization.backends.mobile import MobileBackend
-        backend = MobileBackend()
+        from packages.categorization.backends.cloud import CloudBackend
+        backend = CloudBackend()
         classifier = HypCDClassifier(backend=backend)
 
         # "TACO BELL" is not in rules, so it hits the model.

@@ -20,15 +20,121 @@ interface ApiOptions {
 }
 
 class ApiError extends Error {
-  status: number;
-  detail: string;
-
-  constructor(status: number, detail: string) {
-    super(detail);
+  constructor(
+    message: string,
+    public status?: number,
+    public data?: any
+  ) {
+    super(message);
     this.name = 'ApiError';
-    this.status = status;
-    this.detail = detail;
   }
+}
+
+export interface ForecastPrediction {
+  day_offset: number;
+  predicted_spend: number;
+  predicted_income: number;
+  predicted_net: number;
+}
+
+export interface ForecastResponse {
+  model: string;
+  note?: string;
+  predictions: ForecastPrediction[];
+}
+
+export interface HealthResponse {
+  services?: {
+    api?: string;
+    redis?: string;
+    celery?: string;
+  };
+  engines?: {
+    ingestion?: string;
+  };
+}
+
+export interface TrainingUploadResponse {
+  job_id: string;
+}
+
+export interface TrainingJob {
+  id: string;
+  status: 'pending' | 'training' | 'completed' | 'failed';
+  created_at: string;
+  metrics?: {
+    val_loss?: number;
+    epochs_trained?: number;
+    transaction_count?: number;
+  };
+}
+
+export interface SafeToSpendResponse {
+  safe_amount: number;
+  horizon_days: number;
+  confidence: number;
+  model: string;
+  forecast_breakdown?: any[];
+}
+
+// --- Import response ---
+
+export interface ImportResponse {
+  inserted: number;
+  skipped_duplicates: number;
+  total_parsed: number;
+  filename: string;
+}
+
+// --- Transaction types ---
+
+export interface Transaction {
+  id: string;
+  user_id: string;
+  transaction_date: string;
+  amount: number;
+  currency: string;
+  description: string;
+  merchant_name: string;
+  category: string;
+  original_category?: string | null;
+  payment_method: string;
+  status: string;
+  type: string;
+  fingerprint?: string;
+  is_manual?: boolean;
+  created_at?: string;
+  raw_data?: Record<string, unknown>;
+}
+
+export interface TransactionListParams {
+  limit?: number;
+  cursor?: string;
+  date_from?: string;
+  date_to?: string;
+  amount_min?: number;
+  amount_max?: number;
+  category?: string;
+  merchant?: string;
+  type?: string;
+}
+
+export interface TransactionListResponse {
+  items: Transaction[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface TransactionUpdatePayload {
+  category?: string;
+  amount?: number;
+  original_category?: string;
+}
+
+export interface BatchUpdateItem {
+  id: string;
+  category: string;
+  amount?: number;
 }
 
 async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
@@ -54,7 +160,7 @@ async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promis
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new ApiError(response.status, errorData.detail || 'Request failed');
+    throw new ApiError(errorData.detail || 'Request failed', response.status, errorData);
   }
 
   return response.json();
@@ -63,10 +169,25 @@ async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promis
 // --- Domain-specific helpers ---
 
 export const ingestionApi = {
+  /** Parse-only: returns parsed transactions without inserting */
   uploadCSV: (file: File, token: string) => {
     const formData = new FormData();
     formData.append('file', file);
     return apiFetch('/ingest/csv', { method: 'POST', body: formData, token });
+  },
+
+  /** Full import: parse → classify → dedup → insert into Supabase */
+  importFile: (file: File, token: string, password?: string): Promise<ImportResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (password) {
+      formData.append('password', password);
+    }
+    return apiFetch<ImportResponse>('/ingest/import', {
+      method: 'POST',
+      body: formData,
+      token,
+    });
   },
 };
 
@@ -104,9 +225,12 @@ export const forecastApi = {
 };
 
 export const trainingApi = {
-  upload: (file: File, token: string) => {
+  upload: (file: File, token: string, password?: string) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (password) {
+      formData.append('password', password);
+    }
     return apiFetch('/training/upload', { method: 'POST', body: formData, token });
   },
 
@@ -119,7 +243,39 @@ export const trainingApi = {
 };
 
 export const accountsApi = {
-  getTransactions: (token: string) => apiFetch('/accounts/transactions', { token }),
+  /** Fetch transactions with cursor-based pagination and filters */
+  getTransactions: (
+    token: string,
+    params?: TransactionListParams
+  ): Promise<TransactionListResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.set(key, String(value));
+        }
+      });
+    }
+    const qs = searchParams.toString();
+    const path = qs ? `/accounts/transactions?${qs}` : '/accounts/transactions';
+    return apiFetch<TransactionListResponse>(path, { token });
+  },
+
+  /** Update a single transaction */
+  updateTransaction: (transactionId: string, updates: TransactionUpdatePayload, token: string) =>
+    apiFetch(`/accounts/transactions/${transactionId}`, {
+      method: 'PATCH',
+      body: updates,
+      token,
+    }),
+
+  /** Batch update multiple transactions (e.g., reclassify similar) */
+  batchUpdateTransactions: (updates: BatchUpdateItem[], token: string) =>
+    apiFetch('/accounts/transactions/batch', {
+      method: 'PATCH',
+      body: { updates },
+      token,
+    }),
 
   getProfile: (token: string) => apiFetch('/accounts/profile', { token }),
 };

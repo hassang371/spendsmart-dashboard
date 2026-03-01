@@ -271,27 +271,19 @@ class HypCDClassifier:
         backend: Optional["BackendBase"] = None,
         num_classes: int = 11,
         proj_dim: int = 128,
-        backend_type: str = "cloud",
     ):
         """
         Initialize HypCD classifier.
 
         Args:
-            backend: Pre-initialized backend (Cloud or Mobile)
+            backend: Pre-initialized backend (defaults to CloudBackend)
             num_classes: Number of output categories
             proj_dim: Projected dimension for hyperbolic space
-            backend_type: 'cloud' or 'mobile' (used if backend not provided)
         """
-        # Initialize backend
+        # Initialize backend (mobile deferred to mobile phase)
         if backend is None:
-            if backend_type == "cloud":
-                from .backends.cloud import CloudBackend
-
-                backend = CloudBackend()
-            else:
-                from .backends.mobile import MobileBackend
-
-                backend = MobileBackend()
+            from .backends.cloud import CloudBackend
+            backend = CloudBackend()
 
         self.backend = backend
         self.num_classes = num_classes
