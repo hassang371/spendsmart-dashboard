@@ -1,5 +1,6 @@
 """Hyperbolic clustering with Fréchet mean and hierarchy extraction."""
 import torch
+import geoopt
 from geoopt.optim import RiemannianSGD
 from typing import Optional
 
@@ -58,9 +59,9 @@ class HyperbolicKMeans:
         else:
             mean_tan = points_tan.mean(dim=0)
 
-        centroid = self.manifold.expmap0(mean_tan)
-        centroid = centroid.unsqueeze(0)  # Add batch dimension
-        centroid.requires_grad = True
+        init = self.manifold.expmap0(mean_tan).unsqueeze(0)  # (1, dim)
+        # ManifoldParameter keeps the point on the Poincaré ball after each RiemannianSGD step
+        centroid = geoopt.ManifoldParameter(init.clone(), manifold=self.manifold)
 
         # Optimize with Riemannian SGD
         optimizer = RiemannianSGD([centroid], lr=lr)

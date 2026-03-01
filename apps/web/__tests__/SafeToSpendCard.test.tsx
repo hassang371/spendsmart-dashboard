@@ -1,11 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import SafeToSpendCard from '../components/dashboard/SafeToSpendCard';
-import { apiSafeToSpend } from '../lib/api/client';
+import { forecastApi } from '../lib/api/client';
 import { getBrowserSupabaseClient } from '../lib/supabase/client';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../lib/api/client', () => ({
-  apiSafeToSpend: vi.fn(),
+  forecastApi: {
+    safeToSpend: vi.fn(),
+  },
 }));
 
 vi.mock('../lib/supabase/client', () => ({
@@ -44,13 +46,13 @@ describe('SafeToSpendCard', () => {
   });
 
   it('shows loading state initially', () => {
-    (apiSafeToSpend as any).mockImplementation(() => new Promise(() => {}));
+    (forecastApi.safeToSpend as any).mockImplementation(() => new Promise(() => {}));
     render(<SafeToSpendCard />);
     expect(screen.getByText(/calculating/i)).toBeInTheDocument();
   });
 
   it('renders safe amount and confidence when data loads', async () => {
-    (apiSafeToSpend as any).mockResolvedValue({
+    (forecastApi.safeToSpend as any).mockResolvedValue({
       safe_amount: 15000,
       currency: 'INR',
       horizon_days: 7,
@@ -70,7 +72,7 @@ describe('SafeToSpendCard', () => {
   });
 
   it('renders forecast chart when breakdown is available', async () => {
-    (apiSafeToSpend as any).mockResolvedValue({
+    (forecastApi.safeToSpend as any).mockResolvedValue({
       safe_amount: 12000,
       currency: 'INR',
       horizon_days: 7,
@@ -95,7 +97,7 @@ describe('SafeToSpendCard', () => {
   });
 
   it('handles error gracefully', async () => {
-    (apiSafeToSpend as any).mockRejectedValue(new Error('API Error'));
+    (forecastApi.safeToSpend as any).mockRejectedValue(new Error('API Error'));
     render(<SafeToSpendCard />);
 
     await waitFor(() => {

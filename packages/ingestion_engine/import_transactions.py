@@ -12,13 +12,15 @@ def normalize_merchant(merchant: str) -> str:
     return str(merchant).strip().upper()
 
 
-def generate_fingerprint(iso_date: str, amount: float, merchant: str) -> str:
+def generate_fingerprint(
+    iso_date: str, amount: float, merchant: str, salt: str = ""
+) -> str:
     """
     Generates a unique SHA256 fingerprint for a transaction.
-    Format: SHA256({ISO_Date_Sec}|{Amount_Float}|{Merchant_Normalized})
+    Format: SHA256({ISO_Date_Sec}|{Amount_Float}|{Merchant_Normalized}|{salt})
     """
     normalized_merchant = normalize_merchant(merchant)
-    raw_string = f"{iso_date}|{amount}|{normalized_merchant}"
+    raw_string = f"{iso_date}|{amount}|{normalized_merchant}|{salt}"
     return hashlib.sha256(raw_string.encode("utf-8")).hexdigest()
 
 
@@ -37,6 +39,7 @@ def _normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "date": [
             "date",
             "time",
+            "timestamp",
             "transaction_date",
             "transaction date",
             "posting date",
@@ -44,13 +47,19 @@ def _normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             "posting_date",
             "trans_date",
         ],
-        "description": ["description", "desc", "original description", "memo"],
+        "description": [
+            "description",
+            "desc",
+            "original description",
+            "memo",
+            "merchant_category", # Used as fallback for description if real desc is missing
+        ],
         "merchant": ["merchant", "merchant name", "payee"],
-        "amount": ["amount", "value", "amt"],
+        "amount": ["amount", "value", "amt", "amount (inr)"],
         "debit": ["debit", "withdrawal", "dr"],
         "credit": ["credit", "deposit", "cr"],
-        "status": ["status", "state", "transaction status"],
-        "method": ["payment method", "payment_method", "mode", "payment mode"],
+        "status": ["status", "state", "transaction status", "transaction_status"],
+        "method": ["payment method", "payment_method", "mode", "payment mode", "transaction type"],
         "product": ["product", "item", "product name"],
     }
 
