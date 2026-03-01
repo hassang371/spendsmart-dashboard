@@ -9,7 +9,7 @@ to Supabase.
 """
 
 import structlog
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 from supabase import Client
 from typing import Optional
@@ -25,6 +25,45 @@ logger = structlog.get_logger()
 
 
 # --- Request schemas ---
+
+def _run_supervised_finetuning_bg(
+    user_id: str,
+    texts: list[str],
+    categories: list[str],
+) -> None:
+    """Background task: supervised fine-tuning of user adapter on corrected transactions.
+
+    Triggered after merchant-batch reclassification. Trains projector + HypFFN
+    on the newly labeled (description, category) pairs.
+    """
+    if not texts or len(texts) != len(categories):
+        return
+
+    try:
+        from apps.api.domains.categorization.service import get_classifier
+        from packages.categorization.adapter_manager import AdapterManager
+
+        classifier = get_classifier()
+        mgr = AdapterManager()
+
+        user_state = mgr.load_user_adapter(user_id)
+        if user_state:
+            try:
+                classifier.load_state_dict(user_state)
+            except Exception:
+                pass
+
+        mgr.fine_tune_supervised(classifier, texts, categories, epochs=5)
+        mgr.save_user_adapter(user_id, classifier.state_dict())
+
+        logger.info(
+            "supervised_finetuning_complete",
+            user_id=user_id,
+            examples=len(texts),
+        )
+    except Exception as e:
+        logger.warning("supervised_finetuning_failed", user_id=user_id, error=str(e))
+
 
 def _extract_merchant_keyword(description: str) -> str | None:
     """Extract the most distinctive word from a cleaned transaction description.
@@ -168,6 +207,7 @@ async def batch_update_transactions(
 async def update_transaction(
     transaction_id: str = Path(description="Transaction UUID"),
     update: TransactionUpdate = Body(...),
+    background_tasks: BackgroundTasks = None,
     client: Client = Depends(get_user_client),
 ):
     """Update a single transaction and auto-reclassify all matching merchant transactions.
@@ -231,6 +271,22 @@ async def update_transaction(
                         new=update.category,
                         count=merchant_updated,
                     )
+
+                    # Trigger supervised fine-tuning on the corrected pairs
+                    if merchant_updated > 0 and batch_result.data and background_tasks:
+                        ft_texts = [
+                            r.get("description", "")
+                            for r in batch_result.data
+                            if r.get("description")
+                        ]
+                        if ft_texts:
+                            ft_categories = [update.category] * len(ft_texts)
+                            background_tasks.add_task(
+                                _run_supervised_finetuning_bg,
+                                user_id,
+                                ft_texts,
+                                ft_categories,
+                            )
                 except Exception as e:
                     logger.warning("merchant_batch_failed", error=str(e))
 
