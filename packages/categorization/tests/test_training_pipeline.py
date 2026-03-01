@@ -448,5 +448,38 @@ class TestProductionReadiness:
             assert 'config' in exported
 
 
+def test_validate_returns_per_class_f1():
+    """validate() must return per_class_f1 and top2_accuracy keys."""
+    import tempfile
+    from torch.utils.data import DataLoader, TensorDataset
+
+    with tempfile.TemporaryDirectory() as tmp:
+        config = TrainingConfig(checkpoint_dir=tmp, batch_size=2, num_classes=5)
+        pipeline = HypCDTrainingPipeline(config)
+        # Use tiny backend to avoid downloading real model
+        pipeline.backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
+        pipeline.initialize_model()
+
+        # Build a tiny val_loader: embeddings already in BERT dim
+        n = 6
+        embs = torch.randn(n, 128)   # raw backend dim
+        labels = torch.tensor([0, 1, 2, 3, 4, 0])
+        texts = [f"text_{i}" for i in range(n)]
+
+        # DataLoader must yield (embeddings, labels, texts)
+        class TinyDataset(torch.utils.data.Dataset):
+            def __len__(self): return n
+            def __getitem__(self, i): return embs[i], labels[i], texts[i]
+
+        val_loader = DataLoader(TinyDataset(), batch_size=2, shuffle=False)
+
+        metrics = pipeline.validate(val_loader)
+
+        assert "accuracy" in metrics
+        assert "per_class_f1" in metrics, "Missing per_class_f1 — update validate() to use sklearn"
+        assert isinstance(metrics["per_class_f1"], dict)
+        assert "top2_accuracy" in metrics, "Missing top2_accuracy"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
