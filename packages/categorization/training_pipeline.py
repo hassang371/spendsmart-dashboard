@@ -467,8 +467,9 @@ class HypCDTrainingPipeline:
     
     def initialize_model(self, resume_from: Optional[str] = None):
         """Initialize model and trainer."""
-        # Initialize backend
-        self.backend = CloudBackend()
+        # Initialize backend (use pre-assigned backend if available, e.g. in tests)
+        if self.backend is None:
+            self.backend = CloudBackend()
         
         # Initialize classifier
         self.classifier = HypCDClassifier(
@@ -645,37 +646,71 @@ class HypCDTrainingPipeline:
         return {'loss': avg_loss}
     
     def validate(self, val_loader: DataLoader) -> Dict:
-        """Validate model."""
+        """Validate model, returning per-class F1 and top-2 accuracy."""
+        from sklearn.metrics import accuracy_score, precision_recall_fscore_support, top_k_accuracy_score
+        from geoopt import PoincareBall
+        import torch.nn.functional as F
+        import numpy as np
+
         self.classifier.eval()
-        total_loss = 0.0
-        correct = 0
-        total = 0
-        
+        all_labels: list = []
+        all_preds: list = []
+        all_probs: list = []
+
+        manifold = PoincareBall(c=1.0)
+
         with torch.no_grad():
             for embeddings, labels, texts in val_loader:
-                # Move to device
                 embeddings = embeddings.to(self.device)
-                labels = labels.to(self.device)
-                
-                # Forward pass
+                labels_cpu = labels.numpy().tolist()
+
                 hyp_embeddings = self.classifier.embedder.projector(embeddings)
                 logits = self.classifier.classifier(hyp_embeddings)
-                
-                # Compute loss
-                criterion = HierarchicalLoss(self.config.num_classes)
-                loss = criterion(logits, labels)
-                
-                # Compute accuracy
-                predictions = torch.argmax(logits, dim=-1)
-                correct += (predictions == labels).sum().item()
-                total += labels.size(0)
-                
-                total_loss += loss.item()
-        
-        avg_loss = total_loss / len(val_loader) if len(val_loader) > 0 else 0.0
-        accuracy = correct / total if total > 0 else 0.0
-        
-        return {'loss': avg_loss, 'accuracy': accuracy}
+
+                # Map logits from Poincaré ball to Euclidean space for softmax
+                probs = F.softmax(manifold.logmap0(logits), dim=-1).cpu().numpy()
+                preds = probs.argmax(axis=-1).tolist()
+
+                all_labels.extend(labels_cpu)
+                all_preds.extend(preds)
+                all_probs.extend(probs.tolist())
+
+        if not all_labels:
+            return {"loss": 0.0, "accuracy": 0.0, "per_class_f1": {}, "top2_accuracy": 0.0}
+
+        y_true = np.array(all_labels)
+        y_pred = np.array(all_preds)
+        y_prob = np.array(all_probs)
+
+        acc = accuracy_score(y_true, y_pred)
+
+        num_classes = len(self.classifier.labels)
+        precision, recall, f1, support = precision_recall_fscore_support(
+            y_true, y_pred,
+            labels=list(range(num_classes)),
+            zero_division=0
+        )
+        per_class_f1 = {
+            self.classifier.labels[i]: {
+                "precision": float(precision[i]),
+                "recall": float(recall[i]),
+                "f1": float(f1[i]),
+                "support": int(support[i]),
+            }
+            for i in range(num_classes)
+            if support[i] > 0
+        }
+
+        if y_prob.shape[1] >= 2:
+            top2 = float(top_k_accuracy_score(y_true, y_prob, k=min(2, y_prob.shape[1])))
+        else:
+            top2 = float(acc)
+
+        return {
+            "accuracy": float(acc),
+            "per_class_f1": per_class_f1,
+            "top2_accuracy": top2,
+        }
     
     def train(
         self,
