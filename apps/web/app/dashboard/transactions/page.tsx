@@ -275,10 +275,6 @@ export default function TransactionsPage() {
   const [editingCategoryTxId, setEditingCategoryTxId] = useState<string | null>(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState<string>('Misc');
   const [updatingCategory, setUpdatingCategory] = useState(false);
-  const [reclassifyTarget, setReclassifyTarget] = useState<TransactionRow | null>(null);
-  const [reclassifySimilar, setReclassifySimilar] = useState<TransactionRow[]>([]);
-  const [reclassifyCategory, setReclassifyCategory] = useState<string>('Misc');
-  const [reclassifying, setReclassifying] = useState(false);
   const [consumedOpenTxId, setConsumedOpenTxId] = useState<string | null>(null);
   const [spotlightTxId, setSpotlightTxId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
@@ -661,86 +657,6 @@ export default function TransactionsPage() {
     setEditingCategoryValue(tx.category || 'Misc');
   };
 
-  const findSimilarTransactions = (tx: TransactionRow): TransactionRow[] => {
-    return transactions.filter(
-      t =>
-        t.id !== tx.id &&
-        (t.description === tx.description ||
-          (t.merchant_name &&
-            t.merchant_name === tx.merchant_name &&
-            t.merchant_name !== 'Unknown'))
-    );
-  };
-
-  const handleReclassify = async () => {
-    if (!reclassifyTarget || !userId) return;
-    setReclassifying(true);
-    try {
-      const allTxs = [reclassifyTarget, ...reclassifySimilar];
-
-      // Get auth token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const accessToken = session?.access_token as string;
-
-      // Build batch update items with income auto-flip
-      const batchUpdates = allTxs.map(tx => {
-        const updates: { id: string; category: string; amount?: number } = {
-          id: tx.id,
-          category: reclassifyCategory,
-        };
-        if (reclassifyCategory.toLowerCase() === 'income' && tx.amount < 0) {
-          updates.amount = Math.abs(tx.amount);
-        } else if (
-          reclassifyCategory.toLowerCase() !== 'income' &&
-          tx.amount > 0 &&
-          tx.category?.toLowerCase() === 'income'
-        ) {
-          updates.amount = -Math.abs(tx.amount);
-        }
-        return updates;
-      });
-
-      // Batch update via API
-      await accountsApi.batchUpdateTransactions(batchUpdates, accessToken);
-
-      const idSet = new Set(allTxs.map(t => t.id));
-      setTransactions(prev =>
-        prev.map(t => {
-          if (!idSet.has(t.id)) return t;
-          const isIncome = reclassifyCategory.toLowerCase() === 'income';
-          let newAmt = t.amount;
-          if (isIncome && t.amount < 0) newAmt = Math.abs(t.amount);
-          else if (!isIncome && t.amount > 0 && t.category?.toLowerCase() === 'income')
-            newAmt = -Math.abs(t.amount);
-          return { ...t, category: reclassifyCategory, amount: newAmt };
-        })
-      );
-
-      // Submit feedback for active learning (async, non-blocking)
-      const corrections: Record<string, string> = {};
-      for (const tx of allTxs) {
-        if (tx.category !== reclassifyCategory) {
-          corrections[tx.description] = reclassifyCategory;
-        }
-      }
-      if (Object.keys(corrections).length > 0) {
-        categorizationApi
-          .submitFeedback(corrections, accessToken)
-          .catch(err => console.warn('Feedback failed:', err));
-      }
-
-      setMessage(`Reclassified ${allTxs.length} transaction(s).`);
-      setReclassifyTarget(null);
-      setReclassifySimilar([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reclassify transactions.');
-    } finally {
-      setReclassifying(false);
-    }
-  };
-
   const saveCategoryEdit = async () => {
     if (!editingCategoryTxId || !userId) return;
     setUpdatingCategory(true);
@@ -765,8 +681,9 @@ export default function TransactionsPage() {
         newAmount = -Math.abs(currentAmount);
       }
 
-      const updates: { category: string; amount?: number; original_category?: string } = {
+      const updates: { category: string; amount?: number; original_category?: string; old_category?: string } = {
         category: editingCategoryValue,
+        old_category: tx.category,  // For merchant-batch reclassification (handled server-side)
       };
 
       if (!tx.original_category) {
@@ -777,7 +694,7 @@ export default function TransactionsPage() {
         updates.amount = newAmount;
       }
 
-      // Update via API
+      // Update via API — server auto-updates all matching merchant transactions
       await accountsApi.updateTransaction(editingCategoryTxId, updates, accessToken);
 
       setTransactions(prev =>
@@ -800,14 +717,6 @@ export default function TransactionsPage() {
         categorizationApi
           .submitFeedback({ [tx.description]: editingCategoryValue }, accessToken)
           .catch(err => console.warn('Feedback failed:', err));
-      }
-
-      // Prompt reclassification of similar transactions
-      const similar = findSimilarTransactions(tx);
-      if (similar.length > 0) {
-        setReclassifyTarget({ ...tx, category: editingCategoryValue });
-        setReclassifySimilar(similar);
-        setReclassifyCategory(editingCategoryValue);
       }
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Unable to update category.');
@@ -1092,45 +1001,6 @@ export default function TransactionsPage() {
             ))}
           </div>
 
-          {reclassifyTarget && (
-            <div className="flex items-center gap-2 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-2">
-              <span className="text-xs font-semibold text-foreground">
-                Reclassify this and {reclassifySimilar.length} similar transaction
-                {reclassifySimilar.length !== 1 ? 's' : ''}?
-              </span>
-              <select
-                name="reclassify-category"
-                value={reclassifyCategory}
-                onChange={event => setReclassifyCategory(event.target.value)}
-                className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold text-foreground outline-none"
-                disabled={reclassifying}
-              >
-                {categoryOptions.map(option => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleReclassify}
-                disabled={reclassifying}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {reclassifying ? 'Updating...' : 'Apply'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setReclassifyTarget(null);
-                  setReclassifySimilar([]);
-                }}
-                className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
         </div>
 
         <AnimatePresence>
