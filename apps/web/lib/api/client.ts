@@ -98,6 +98,8 @@ export interface Transaction {
   merchant_name: string;
   category: string;
   original_category?: string | null;
+  suggested_category?: string | null;
+  confidence_score?: number | null;
   payment_method: string;
   status: string;
   type: string;
@@ -105,6 +107,25 @@ export interface Transaction {
   is_manual?: boolean;
   created_at?: string;
   raw_data?: Record<string, unknown>;
+}
+
+export interface UncategorizedTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  suggested_category?: string | null;
+  confidence_score?: number | null;
+  transaction_date: string;
+  merchant_name: string;
+  payment_method: string;
+  type: string;
+  created_at: string;
+}
+
+export interface UncategorizedListResponse {
+  items: UncategorizedTransaction[];
+  count: number;
 }
 
 export interface TransactionListParams {
@@ -277,6 +298,13 @@ export const accountsApi = {
       body: { updates },
       token,
     }),
+
+  /** Fetch transactions where category='Uncategorized' (for Review tab) */
+  getUncategorized: (token: string, limit = 50): Promise<UncategorizedListResponse> =>
+    apiFetch<UncategorizedListResponse>(
+      `/accounts/transactions/uncategorized?limit=${limit}`,
+      { token }
+    ),
 
   getProfile: (token: string) => apiFetch('/accounts/profile', { token }),
 };
