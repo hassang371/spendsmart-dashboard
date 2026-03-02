@@ -1,5 +1,5 @@
 import pytest
-from packages.ingestion_engine.merchant_extractor import MerchantExtractor
+from packages.ingestion_engine.merchant_extractor import MerchantExtractor, infer_payment_method
 
 
 @pytest.fixture
@@ -108,3 +108,45 @@ def test_jiocinema(extractor):
 
 def test_indigo(extractor):
     assert extractor.extract("IndiGo flight PNR 6E1234") == "IndiGo"
+
+
+# --- infer_payment_method tests ---
+
+def test_upi_description():
+    assert infer_payment_method("UPI-SWIGGY-pay@okaxis") == "UPI"
+
+def test_neft_description():
+    assert infer_payment_method("NEFT-HDFC0001234-SALARY") == "Bank Transfer"
+
+def test_rtgs_description():
+    assert infer_payment_method("RTGS/001/VENDOR PAYMENT") == "Bank Transfer"
+
+def test_imps_description():
+    assert infer_payment_method("IMPS/P2P/9876543210/Rahul") == "IMPS"
+
+def test_ach_description():
+    assert infer_payment_method("ACH D-BAJAJ FINANCE-123") == "Auto Debit"
+
+def test_nach_description():
+    assert infer_payment_method("NACH DEBIT HDFC BANK") == "Auto Debit"
+
+def test_atm_description():
+    assert infer_payment_method("ATM WDL 1234 KORAMANGALA") == "Cash"
+
+def test_pos_description():
+    assert infer_payment_method("POS PURCHASE ZARA STORE") == "Card"
+
+def test_google_play_is_subscription():
+    assert infer_payment_method("YouTube Premium Individual") == "Subscription"
+
+def test_cloud_storage_is_subscription():
+    assert infer_payment_method("Cloud Storage Monthly") == "Subscription"
+
+def test_play_pass_is_subscription():
+    assert infer_payment_method("Play Pass Monthly") == "Subscription"
+
+def test_unknown_defaults_to_other():
+    assert infer_payment_method("Random merchant description") == "Other"
+
+def test_empty_defaults_to_other():
+    assert infer_payment_method("") == "Other"
