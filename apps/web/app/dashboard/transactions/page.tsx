@@ -50,6 +50,8 @@ type TransactionRow = {
   description: string;
   category: string;
   original_category?: string | null;
+  suggested_category?: string | null;
+  confidence_score?: number | null;
   payment_method: string;
   merchant_name: string;
   status: string;
