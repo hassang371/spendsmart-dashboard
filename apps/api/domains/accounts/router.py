@@ -257,6 +257,8 @@ async def update_transaction(
     if update.category is not None:
         updates["category"] = update.category
         updates["is_manual"] = True
+        updates["suggested_category"] = None
+        updates["confidence_score"] = None
     if update.amount is not None:
         updates["amount"] = update.amount
     if update.original_category is not None:
@@ -281,27 +283,67 @@ async def update_transaction(
 
         # Merchant-batch reclassification: auto-update all matching transactions
         if update.category and update.old_category:
-            description = tx.get("description", "")
-            keyword = _extract_merchant_keyword(description)
+            batch_payload = {
+                "category": update.category,
+                "is_manual": True,
+                "suggested_category": None,
+                "confidence_score": None,
+            }
+            merchant_name = tx.get("merchant_name", "") or ""
 
-            if keyword:
-                try:
+            try:
+                if merchant_name:
+                    # Precise match: same merchant_name
                     batch_result = (
                         client.table("transactions")
-                        .update({"category": update.category, "is_manual": True})
+                        .update(batch_payload)
                         .eq("user_id", user_id)
                         .eq("category", update.old_category)
-                        .ilike("description", f"%{keyword}%")
+                        .eq("merchant_name", merchant_name)
                         .execute()
                     )
+                    match_key = f"merchant_name={merchant_name}"
+                else:
+                    # Fallback: keyword search on description
+                    description = tx.get("description", "")
+                    keyword = _extract_merchant_keyword(description)
+                    if keyword:
+                        batch_result = (
+                            client.table("transactions")
+                            .update(batch_payload)
+                            .eq("user_id", user_id)
+                            .eq("category", update.old_category)
+                            .ilike("description", f"%{keyword}%")
+                            .execute()
+                        )
+                        match_key = f"keyword={keyword}"
+                    else:
+                        batch_result = None
+                        match_key = "none"
+
+                if batch_result:
                     merchant_updated = len(batch_result.data) if batch_result.data else 0
                     logger.info(
                         "merchant_batch_reclassified",
-                        keyword=keyword,
+                        match_key=match_key,
                         old=update.old_category,
                         new=update.category,
                         count=merchant_updated,
                     )
+
+                    # Write training_corrections for active learning
+                    if merchant_updated > 0 and batch_result.data:
+                        for r in batch_result.data:
+                            try:
+                                client.table("training_corrections").insert({
+                                    "user_id": user_id,
+                                    "transaction_id": r.get("id"),
+                                    "description": r.get("description", ""),
+                                    "original_category": update.old_category,
+                                    "corrected_category": update.category,
+                                }).execute()
+                            except Exception:
+                                pass
 
                     # Trigger supervised fine-tuning on the corrected pairs
                     if merchant_updated > 0 and batch_result.data and background_tasks:
@@ -318,8 +360,8 @@ async def update_transaction(
                                 ft_texts,
                                 ft_categories,
                             )
-                except Exception as e:
-                    logger.warning("merchant_batch_failed", error=str(e))
+            except Exception as e:
+                logger.warning("merchant_batch_failed", error=str(e))
 
         return {
             "status": "ok",
