@@ -155,6 +155,37 @@ async def list_transactions(
     )
 
 
+@router.get("/transactions/uncategorized")
+async def list_uncategorized_transactions(
+    limit: int = Query(default=50, ge=1, le=200),
+    client: Client = Depends(get_user_client),
+):
+    """Return transactions where category='Uncategorized', including suggested_category."""
+    user_response = client.auth.get_user()
+    if not user_response or not user_response.user:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+    user_id = user_response.user.id
+
+    try:
+        res = (
+            client.table("transactions")
+            .select(
+                "id, description, amount, category, suggested_category, "
+                "confidence_score, transaction_date, merchant_name, "
+                "payment_method, type, created_at"
+            )
+            .eq("user_id", user_id)
+            .eq("category", "Uncategorized")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return {"items": res.data or [], "count": len(res.data or [])}
+    except Exception as e:
+        logger.error("uncategorized_fetch_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to fetch uncategorized transactions")
+
+
 @router.patch("/transactions/batch")
 async def batch_update_transactions(
     request: BatchUpdateRequest = Body(...),
