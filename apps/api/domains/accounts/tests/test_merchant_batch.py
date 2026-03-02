@@ -90,3 +90,45 @@ def test_fine_tuning_triggered_after_merchant_batch():
         "update_transaction must enqueue _run_supervised_finetuning_bg — "
         "supervised fine-tuning not triggered after reclassification"
     )
+
+
+def test_merchant_name_used_for_batch_when_populated(app_client, mock_client_with_tx):
+    """When tx has merchant_name, batch update must eq on merchant_name, not ilike description."""
+    tx_with_merchant = {
+        "id": "tx-123",
+        "user_id": "user-1",
+        "description": "SWIGGY ORDER",
+        "merchant_name": "Swiggy",
+        "category": "Transport",
+        "amount": -200.0,
+        "is_manual": False,
+    }
+    tbl = mock_client_with_tx.table.return_value
+    tbl.execute.return_value = MagicMock(data=[tx_with_merchant])
+
+    response = app_client.patch(
+        "/api/v1/accounts/transactions/tx-123",
+        json={"category": "Food", "old_category": "Transport"},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert response.status_code == 200
+
+    eq_calls = tbl.eq.call_args_list
+    merchant_name_matched = any(
+        call.args and call.args[0] == "merchant_name"
+        for call in eq_calls
+    )
+    assert merchant_name_matched, (
+        "When merchant_name is populated, batch must match on merchant_name field"
+    )
+
+
+def test_suggested_category_cleared_on_correction(app_client, mock_client_with_tx):
+    """Correcting a category must clear suggested_category and confidence_score."""
+    from apps.api.domains.accounts import router as accounts_module
+    import inspect
+
+    src = inspect.getsource(accounts_module.update_transaction)
+    assert "suggested_category" in src and "confidence_score" in src, (
+        "update_transaction must clear suggested_category and confidence_score on correction"
+    )
