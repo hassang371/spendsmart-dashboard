@@ -24,8 +24,8 @@ def test_extract_known_merchants(extractor):
 
 
 def test_clean_noise_generic(extractor):
-    # Case 1: Simple POS transaction
-    assert extractor.extract("POS 40593845 MCDONALDS") == "Mcdonalds"
+    # Case 1: Simple POS transaction — returns official name from known_merchants
+    assert extractor.extract("POS 40593845 MCDONALDS") == "McDonald's"
 
     # Case 2: NEFT transfer (should return beneficiary if possible, or cleaned string)
     assert extractor.extract("NEFT-DR-HDFC-NETFLIX.COM") == "Netflix"
@@ -52,3 +52,59 @@ def test_upi_p2p_extraction(extractor):
 
     # Case 3: Transfer to Dad (generic P2P if not UPI pattern)
     # This might require broader logic, but let's test the UPI pattern first.
+
+
+# Clean descriptions (current data style)
+def test_youtube_premium_clean(extractor):
+    assert extractor.extract("YouTube Premium Individual") == "YouTube"
+
+def test_play_pass_clean(extractor):
+    assert extractor.extract("Play Pass Monthly") == "Google Play"
+
+def test_cloud_storage_clean(extractor):
+    assert extractor.extract("Cloud Storage Monthly") == "Google One"
+
+def test_music_premium_clean(extractor):
+    result = extractor.extract("Music Premium")
+    assert result == "Music Premium"
+
+def test_movie_rental_clean(extractor):
+    # Should NOT return "Vodafone" for "Movie Rental HD"
+    result = extractor.extract("Movie Rental HD")
+    assert result != "Vodafone"
+
+def test_samay_raina_clean(extractor):
+    result = extractor.extract("Samay Raina membership")
+    assert "Samay Raina" in result
+
+# UPI-style (future bank data)
+def test_upi_swiggy(extractor):
+    assert extractor.extract("UPI-SWIGGY INTERNET PVT LTD-swiggy@icici") == "Swiggy"
+
+def test_upi_zomato(extractor):
+    assert extractor.extract("UPI/DR/123456/ZOMATO/YESB/zomato@axl") == "Zomato"
+
+# New brands
+def test_nykaa(extractor):
+    assert extractor.extract("Nykaa fashion order") == "Nykaa"
+
+def test_meesho(extractor):
+    assert extractor.extract("Meesho clothing purchase") == "Meesho"
+
+def test_cred(extractor):
+    assert extractor.extract("CRED credit card bill") == "CRED"
+
+def test_phonepay(extractor):
+    assert extractor.extract("PhonePe UPI payment") == "PhonePe"
+
+def test_onemg(extractor):
+    assert extractor.extract("1mg medicine order") == "1mg"
+
+def test_cultfit(extractor):
+    assert extractor.extract("Cult.fit gym plan") == "Cult.fit"
+
+def test_jiocinema(extractor):
+    assert extractor.extract("JioCinema subscription") == "JioCinema"
+
+def test_indigo(extractor):
+    assert extractor.extract("IndiGo flight PNR 6E1234") == "IndiGo"
