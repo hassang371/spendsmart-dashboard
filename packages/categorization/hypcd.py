@@ -10,6 +10,12 @@ from .rules import KeywordMatcher
 
 logger = structlog.get_logger()
 
+# Confidence threshold for categorization.
+# Predictions below this score are stored as suggested_category
+# and the transaction is left as "Uncategorized" for user review.
+# Tune after running real data through the classifier.
+CONFIDENCE_THRESHOLD: float = 0.90
+
 
 class HyperbolicProjector(nn.Module):
     """
@@ -388,16 +394,74 @@ class HypCDClassifier:
 
     def _initialize_anchors(self) -> Dict[str, torch.Tensor]:
         seed_phrases = {
-            "Food": ["swiggy order", "zomato payment", "restaurant bill"],
-            "Transport": ["uber ride", "ola trip", "metro recharge"],
-            "Utilities": ["electricity bill", "water bill", "airtel recharge"],
-            "Salary": ["salary credited", "monthly payroll", "salary transfer"],
-            "Shopping": ["amazon purchase", "flipkart order", "retail shopping"],
-            "Entertainment": ["netflix subscription", "spotify payment", "movie ticket"],
-            "Health": ["pharmacy purchase", "hospital bill", "clinic payment"],
-            "Education": ["course payment", "tuition fee", "school fee"],
-            "Finance": ["loan emi", "insurance premium", "investment transfer"],
-            "People": ["transfer to friend", "gift payment", "family transfer"],
+            "Food": [
+                "swiggy order", "zomato payment", "restaurant bill",
+                "blinkit grocery delivery", "zepto quick delivery",
+                "bigbasket grocery order", "dunzo delivery",
+                "eatfit healthy meal", "dominos pizza order",
+                "cafe coffee purchase",
+            ],
+            "Transport": [
+                "uber ride payment", "ola cab trip", "rapido bike taxi",
+                "metro card recharge", "irctc train ticket",
+                "indigo flight booking", "petrol pump payment",
+                "fastag toll recharge", "makemytrip travel booking",
+                "redbus bus ticket",
+            ],
+            "Utilities": [
+                "electricity bill payment", "water bill payment",
+                "airtel mobile recharge", "jio prepaid recharge",
+                "act fibernet broadband", "tata power electricity",
+                "vodafone postpaid bill", "bwssb water payment",
+                "gas cylinder booking", "broadband monthly bill",
+            ],
+            "Salary": [
+                "salary credited account", "monthly payroll credit",
+                "salary transfer neft", "payroll deposit",
+                "stipend payment credited", "wages monthly income",
+                "salary for the month", "income transfer received",
+            ],
+            "Shopping": [
+                "amazon purchase order", "flipkart product order",
+                "myntra fashion purchase", "nykaa beauty products",
+                "meesho clothing order", "croma electronics",
+                "decathlon sports equipment", "ajio fashion sale",
+                "retail store purchase", "online shopping payment",
+            ],
+            "Entertainment": [
+                "netflix monthly subscription", "spotify premium",
+                "jiocinema subscription plan", "sonyliv monthly",
+                "hotstar disney subscription", "youtube premium",
+                "bookmyshow movie ticket", "play pass monthly",
+                "music streaming subscription", "movie rental payment",
+            ],
+            "Health": [
+                "pharmacy medicine purchase", "hospital bill payment",
+                "clinic doctor consultation", "1mg medicine order",
+                "netmeds pharmacy delivery", "cult.fit gym membership",
+                "healthifyme subscription", "apollo pharmacy",
+                "lab test diagnostics", "medical expense payment",
+            ],
+            "Education": [
+                "udemy online course", "unacademy subscription",
+                "byju learning app payment", "coursera course fee",
+                "tuition fee payment", "college exam fee",
+                "physics wallah subscription", "upgrad course",
+                "book purchase education", "simplilearn certification",
+            ],
+            "Finance": [
+                "loan emi debit", "insurance premium payment",
+                "mutual fund sip", "zerodha brokerage",
+                "groww investment", "cred credit card",
+                "bajaj finance emi", "tax payment",
+                "upstox trading", "fd deposit bank",
+            ],
+            "People": [
+                "transfer to friend", "sent money family",
+                "upi transfer personal", "gift payment friend",
+                "reimbursement colleague", "money sent contact",
+                "personal payment received", "family expense split",
+            ],
         }
 
         anchors: Dict[str, torch.Tensor] = {}
@@ -536,7 +600,6 @@ class HypCDClassifier:
         # Import hierarchy extractor once for all results
         from .clustering import HierarchyExtractor
         _extractor = HierarchyExtractor(self.manifold)
-        CONFIDENCE_THRESHOLD = 0.5
 
         # Build results
         for model_i, (idx, conf) in enumerate(zip(indices, confidences)):
