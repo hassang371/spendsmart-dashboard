@@ -22,6 +22,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { supabase } from '../../lib/supabase/client';
+import { accountsApi } from '../../lib/api/client';
 
 function firstNameFromDisplayName(value: string): string {
   const cleaned = value.trim().replace(/\s+/g, ' ');
@@ -69,6 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [savedSessions, setSavedSessions] = useState<StoredSession[]>([]);
   const [expiredSessionEmail, setExpiredSessionEmail] = useState<string | null>(null);
+  const [uncategorizedCount, setUncategorizedCount] = useState(0);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -98,6 +100,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       sessions.push(currentSessionInfo);
       localStorage.setItem('supabase-multi-auth', JSON.stringify(sessions));
       setSavedSessions(sessions);
+
+      // Fetch uncategorized count for sidebar badge
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (authSession?.access_token) {
+        accountsApi.getUncategorized(authSession.access_token, 200)
+          .then(res => setUncategorizedCount(res.count))
+          .catch(() => {});
+      }
     };
 
     loadUser();
@@ -234,6 +244,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               label="Transactions"
               href="/dashboard/transactions"
               active={pathname === '/dashboard/transactions'}
+              badge={uncategorizedCount}
             />
             <SidebarItem
               icon={<PieChart size={20} />}
@@ -371,11 +382,13 @@ function SidebarItem({
   label,
   href,
   active = false,
+  badge = 0,
 }: {
   icon: React.ReactNode;
   label: string;
   href: string;
   active?: boolean;
+  badge?: number;
 }) {
   return (
     <Link href={href} prefetch>
@@ -392,7 +405,14 @@ function SidebarItem({
             `}
       >
         {icon}
-        <span className="font-bold text-sm tracking-wide">{label}</span>
+        <span className="font-bold text-sm tracking-wide flex-1">{label}</span>
+        {badge > 0 && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center ${
+            active ? 'bg-white/20 text-white' : 'bg-amber-500/20 text-amber-400'
+          }`}>
+            {badge}
+          </span>
+        )}
       </motion.div>
     </Link>
   );

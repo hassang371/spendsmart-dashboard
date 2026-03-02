@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Check,
   X,
+  Brain,
+  Sparkles,
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase/client';
 import { useTheme } from 'next-themes';
@@ -40,6 +42,12 @@ export default function SettingsPage() {
 
   const [exporting, setExporting] = useState(false);
 
+  // AI Model metadata
+  const [modelMeta, setModelMeta] = useState<{
+    correction_count: number;
+    adapter_updated_at: string | null;
+  } | null>(null);
+
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
 
@@ -67,6 +75,14 @@ export default function SettingsPage() {
           name: data.user.user_metadata?.full_name || 'User',
         });
         setNewName(data.user.user_metadata?.full_name || '');
+
+        // Fetch AI model metadata
+        const { data: meta } = await supabase
+          .from('user_model_metadata')
+          .select('correction_count, adapter_updated_at')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        if (meta) setModelMeta(meta);
       }
       setLoading(false);
     })();
@@ -403,6 +419,45 @@ export default function SettingsPage() {
               >
                 Switch
               </button>
+            </div>
+          </section>
+
+          {/* AI Model */}
+          <section className="rounded-3xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 ring-4 ring-blue-500/5">
+                <Brain size={18} strokeWidth={2.5} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-foreground">AI Model</h2>
+                <p className="text-[10px] font-medium text-muted-foreground">
+                  Your personal categorization adapter
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-amber-400" />
+                  <p className="text-xs font-bold text-foreground">Corrections</p>
+                </div>
+                <span className="text-sm font-black text-foreground font-mono">
+                  {modelMeta ? modelMeta.correction_count : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs font-bold text-foreground">Last Trained</p>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {modelMeta?.adapter_updated_at
+                    ? new Date(modelMeta.adapter_updated_at).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : 'Never'}
+                </span>
+              </div>
             </div>
           </section>
 
