@@ -18,6 +18,9 @@ from supabase import Client
 from apps.api.core.auth import get_user_client
 from packages.ingestion_engine.import_transactions import parse_file
 from apps.api.domains.ingestion.service import generate_fingerprint
+from packages.ingestion_engine.merchant_extractor import MerchantExtractor, infer_payment_method
+
+_merchant_extractor = MerchantExtractor()  # module-level singleton
 
 router = APIRouter(prefix="/ingest", tags=["ingestion"])
 logger = structlog.get_logger()
@@ -174,27 +177,43 @@ def _build_transaction_row(
     user_id: str,
     fingerprint: str,
     category: str = "Uncategorized",
+    suggested_category: str | None = None,
+    confidence_score: float | None = None,
 ) -> dict:
     """Build a Supabase-ready transaction row from a parsed row."""
     amount = float(row.get("amount", 0) or 0)
-
-    # Determine type from amount
     tx_type = "credit" if amount >= 0 else "debit"
+    description = str(row.get("description", "") or "")
 
-    return {
+    # Use CSV-provided merchant name, fall back to extractor
+    raw_merchant = str(row.get("merchant", "") or "").strip()
+    merchant_name = raw_merchant if raw_merchant else _merchant_extractor.extract(description)
+
+    # Use CSV-provided payment method, fall back to inference
+    raw_payment = str(row.get("payment_method", "") or "").strip()
+    payment_method = raw_payment if raw_payment else infer_payment_method(description)
+
+    result = {
         "user_id": user_id,
         "transaction_date": str(row.get("date", "")),
         "amount": amount,
         "currency": str(row.get("currency", "INR") or "INR"),
-        "description": str(row.get("description", "") or ""),
-        "merchant_name": str(row.get("merchant", "") or ""),
+        "description": description,
+        "merchant_name": merchant_name,
         "category": category,
-        "payment_method": str(row.get("payment_method", "") or ""),
+        "payment_method": payment_method,
         "status": str(row.get("status", "completed") or "completed"),
         "type": tx_type,
         "fingerprint": fingerprint,
         "raw_data": {k: v for k, v in row.items() if v is not None},
     }
+
+    if suggested_category is not None:
+        result["suggested_category"] = suggested_category
+    if confidence_score is not None:
+        result["confidence_score"] = confidence_score
+
+    return result
 
 
 @router.post("/csv")
