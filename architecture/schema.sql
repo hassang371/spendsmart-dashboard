@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     type TEXT DEFAULT 'debit',
     original_category TEXT,
     is_manual BOOLEAN DEFAULT FALSE,
+    suggested_category TEXT,
+    confidence_score   FLOAT,
 
     -- Constraints
     -- No CHECK on amount: cancelled transactions have amount=0
