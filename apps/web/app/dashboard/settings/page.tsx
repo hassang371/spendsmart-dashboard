@@ -42,12 +42,6 @@ export default function SettingsPage() {
 
   const [exporting, setExporting] = useState(false);
 
-  // AI Model metadata
-  const [modelMeta, setModelMeta] = useState<{
-    correction_count: number;
-    adapter_updated_at: string | null;
-  } | null>(null);
-
   const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
 
@@ -63,6 +57,12 @@ export default function SettingsPage() {
 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+
+  // AI Model metadata
+  const [modelMeta, setModelMeta] = useState<{
+    correction_count: number;
+    adapter_updated_at: string | null;
+  } | null>(null);
 
   useEffect(() => {
     setMounted(true);
