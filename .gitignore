@@ -61,3 +61,11 @@ next-env.d.ts
 .idea/
 *.swp
 *.swo
+
+# Model weights and checkpoints (managed via Supabase Storage, not git)
+checkpoints/
+models/
+*.pt
+*.pth
+*.ckpt
+*.bin
