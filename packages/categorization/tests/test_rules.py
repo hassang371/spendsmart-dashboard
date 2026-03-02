@@ -72,3 +72,23 @@ def test_byjus_is_education(matcher):
 
 def test_unacademy_is_education(matcher):
     assert matcher.predict("Unacademy Plus plan") == "Education"
+
+
+from packages.categorization.constants import DEFAULT_CATEGORY_KEYWORDS
+
+
+def test_each_category_has_at_least_8_seed_phrases():
+    """Anchor seed phrases must be rich enough to position prototypes well."""
+    for category, phrases in DEFAULT_CATEGORY_KEYWORDS.items():
+        assert len(phrases) >= 8, f"{category} only has {len(phrases)} phrases — need >= 8"
+
+
+def test_food_seeds_include_indian_apps():
+    food = DEFAULT_CATEGORY_KEYWORDS.get("Food", [])
+    assert any("swiggy" in p.lower() for p in food)
+    assert any("blinkit" in p.lower() or "zepto" in p.lower() for p in food)
+
+
+def test_entertainment_includes_subscriptions():
+    ent = DEFAULT_CATEGORY_KEYWORDS.get("Entertainment", [])
+    assert any("jiocinema" in p.lower() or "sonyliv" in p.lower() for p in ent)
