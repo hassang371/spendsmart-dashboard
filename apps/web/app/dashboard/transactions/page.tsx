@@ -40,7 +40,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase/client';
-import { accountsApi, categorizationApi, ingestionApi } from '../../../lib/api/client';
+import { accountsApi, categorizationApi, ingestionApi, type UncategorizedTransaction } from '../../../lib/api/client';
 
 type TransactionRow = {
   id: string;
@@ -268,7 +268,7 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<'all' | 'debit' | 'credit'>('all');
+  const [tab, setTab] = useState<'all' | 'debit' | 'credit' | 'review'>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState<FilterState>(defaultFilters);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
@@ -277,6 +277,13 @@ export default function TransactionsPage() {
   const [editingCategoryTxId, setEditingCategoryTxId] = useState<string | null>(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState<string>('Misc');
   const [updatingCategory, setUpdatingCategory] = useState(false);
+
+  // Review tab
+  const [uncategorized, setUncategorized] = useState<UncategorizedTransaction[]>([]);
+  const [loadingUncategorized, setLoadingUncategorized] = useState(false);
+  const [reviewEditId, setReviewEditId] = useState<string | null>(null);
+  const [reviewEditValue, setReviewEditValue] = useState<string>('');
+  const [savingReviewId, setSavingReviewId] = useState<string | null>(null);
   const [consumedOpenTxId, setConsumedOpenTxId] = useState<string | null>(null);
   const [spotlightTxId, setSpotlightTxId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
@@ -421,6 +428,41 @@ export default function TransactionsPage() {
       })
     );
   }, [router]);
+
+  const fetchUncategorized = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    setLoadingUncategorized(true);
+    try {
+      const res = await accountsApi.getUncategorized(session.access_token, 200);
+      setUncategorized(res.items);
+    } catch {
+      // silently ignore — badge disappears if offline
+    } finally {
+      setLoadingUncategorized(false);
+    }
+  }, []);
+
+  // Fetch uncategorized when review tab is selected
+  useEffect(() => {
+    if (tab === 'review') fetchUncategorized();
+  }, [tab, fetchUncategorized]);
+
+  const handleReviewSave = async (tx: UncategorizedTransaction, category: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    setSavingReviewId(tx.id);
+    try {
+      await accountsApi.updateTransaction(tx.id, { category, old_category: 'Uncategorized' }, session.access_token);
+      setUncategorized(prev => prev.filter(t => t.id !== tx.id));
+      setMessage('Category saved.');
+      setReviewEditId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save category.');
+    } finally {
+      setSavingReviewId(null);
+    }
+  };
 
   // Poll for category updates after import — background classification takes a few seconds.
   // Stops after 15 polls (30s) or on unmount.
@@ -1001,6 +1043,32 @@ export default function TransactionsPage() {
                 </span>
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setTab('review')}
+              className={`relative px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+                tab === 'review'
+                  ? 'text-foreground shadow-sm bg-background ring-1 ring-border'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab === 'review' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 bg-white/5 rounded-xl"
+                  initial={false}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-2">
+                Review
+                {uncategorized.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold">
+                    {uncategorized.length}
+                  </span>
+                )}
+              </span>
+            </button>
           </div>
 
         </div>
@@ -1176,8 +1244,156 @@ export default function TransactionsPage() {
         </AnimatePresence>
       </section>
 
+      {/* Review Tab */}
+      {tab === 'review' && (
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-20">
+          {loadingUncategorized ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : uncategorized.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-20 text-center"
+            >
+              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <Check className="h-8 w-8 text-emerald-500" />
+              </div>
+              <h3 className="text-xl font-bold text-foreground">All caught up!</h3>
+              <p className="mt-2 text-muted-foreground max-w-sm">
+                No uncategorized transactions to review.
+              </p>
+            </motion.div>
+          ) : (
+            <div className="rounded-[2rem] border border-border bg-card overflow-hidden shadow-lg">
+              <div className="flex items-center justify-between bg-amber-500/10 border-b border-border px-8 py-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-400/80 mb-0.5">
+                    Needs Review
+                  </p>
+                  <h3 className="text-2xl font-black text-foreground">
+                    Uncategorized Transactions
+                  </h3>
+                </div>
+                <span className="text-sm font-bold text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
+                  {uncategorized.length} pending
+                </span>
+              </div>
+              <div className="divide-y divide-border">
+                {uncategorized.map(tx => {
+                  const amount = Number(tx.amount || 0);
+                  const isCredit = amount >= 0;
+                  const confidencePct = tx.confidence_score != null
+                    ? Math.round(tx.confidence_score * 100)
+                    : null;
+                  const isEditing = reviewEditId === tx.id;
+                  const isSaving = savingReviewId === tx.id;
+
+                  return (
+                    <div key={tx.id} className="flex items-center justify-between px-6 py-4 hover:bg-muted/20 transition-colors">
+                      <div className="flex items-center gap-5 min-w-0 flex-1">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                          <HelpCircle className="h-5 w-5 text-amber-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-bold text-foreground">
+                            {tx.description}
+                          </p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {new Date(tx.transaction_date).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                              })}
+                            </p>
+                            {tx.suggested_category && (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                                <span className="text-xs text-amber-400 font-medium">
+                                  Suggested: {tx.suggested_category}
+                                  {confidencePct !== null && (
+                                    <span className="ml-1 text-muted-foreground">({confidencePct}%)</span>
+                                  )}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 pl-4 shrink-0">
+                        <p className={`font-mono text-base font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {isCredit ? '+' : ''}₹{Math.abs(amount).toLocaleString('en-IN')}
+                        </p>
+
+                        {isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <select
+                              value={reviewEditValue}
+                              onChange={e => setReviewEditValue(e.target.value)}
+                              className="rounded-lg border border-border bg-secondary/80 px-2 py-1 text-xs font-medium text-foreground outline-none"
+                              disabled={isSaving}
+                            >
+                              {categoryOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => handleReviewSave(tx, reviewEditValue)}
+                              disabled={isSaving}
+                              className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1 text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-60"
+                              title="Save"
+                            >
+                              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setReviewEditId(null)}
+                              disabled={isSaving}
+                              className="rounded-md border border-border bg-secondary/50 p-1 text-muted-foreground hover:bg-secondary"
+                              title="Cancel"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            {tx.suggested_category && (
+                              <button
+                                type="button"
+                                onClick={() => handleReviewSave(tx, tx.suggested_category!)}
+                                disabled={isSaving}
+                                className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-60"
+                              >
+                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin inline" /> : 'Accept'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReviewEditId(tx.id);
+                                setReviewEditValue(tx.suggested_category || categoryOptions[0] || 'Misc');
+                              }}
+                              className="rounded-xl border border-border bg-secondary/30 px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                            >
+                              Reclassify
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Transactions List */}
-      <div
+      {tab !== 'review' && <div
         ref={listRef}
         key={tab}
         className="min-h-0 flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-6 pb-20"
@@ -1385,7 +1601,7 @@ export default function TransactionsPage() {
             )}
           </>
         )}
-      </div>
+      </div>}
 
       {/* Detail Modal */}
       <AnimatePresence>
