@@ -452,12 +452,18 @@ export default function TransactionsPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
     setSavingReviewId(tx.id);
+
+    // Optimistic: remove all transactions from the same merchant immediately
+    const merchantKey = tx.merchant_name || tx.description;
+    setUncategorized(prev => prev.filter(t => (t.merchant_name || t.description) !== merchantKey));
+    setReviewEditId(null);
+
     try {
       await accountsApi.updateTransaction(tx.id, { category, old_category: 'Uncategorized' }, session.access_token);
-      setUncategorized(prev => prev.filter(t => t.id !== tx.id));
       setMessage('Category saved.');
-      setReviewEditId(null);
     } catch (e) {
+      // Revert by re-fetching
+      fetchUncategorized();
       setError(e instanceof Error ? e.message : 'Failed to save category.');
     } finally {
       setSavingReviewId(null);
@@ -659,6 +665,21 @@ export default function TransactionsPage() {
     return result;
   }, [groupedTransactions, visibleCount]);
 
+  // Deduplicate uncategorized by merchant_name — show one row per merchant
+  const distinctUncategorized = useMemo(() => {
+    const seen = new Map<string, { tx: UncategorizedTransaction; count: number }>();
+    for (const tx of uncategorized) {
+      const key = tx.merchant_name || tx.description;
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, { tx, count: 1 });
+      } else {
+        existing.count++;
+      }
+    }
+    return Array.from(seen.values());
+  }, [uncategorized]);
+
   const applyFilters = () => {
     setFilters(draftFilters);
     setIsFilterOpen(false);
@@ -703,69 +724,69 @@ export default function TransactionsPage() {
 
   const saveCategoryEdit = async () => {
     if (!editingCategoryTxId || !userId) return;
-    setUpdatingCategory(true);
+
+    const txId = editingCategoryTxId;
+    const tx = transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const accessToken = session?.access_token as string;
+    if (!accessToken) return;
+
+    const isIncome = editingCategoryValue.toLowerCase() === 'income';
+    const currentAmount = tx.amount;
+    const oldCategory = tx.category;
+    const merchantName = tx.merchant_name;
+
+    let newAmount = currentAmount;
+    if (isIncome && currentAmount < 0) {
+      newAmount = Math.abs(currentAmount);
+    } else if (!isIncome && currentAmount > 0 && tx.category?.toLowerCase() === 'income') {
+      newAmount = -Math.abs(currentAmount);
+    }
+
+    const updates: { category: string; amount?: number; original_category?: string; old_category?: string } = {
+      category: editingCategoryValue,
+      old_category: oldCategory,
+    };
+    if (!tx.original_category) updates.original_category = oldCategory;
+    if (newAmount !== currentAmount) updates.amount = newAmount;
+
+    // Optimistic update: close editor immediately and update this tx + all same-merchant same-category txs
+    setTransactions(prev =>
+      prev.map(t => {
+        if (t.id === txId) return { ...t, category: editingCategoryValue, amount: newAmount };
+        if (merchantName && t.merchant_name === merchantName && t.category === oldCategory)
+          return { ...t, category: editingCategoryValue };
+        return t;
+      })
+    );
+    setEditingCategoryTxId(null);
+
     try {
-      const tx = transactions.find(t => t.id === editingCategoryTxId);
-      if (!tx) throw new Error('Transaction not found');
-
-      // Get auth token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const accessToken = session?.access_token as string;
-
-      const isIncome = editingCategoryValue.toLowerCase() === 'income';
-      const currentAmount = tx.amount;
-
-      // Auto-flip logic
-      let newAmount = currentAmount;
-      if (isIncome && currentAmount < 0) {
-        newAmount = Math.abs(currentAmount);
-      } else if (!isIncome && currentAmount > 0 && tx.category?.toLowerCase() === 'income') {
-        newAmount = -Math.abs(currentAmount);
-      }
-
-      const updates: { category: string; amount?: number; original_category?: string; old_category?: string } = {
-        category: editingCategoryValue,
-        old_category: tx.category,  // For merchant-batch reclassification (handled server-side)
-      };
-
-      if (!tx.original_category) {
-        updates.original_category = tx.category;
-      }
-
-      if (newAmount !== currentAmount) {
-        updates.amount = newAmount;
-      }
-
-      // Update via API — server auto-updates all matching merchant transactions
-      await accountsApi.updateTransaction(editingCategoryTxId, updates, accessToken);
-
-      setTransactions(prev =>
-        prev.map(t =>
-          t.id === editingCategoryTxId
-            ? {
-                ...t,
-                category: editingCategoryValue,
-                amount: newAmount,
-              }
-            : t
-        )
-      );
-
+      await accountsApi.updateTransaction(txId, updates, accessToken);
       setMessage('Category updated.');
-      setEditingCategoryTxId(null);
+      // Refresh in background to sync any additional batch updates from server
+      fetchTransactions();
 
-      // Active Learning: Submit feedback to backend (handles training_corrections too)
-      if (tx && tx.category !== editingCategoryValue) {
+      if (oldCategory !== editingCategoryValue) {
         categorizationApi
           .submitFeedback({ [tx.description]: editingCategoryValue }, accessToken)
           .catch(err => console.warn('Feedback failed:', err));
       }
     } catch (updateError) {
+      // Revert optimistic update
+      setTransactions(prev =>
+        prev.map(t => {
+          if (t.id === txId) return { ...t, category: oldCategory, amount: currentAmount };
+          if (merchantName && t.merchant_name === merchantName && t.category === editingCategoryValue)
+            return { ...t, category: oldCategory };
+          return t;
+        })
+      );
       setError(updateError instanceof Error ? updateError.message : 'Unable to update category.');
-    } finally {
-      setUpdatingCategory(false);
     }
   };
 
@@ -1062,9 +1083,9 @@ export default function TransactionsPage() {
               )}
               <span className="relative z-10 flex items-center gap-2">
                 Review
-                {uncategorized.length > 0 && (
+                {distinctUncategorized.length > 0 && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold">
-                    {uncategorized.length}
+                    {distinctUncategorized.length}
                   </span>
                 )}
               </span>
@@ -1277,11 +1298,11 @@ export default function TransactionsPage() {
                   </h3>
                 </div>
                 <span className="text-sm font-bold text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
-                  {uncategorized.length} pending
+                  {distinctUncategorized.length} pending
                 </span>
               </div>
               <div className="divide-y divide-border">
-                {uncategorized.map(tx => {
+                {distinctUncategorized.map(({ tx, count }) => {
                   const amount = Number(tx.amount || 0);
                   const isCredit = amount >= 0;
                   const confidencePct = tx.confidence_score != null
@@ -1297,9 +1318,16 @@ export default function TransactionsPage() {
                           <HelpCircle className="h-5 w-5 text-amber-400" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-base font-bold text-foreground">
-                            {tx.description}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-base font-bold text-foreground">
+                              {tx.merchant_name || tx.description}
+                            </p>
+                            {count > 1 && (
+                              <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold">
+                                ×{count}
+                              </span>
+                            )}
+                          </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2">
                             <p className="text-xs font-medium text-muted-foreground">
                               {new Date(tx.transaction_date).toLocaleDateString('en-IN', {
