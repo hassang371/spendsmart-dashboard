@@ -29,12 +29,12 @@ MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # 500 MB (large bank statements)
 BATCH_UPSERT_SIZE = 500
 
 
-def _classify_descriptions(descriptions: list[str]) -> dict[str, str]:
+def _classify_descriptions(descriptions: list[str]) -> dict[str, dict]:
     """Classify transaction descriptions using HypCD, with keyword fallback.
 
-    Returns a dict mapping description -> category.
+    Returns: {description: {"category": str, "confidence": float}}
     """
-    result: dict[str, str] = {}
+    result: dict[str, dict] = {}
     if not descriptions:
         return result
 
@@ -44,45 +44,44 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, str]:
 
         classifications = classify_batch_in_process(descriptions)
         for desc, clf in zip(descriptions, classifications):
-            result[desc] = clf.get("category", "Uncategorized")
+            result[desc] = {
+                "category":   clf.get("category", "Uncategorized"),
+                "confidence": float(clf.get("confidence", 0.0)),
+            }
         return result
     except Exception as e:
         logger.warning("hypcd_unavailable_for_import", error=str(e))
 
-    # Fallback: keyword-based classification
+    # Fallback: keyword-based classification (rule matches default to confidence=1.0)
     keyword_map = [
-        ("Food", ["swiggy", "zomato", "food", "restaurant", "dining", "blinkit",
-                   "zepto", "bigbasket", "mcdonalds", "kfc", "burger", "pizza",
-                   "dominos", "subway", "starbucks", "cafe", "bakery"]),
-        ("Grocery", ["grocery", "grofers", "dmart", "supermarket", "provision"]),
-        ("Shopping", ["amazon", "flipkart", "myntra", "ajio", "shop", "mall",
-                      "cloth", "fashion", "meesho", "nykaa"]),
-        ("Transport", ["uber", "ola", "rapido", "taxi", "cab", "auto", "metro",
-                       "bus", "train", "fuel", "petrol", "diesel", "parking"]),
-        ("Utilities", ["electric", "water", "gas", "bill", "recharge", "airtel",
-                       "jio", "vodafone", "broadband", "wifi", "internet"]),
-        ("Subscriptions", ["netflix", "spotify", "hotstar", "prime", "youtube",
-                          "subscription", "membership"]),
-        ("Healthcare", ["hospital", "medical", "pharmacy", "doctor", "medicine",
-                       "health", "clinic", "lab", "dental"]),
-        ("Education", ["course", "tuition", "school", "college", "udemy",
-                      "coursera", "education", "book"]),
-        ("Entertainment", ["movie", "cinema", "game", "concert", "ticket",
-                          "amusement", "theme park"]),
-        ("Finance", ["investment", "loan", "insurance", "mutual fund", "zerodha",
-                    "groww", "emi", "sip", "bank charge"]),
-        ("Income", ["salary", "refund", "cashback", "dividend", "interest earned"]),
-        ("People", ["sent to", "received from", "upi transfer", "transfer to"]),
+        ("Food",          ["swiggy", "zomato", "blinkit", "zepto", "bigbasket", "food",
+                           "restaurant", "dining", "dunzo", "dominos", "kfc", "burger"]),
+        ("Transport",     ["uber", "ola", "rapido", "metro", "irctc", "fuel", "petrol",
+                           "indigo", "makemytrip", "redbus", "fastag"]),
+        ("Shopping",      ["amazon", "flipkart", "myntra", "ajio", "meesho", "nykaa",
+                           "decathlon", "croma"]),
+        ("Utilities",     ["electric", "water", "gas", "bill", "recharge", "airtel",
+                           "jio", "vodafone", "broadband"]),
+        ("Entertainment", ["netflix", "spotify", "hotstar", "prime", "youtube",
+                           "jiocinema", "sonyliv", "subscription", "play pass"]),
+        ("Health",        ["hospital", "pharmacy", "doctor", "clinic", "1mg",
+                           "netmeds", "cultfit", "gym"]),
+        ("Education",     ["course", "tuition", "udemy", "byju", "unacademy"]),
+        ("Finance",       ["loan", "emi", "insurance", "zerodha", "groww", "cred"]),
+        ("Salary",        ["salary", "payroll", "stipend"]),
     ]
 
     for desc in descriptions:
-        desc_lower = desc.lower()
+        d = desc.lower()
         matched = "Uncategorized"
         for category, keywords in keyword_map:
-            if any(kw in desc_lower for kw in keywords):
+            if any(kw in d for kw in keywords):
                 matched = category
                 break
-        result[desc] = matched
+        result[desc] = {
+            "category":   matched,
+            "confidence": 1.0 if matched != "Uncategorized" else 0.0,
+        }
 
     return result
 
@@ -90,10 +89,12 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, str]:
 def _classify_and_update_transactions(user_id: str, fps_to_desc: dict, token: str) -> None:
     """Background task: classify inserted transactions and patch their categories.
 
-    Runs after the HTTP response is sent so /import responds in milliseconds.
-    Uses the user's JWT (passed from the request) so no SUPABASE_SERVICE_KEY
-    is required — RLS still enforces user isolation.
+    Applies CONFIDENCE_THRESHOLD — confident predictions are assigned normally;
+    low-confidence predictions leave category as "Uncategorized" with
+    suggested_category + confidence_score set for user review.
     """
+    from packages.categorization.hypcd import CONFIDENCE_THRESHOLD
+
     unique_descs = list({desc for desc in fps_to_desc.values() if desc.strip()})
     if not unique_descs:
         return
@@ -104,30 +105,45 @@ def _classify_and_update_transactions(user_id: str, fps_to_desc: dict, token: st
         logger.warning("bg_classify_failed", error=str(e))
         return
 
-    # Group fingerprints by resolved category for batch updates
-    category_to_fps: dict = defaultdict(list)
-    for fp, desc in fps_to_desc.items():
-        category = category_map.get(desc, "Uncategorized")
-        if category != "Uncategorized":
-            category_to_fps[category].append(fp)
+    # Separate confident vs uncertain predictions
+    confident_fps: dict[str, list[str]] = defaultdict(list)  # category -> [fps]
+    uncertain_rows: list[dict] = []                          # [{fp, suggested, confidence}]
 
-    if not category_to_fps:
-        return
+    for fp, desc in fps_to_desc.items():
+        pred = category_map.get(desc, {"category": "Uncategorized", "confidence": 0.0})
+        cat  = pred["category"]
+        conf = pred["confidence"]
+
+        if conf >= CONFIDENCE_THRESHOLD and cat != "Uncategorized":
+            confident_fps[cat].append(fp)
+        else:
+            uncertain_rows.append({"fp": fp, "suggested": cat, "confidence": conf})
 
     try:
         from supabase import create_client
         from apps.api.core.auth import _get_supabase_url, _get_supabase_anon_key
         client = create_client(_get_supabase_url(), _get_supabase_anon_key())
         client.auth.set_session(token, "")
-        for category, fps in category_to_fps.items():
+
+        # Batch-update confident predictions
+        for category, fps in confident_fps.items():
             client.table("transactions").update(
-                {"category": category}
+                {"category": category, "suggested_category": None, "confidence_score": None}
             ).eq("user_id", user_id).in_("fingerprint", fps).execute()
+
+        # Update uncertain predictions — leave as Uncategorized, store suggestion
+        for row in uncertain_rows:
+            client.table("transactions").update({
+                "category":           "Uncategorized",
+                "suggested_category": row["suggested"],
+                "confidence_score":   row["confidence"],
+            }).eq("user_id", user_id).eq("fingerprint", row["fp"]).execute()
+
         logger.info(
             "bg_classify_complete",
             user_id=user_id,
-            categories=len(category_to_fps),
-            total=len(fps_to_desc),
+            confident=sum(len(v) for v in confident_fps.values()),
+            uncertain=len(uncertain_rows),
         )
     except Exception as e:
         logger.warning("bg_category_update_failed", user_id=user_id, error=str(e))
