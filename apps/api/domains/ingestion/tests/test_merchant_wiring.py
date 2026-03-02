@@ -44,7 +44,8 @@ def test_payment_method_preserved_when_csv_provides_it():
     assert result["payment_method"] == "Card"
 
 
-def test_google_play_gets_subscription_payment_method():
+def test_google_play_gets_other_payment_method():
+    # "Play Pass Monthly" has no UPI/NEFT/card indicator — should be "Other"
     row = {
         "date": "2026-01-01",
         "amount": -129.0,
@@ -55,4 +56,4 @@ def test_google_play_gets_subscription_payment_method():
         "status": "completed",
     }
     result = _build_transaction_row(row, "user-1", "fp999")
-    assert result["payment_method"] == "Subscription"
+    assert result["payment_method"] == "Other"

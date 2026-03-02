@@ -188,20 +188,11 @@ class MerchantExtractor:
         return " ".join(words[:4]).title()
 
 
-_SUBSCRIPTION_KEYWORDS = [
-    "premium", "subscription", "monthly plan", "annual plan",
-    "play pass", "google play", "cloud storage", "google one",
-    "music premium", "movie rental", "membership",
-    "youtube", "netflix", "spotify", "hotstar", "jiocinema",
-    "sonyliv", "zee5", "mubi", "prime video",
-]
-
-
 def infer_payment_method(description: str) -> str:
     """Infer payment method from transaction description patterns.
 
     Returns one of: "UPI", "Bank Transfer", "IMPS", "Auto Debit",
-                    "Cash", "Card", "Subscription", "Other"
+                    "Cash", "Card", "Other"
     """
     if not description:
         return "Other"
@@ -220,9 +211,5 @@ def infer_payment_method(description: str) -> str:
         return "Cash"
     if "POS" in d or "SWIPE" in d or "CARD PURCHASE" in d:
         return "Card"
-
-    d_lower = description.lower()
-    if any(kw in d_lower for kw in _SUBSCRIPTION_KEYWORDS):
-        return "Subscription"
 
     return "Other"
