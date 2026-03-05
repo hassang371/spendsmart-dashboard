@@ -14,6 +14,11 @@ vi.mock('../lib/supabase/client', () => ({
   getBrowserSupabaseClient: vi.fn(),
 }));
 
+vi.mock('../lib/utils/cache', () => ({
+  getCachedData: vi.fn().mockReturnValue(undefined),
+  setCachedData: vi.fn(),
+}));
+
 describe('TrainingJobCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -21,7 +26,12 @@ describe('TrainingJobCard', () => {
     const mockSupabase = {
       auth: {
         getSession: vi.fn().mockResolvedValue({
-          data: { session: { access_token: 'fake-token' } },
+          data: {
+            session: {
+              access_token: 'fake-token',
+              user: { id: 'test-user-123' },
+            },
+          },
         }),
       },
     };

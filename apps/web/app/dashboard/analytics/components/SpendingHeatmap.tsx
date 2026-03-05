@@ -48,8 +48,8 @@ export function SpendingHeatmap({ transactions }: { transactions: Transaction[] 
         </p>
       </div>
 
-      <div className="relative z-10 min-h-0 flex-1 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="relative z-10 w-full" style={{ height: '260px' }}>
+        <ResponsiveContainer width="100%" height={260} minWidth={1}>
           <BarChart data={data}>
             <defs>
               <linearGradient id="heatmapBarGradient" x1="0" y1="0" x2="0" y2="1">

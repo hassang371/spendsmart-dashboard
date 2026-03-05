@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.domains.accounts.router import router
-from apps.api.core.auth import get_user_client
+from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 
 @pytest.fixture
@@ -63,6 +63,8 @@ def mock_user_client():
 @pytest.fixture
 def client(app, mock_user_client):
     app.dependency_overrides[get_user_client] = lambda: mock_user_client
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user-123"
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="test-user-123", email="test@example.com")
     c = TestClient(app)
     yield c
     app.dependency_overrides.clear()

@@ -136,14 +136,15 @@ def test_atm_description():
 def test_pos_description():
     assert infer_payment_method("POS PURCHASE ZARA STORE") == "Card"
 
-def test_google_play_is_subscription():
-    assert infer_payment_method("YouTube Premium Individual") == "Subscription"
+def test_google_play_no_payment_indicator():
+    # No UPI/POS/NEFT marker — payment method cannot be inferred
+    assert infer_payment_method("YouTube Premium Individual") == "Other"
 
-def test_cloud_storage_is_subscription():
-    assert infer_payment_method("Cloud Storage Monthly") == "Subscription"
+def test_cloud_storage_no_payment_indicator():
+    assert infer_payment_method("Cloud Storage Monthly") == "Other"
 
-def test_play_pass_is_subscription():
-    assert infer_payment_method("Play Pass Monthly") == "Subscription"
+def test_play_pass_no_payment_indicator():
+    assert infer_payment_method("Play Pass Monthly") == "Other"
 
 def test_unknown_defaults_to_other():
     assert infer_payment_method("Random merchant description") == "Other"

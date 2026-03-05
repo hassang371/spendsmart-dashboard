@@ -1,8 +1,8 @@
-"""Celery tasks for async model training.
+"""Celery tasks for async model training (v2).
 
-BUG-01 fix: Task now updates the training_jobs table in Supabase using a
-service-role client. Previously, the task returned a result dict but NEVER
-wrote the status back to DB, leaving jobs stuck at "queued" forever.
+v2: Uses TransactionClassifier with Linear Adapter.
+Training tasks now train the lightweight Linear Adapter from user corrections,
+not the full HypCD pipeline.
 """
 
 import logging
@@ -11,10 +11,6 @@ from typing import List, Dict, Optional
 from celery import shared_task
 from celery.exceptions import MaxRetriesExceededError
 
-from packages.categorization.training_pipeline import (
-    HypCDTrainingPipeline,
-    TrainingConfig,
-)
 from packages.categorization.backends.cloud import CloudBackend
 
 logger = logging.getLogger(__name__)
@@ -27,11 +23,7 @@ def _update_job_status(
     checkpoint_path: Optional[str] = None,
     error: Optional[str] = None,
 ) -> None:
-    """Update training job status in Supabase using service-role client.
-
-    BUG-01 fix: This uses a service-role key (bypasses RLS) so the Celery
-    worker can update the training_jobs table. The old code never did this.
-    """
+    """Update training job status in Supabase using service-role client."""
     try:
         from apps.api.core.auth import get_service_client
         client = get_service_client()
@@ -51,52 +43,46 @@ def _update_job_status(
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def train_model_task(
+def train_adapter_task(
     self,
     texts: List[str],
-    labels: List[int],
+    categories: List[str],
     user_id: str,
     job_id: str,
-    epochs: int = 50,
-    batch_size: int = 32,
-    learning_rate: float = 1e-4,
-    checkpoint_dir: str = "/app/checkpoints",
+    epochs: int = 5,
+    learning_rate: float = 1e-3,
 ) -> Dict:
-    """Async task to train HypCD model.
+    """Async task to train user's Linear Adapter from corrections.
 
-    BUG-01 fix: Now updates training_jobs table with status on
-    completion/failure via service-role Supabase client.
+    v2: Trains only the lightweight Linear Adapter (~10KB), not the full model.
+    The frozen MiniLM base model is never retrained.
     """
     try:
-        logger.info(f"Starting training job {job_id} for user {user_id}")
+        logger.info(f"Starting adapter training job {job_id} for user {user_id}")
         _update_job_status(job_id, "running")
 
-        config = TrainingConfig(
+        from apps.api.domains.categorization.service import get_classifier
+        classifier = get_classifier()
+
+        adapter = classifier.train_adapter(
+            texts=texts,
+            categories=categories,
             epochs=epochs,
-            batch_size=batch_size,
-            learning_rate=learning_rate,
-            checkpoint_dir=f"{checkpoint_dir}/{user_id}",
-            checkpoint_frequency=5,
-            num_classes=len(set(labels)),
+            lr=learning_rate,
         )
 
-        pipeline = HypCDTrainingPipeline(config)
+        # Save adapter checkpoint
+        import torch
+        checkpoint_dir = os.getenv("MODEL_CHECKPOINT_DIR", "/app/checkpoints")
+        user_dir = f"{checkpoint_dir}/{user_id}"
+        os.makedirs(user_dir, exist_ok=True)
+        model_path = f"{user_dir}/adapter.pt"
+        torch.save(adapter.state_dict(), model_path)
 
-        def data_loader():
-            return texts, labels
-
-        metrics = pipeline.train(data_loader)
-
-        model_path = f"{checkpoint_dir}/{user_id}/final_model.pt"
-        pipeline.export_model(model_path)
-
-        logger.info(f"Training job {job_id} completed successfully")
-
-        # BUG-01 fix: Update DB with completed status
+        logger.info(f"Adapter training job {job_id} completed successfully")
         _update_job_status(
             job_id,
             status="completed",
-            metrics=metrics,
             checkpoint_path=model_path,
         )
 
@@ -104,18 +90,16 @@ def train_model_task(
             "status": "completed",
             "job_id": job_id,
             "user_id": user_id,
-            "metrics": metrics,
             "model_path": model_path,
         }
 
     except Exception as exc:
-        logger.error(f"Training job {job_id} failed: {exc}")
+        logger.error(f"Adapter training job {job_id} failed: {exc}")
 
         retry_count = self.request.retries
         max_retries = self.max_retries
 
         if retry_count < max_retries:
-            # Update DB so users see retry progress instead of stuck "running"
             _update_job_status(
                 job_id,
                 status="running",
@@ -142,66 +126,15 @@ def train_model_task(
 @shared_task
 def classify_transaction_task(
     text: str,
-    model_path: str,
-    backend_type: str = "cloud",
 ) -> Dict:
+    """Classify a single transaction using the v2 classifier.
+
+    Uses the TransactionClassifier singleton (MiniLM + Cosine Similarity).
     """
-    Classify a single transaction using a trained model.
-    
-    Args:
-        text: Transaction description
-        model_path: Path to trained model
-        backend_type: Backend type ('cloud' or 'mobile')
-        
-    Returns:
-        Dictionary with prediction and confidence
-    """
-    import torch
-    from packages.categorization.hypcd import HypCDClassifier
-    
     try:
-        # Initialize backend
-        if backend_type == "cloud":
-            from packages.categorization.backends.cloud import CloudBackend
-            backend = CloudBackend()
-        else:
-            from packages.categorization.backends.mobile import MobileBackend
-            backend = MobileBackend()
-        
-        # Load model
-        checkpoint = torch.load(model_path, map_location="cpu")
-        
-        # Initialize classifier
-        classifier = HypCDClassifier(
-            backend=backend,
-            num_classes=checkpoint["config"]["num_classes"],
-            proj_dim=checkpoint["config"]["proj_dim"],
-            backend_type=backend_type,
-        )
-        classifier.load_state_dict(checkpoint["classifier"])
-        classifier.eval()
-        
-        # Get embedding and predict
-        with torch.no_grad():
-            embedding = backend.embed(text).unsqueeze(0)
-            hyp_embedding = classifier.embedder.projector(embedding)
-            logits = classifier.classifier(hyp_embedding)
-            probs = torch.softmax(logits, dim=-1)
-            pred_idx = torch.argmax(probs, dim=-1).item()
-            confidence = probs[0][pred_idx].item()
-        
-        # Map to category name
-        category = classifier.labels[pred_idx]
-        
-        return {
-            "category": category,
-            "confidence": confidence,
-            "all_probabilities": {
-                label: prob.item()
-                for label, prob in zip(classifier.labels, probs[0])
-            },
-        }
-        
+        from apps.api.domains.categorization.service import classify_single
+        result = classify_single(text)
+        return result
     except Exception as exc:
         logger.error(f"Classification failed: {exc}")
         return {

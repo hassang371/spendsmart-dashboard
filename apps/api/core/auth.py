@@ -16,6 +16,8 @@ import json
 import time
 import base64
 import structlog
+from dataclasses import dataclass
+from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
 from supabase import Client, create_client
@@ -113,17 +115,46 @@ async def get_user_token(authorization: str = Header(default="")) -> str:
     return token
 
 
+@dataclass
+class CurrentUser:
+    id: str
+    email: Optional[str]
+
+
+async def get_current_user(token: str = Depends(get_user_token)) -> CurrentUser:
+    """Extract user identity from JWT payload — no network call.
+
+    The JWT was already validated (structure + expiry) by get_user_token.
+    Supabase enforces full cryptographic verification when the token is
+    used in any query via RLS.
+    """
+    try:
+        payload = _decode_jwt_payload(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
+        return CurrentUser(id=user_id, email=payload.get("email"))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_current_user_id(user: CurrentUser = Depends(get_current_user)) -> str:
+    """Convenience dependency: return just the user UUID."""
+    return user.id
+
+
 async def get_user_client(token: str = Depends(get_user_token)) -> Client:
     """Provide a Supabase client authenticated with the user's JWT.
 
-    RLS policies will be enforced for all queries.
-
-    Note: We pass an empty string as the refresh token because the API
-    gateway is stateless — each request carries a fresh token from the
-    client. The backend never refreshes tokens.
+    Uses postgrest.auth() instead of auth.set_session() to avoid the
+    internal get_user() network call that set_session() triggers.
+    RLS policies are still fully enforced — Supabase verifies the JWT
+    on every PostgREST request server-side.
     """
     client = create_client(_get_supabase_url(), _get_supabase_anon_key())
-    client.auth.set_session(token, "")
+    client.postgrest.auth(token)
     return client
 
 

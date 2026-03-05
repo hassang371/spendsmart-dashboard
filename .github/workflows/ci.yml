@@ -18,9 +18,9 @@ jobs:
           cache: "pip"
       - run: pip install ruff
       - name: Run Ruff Linter
-        run: ruff check apps/api/
+        run: ruff check apps/api/ packages/
       - name: Run Ruff Formatter
-        run: ruff format --check apps/api/
+        run: ruff format --check apps/api/ packages/
 
   security-sast:
     name: Security Scans (SAST & Secrets)
@@ -50,7 +50,7 @@ jobs:
         run: bandit -r apps/api/ -c pyproject.toml || bandit -r apps/api/ -ll
 
       - name: Run pip-audit (SCA)
-        run: pip-audit -r apps/api/requirements.txt || echo "Warning: Vulnerabilities found"
+        run: pip-audit -r requirements.txt || echo "Warning: Vulnerabilities found"
 
   test-backend:
     name: Backend Tests
@@ -63,9 +63,9 @@ jobs:
           python-version: "3.11"
           cache: "pip"
       - name: Install dependencies
-        run: pip install -r apps/api/requirements.txt
+        run: pip install -r requirements.txt
       - name: Run pytest
-        run: python -m pytest apps/api/ -v --tb=short
+        run: python -m pytest apps/api/ packages/ -v --tb=short
 
   build-scan-images:
     name: Build & Container Scan

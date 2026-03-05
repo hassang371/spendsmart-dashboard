@@ -6,6 +6,16 @@ import { supabase } from '../../lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+type LoginFormInputs = z.infer<typeof loginSchema>;
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 import rocketAnimation from '@/public/slush/rocket.json';
@@ -14,8 +24,14 @@ import walletAnimation from '@/public/slush/wallet.json';
 import smileyAnimation from '@/public/slush/icon-smiley.json';
 
 function LoginContent() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormInputs>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [sessionCheckSlow, setSessionCheckSlow] = useState(false);
@@ -43,14 +59,13 @@ function LoginContent() {
     checkSession().finally(() => clearTimeout(timeout));
   }, [router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: LoginFormInputs) => {
     setLoading(true);
     setError(null);
 
     const { error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: data.email,
+      password: data.password,
     });
 
     if (loginError) {
@@ -166,31 +181,55 @@ function LoginContent() {
               )}
 
               <form
-                onSubmit={handleLogin}
+                onSubmit={handleSubmit(onSubmit)}
                 className="flex flex-col gap-4 font-sans text-left relative z-10"
               >
-                <input
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  type="email"
-                  placeholder="Email"
-                  className="w-full px-6 py-4 bg-brand-light border-2 border-black/10 rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
-                />
-                <input
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  type="password"
-                  placeholder="Password"
-                  className="w-full px-6 py-4 bg-brand-light border-2 border-black/10 rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
-                />
+                <div>
+                  <input
+                    {...register('email')}
+                    type="email"
+                    placeholder="Email"
+                    className={`w-full px-6 py-4 bg-brand-light border-2 rounded-full focus:outline-none focus:shadow-hard-sm transition-all text-black placeholder-black/40 font-bold ${
+                      errors.email
+                        ? 'border-brand-coral focus:border-brand-coral'
+                        : 'border-black/10 focus:border-brand-blue'
+                    }`}
+                  />
+                  {errors.email && (
+                    <span className="text-brand-coral text-xs font-bold ml-4 mt-1 block">
+                      {errors.email.message}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <input
+                    {...register('password')}
+                    type="password"
+                    placeholder="Password"
+                    className={`w-full px-6 py-4 bg-brand-light border-2 rounded-full focus:outline-none focus:shadow-hard-sm transition-all text-black placeholder-black/40 font-bold ${
+                      errors.password
+                        ? 'border-brand-coral focus:border-brand-coral'
+                        : 'border-black/10 focus:border-brand-blue'
+                    }`}
+                  />
+                  {errors.password && (
+                    <span className="text-brand-coral text-xs font-bold ml-4 mt-1 block">
+                      {errors.password.message}
+                    </span>
+                  )}
+                </div>
+
                 <button
-                  disabled={loading}
+                  disabled={loading || isSubmitting}
                   type="submit"
                   className="w-full py-4 bg-black text-white font-bold uppercase tracking-widest rounded-full hover:bg-brand-blue hover:text-white transition-all shadow-hard active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black"
                 >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Continue'}
+                  {loading || isSubmitting ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                  ) : (
+                    'Continue'
+                  )}
                 </button>
               </form>
               {/* Actions embedded in card or below? Slush has Google/Apple buttons below form usually or inside. Putting inside for cleaner unit. */}

@@ -14,6 +14,11 @@ vi.mock('../lib/supabase/client', () => ({
   getBrowserSupabaseClient: vi.fn(),
 }));
 
+vi.mock('../lib/utils/cache', () => ({
+  getCachedData: vi.fn().mockReturnValue(undefined),
+  setCachedData: vi.fn(),
+}));
+
 // Mock Recharts because it doesn't render well in jsdom without sizing
 vi.mock('recharts', () => {
   const OriginalModule = vi.importActual('recharts');
@@ -38,7 +43,12 @@ describe('SafeToSpendCard', () => {
     const mockSupabase = {
       auth: {
         getSession: vi.fn().mockResolvedValue({
-          data: { session: { access_token: 'fake-token' } },
+          data: {
+            session: {
+              access_token: 'fake-token',
+              user: { id: 'test-user-123' },
+            },
+          },
         }),
       },
     };

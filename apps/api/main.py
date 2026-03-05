@@ -127,8 +127,8 @@ async def lifespan(app: FastAPI):
         logger.warning("rate_limiter_unavailable", error=str(e))
         app.state.import_rate_limiter = None
 
-    # Eagerly initialize the HypCD/BERT classifier in background thread
-    # so the first import doesn't wait ~80s for model loading.
+    # Eagerly initialize the MiniLM classifier in background thread
+    # so the first import doesn't wait for model loading.
     import asyncio
 
     async def _warmup_classifier():
@@ -153,7 +153,7 @@ TAGS_METADATA = [
     },
     {
         "name": "categorization",
-        "description": "Transaction classification using HypCD model.",
+        "description": "Transaction classification using MiniLM + Cosine Similarity.",
     },
     {
         "name": "forecasting",

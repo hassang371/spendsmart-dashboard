@@ -5,7 +5,10 @@ import { motion } from 'framer-motion';
 import { Shield, Loader2, Activity, AlertCircle, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { forecastApi, type SafeToSpendResponse } from '../../lib/api/client';
+import { getCachedData, setCachedData } from '../../lib/utils/cache';
 import { getBrowserSupabaseClient } from '../../lib/supabase/client';
+
+const SAFE_TO_SPEND_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export default function SafeToSpendCard() {
   const [data, setData] = useState<SafeToSpendResponse | null>(null);
@@ -23,8 +26,18 @@ export default function SafeToSpendCard() {
       if (!session?.access_token) {
         throw new Error('Session expired. Please sign in again.');
       }
+
+      const cacheKey = `safe-to-spend-cache:${session.user.id}`;
+      const cachedData = getCachedData<SafeToSpendResponse>(cacheKey, SAFE_TO_SPEND_CACHE_TTL_MS);
+
+      if (cachedData) {
+        setData(cachedData);
+        return;
+      }
+
       const result = await forecastApi.safeToSpend(session.access_token);
       setData(result);
+      setCachedData(cacheKey, result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -110,8 +123,8 @@ export default function SafeToSpendCard() {
 
         {/* Forecast Chart (Mini) */}
         {data.forecast_breakdown && data.forecast_breakdown.length > 0 && (
-          <div className="mt-6 h-24 w-full opacity-80 transition-opacity hover:opacity-100">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="mt-6 h-24 w-full opacity-80 transition-opacity hover:opacity-100 min-h-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <AreaChart data={data.forecast_breakdown}>
                 <defs>
                   <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">

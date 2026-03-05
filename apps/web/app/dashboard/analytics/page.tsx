@@ -12,8 +12,9 @@ import { SpendingHeatmap } from './components/SpendingHeatmap';
 import { CategoryDistribution } from './components/CategoryDistribution';
 import { MerchantLeaderboard } from './components/MerchantLeaderboard';
 import { AnalyticsEmptyState } from './components/AnalyticsEmptyState';
+import { getCachedData, setCachedData } from '../../../lib/utils/cache';
 
-const ANALYTICS_CACHE_TTL_MS = 60 * 1000; // 1 minute cache
+const ANALYTICS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour cache
 
 export default function AnalyticsPage() {
   const router = useRouter();
@@ -22,6 +23,8 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchData = async () => {
       try {
         const {
@@ -34,17 +37,14 @@ export default function AnalyticsPage() {
         }
 
         const cacheKey = `analytics-cache:${user.id}`;
-        const cachedRaw = sessionStorage.getItem(cacheKey);
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw) as { timestamp: number; rows: Transaction[] };
-            if (Date.now() - cached.timestamp < ANALYTICS_CACHE_TTL_MS) {
-              setTransactions(cached.rows);
-              setLoading(false);
-            }
-          } catch {
-            /* ignore */
+        const cachedData = getCachedData<Transaction[]>(cacheKey, ANALYTICS_CACHE_TTL_MS);
+
+        if (cachedData) {
+          if (mounted) {
+            setTransactions(cachedData);
+            setLoading(false);
           }
+          return;
         }
 
         // Get auth token for API call
@@ -56,41 +56,33 @@ export default function AnalyticsPage() {
           return;
         }
 
-        // Fetch all transactions via FastAPI backend
-        const allItems: Transaction[] = [];
-        let cursor: string | undefined;
-        let hasMore = true;
-        const MAX_PAGES = 50; // Guard: cap at 5,000 transactions (50 × 100)
-        let pagesFetched = 0;
+        // Single request: last 12 months, up to 500 transactions.
+        // Avoids multi-round-trip cursor loop that causes 7+ second load times
+        // and is sensitive to backend hot-reloads during development.
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+        const response = await accountsApi.getTransactions(session.access_token, {
+          limit: 500,
+          date_from: twelveMonthsAgo.toISOString().split('T')[0],
+        });
 
-        while (hasMore && pagesFetched < MAX_PAGES) {
-          const response = await accountsApi.getTransactions(session.access_token, {
-            limit: 100,
-            cursor,
-          });
-          allItems.push(...response.items);
-          hasMore = response.has_more && !!response.next_cursor;
-          cursor = response.next_cursor ?? undefined;
-          pagesFetched++;
-        }
+        if (!mounted) return;
 
-        setTransactions(allItems);
-        sessionStorage.setItem(
-          cacheKey,
-          JSON.stringify({
-            timestamp: Date.now(),
-            rows: allItems,
-          })
-        );
+        setTransactions(response.items);
+        setCachedData(cacheKey, response.items);
       } catch (err: unknown) {
+        if (!mounted) return;
         const message = err instanceof Error ? err.message : 'Failed to load analytics data.';
         setError(message);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     fetchData();
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
   // Animation Variants
@@ -150,7 +142,7 @@ export default function AnalyticsPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-4 p-2 md:p-4"
+      className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-2 md:p-4"
     >
       <motion.div variants={itemVariants} className="flex flex-col gap-1">
         <h1 className="text-3xl font-black text-foreground tracking-tight">Analytics</h1>
@@ -159,7 +151,7 @@ export default function AnalyticsPage() {
         </p>
       </motion.div>
 
-      <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 lg:grid-cols-12 lg:grid-rows-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <motion.div variants={itemVariants} className="lg:col-span-4 lg:row-span-1 min-h-0">
           <MonthlyComparison transactions={transactions as any} />
         </motion.div>

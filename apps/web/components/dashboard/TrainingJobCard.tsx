@@ -1,16 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BrainCircuit, Loader2, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import { trainingApi, type TrainingJob } from '../../lib/api/client';
+import { getCachedData, setCachedData } from '../../lib/utils/cache';
 import { getBrowserSupabaseClient } from '../../lib/supabase/client';
+
+const TRAINING_JOB_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours (terminal states are immutable)
 
 export default function TrainingJobCard() {
   const [job, setJob] = useState<TrainingJob | null>(null);
   const [loading, setLoading] = useState(true);
+  // Ref tracks terminal state so fetchJob (stable, [] deps) can skip re-fetches
+  const isTerminalRef = useRef(false);
 
   const fetchJob = useCallback(async () => {
+    if (isTerminalRef.current) return;
     try {
       const supabase = getBrowserSupabaseClient();
       const {
@@ -20,27 +26,40 @@ export default function TrainingJobCard() {
         setJob(null);
         return;
       }
+
+      const cacheKey = `training-job-cache:${session.user.id}`;
+
+      // Only restore cache for terminal states — active jobs must always poll live
+      const cachedData = getCachedData<TrainingJob | null>(cacheKey, TRAINING_JOB_CACHE_TTL_MS);
+
+      if (cachedData !== undefined && cachedData !== null) {
+        const isTerminal = cachedData.status === 'completed' || cachedData.status === 'failed';
+        if (isTerminal) {
+          setJob(cachedData);
+          isTerminalRef.current = true;
+          return;
+        }
+      }
+
       const latestJob = await trainingApi.getLatest(session.access_token);
       setJob(latestJob);
+      if (latestJob?.status === 'completed' || latestJob?.status === 'failed') {
+        isTerminalRef.current = true;
+        // Cache terminal states — they're immutable so safe to keep for the session
+        setCachedData(cacheKey, latestJob);
+      }
     } catch {
       setJob(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // stable — no deps, uses ref for terminal check
 
   useEffect(() => {
     fetchJob();
-    const interval = setInterval(() => {
-      // Stop polling once job reaches a terminal state
-      if (job?.status === 'completed' || job?.status === 'failed') {
-        clearInterval(interval);
-        return;
-      }
-      fetchJob();
-    }, 30000);
+    const interval = setInterval(fetchJob, 30000);
     return () => clearInterval(interval);
-  }, [fetchJob, job?.status]);
+  }, [fetchJob]); // fetchJob is stable so this runs once
 
   if (loading) {
     return (

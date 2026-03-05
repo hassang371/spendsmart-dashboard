@@ -34,9 +34,9 @@ def test_save_and_reload_user_adapter(tmp_path):
 
 
 def test_load_global_base_returns_none_when_not_found(tmp_path):
-    """Returns None when no global checkpoint exists."""
+    """Returns None when no global checkpoint exists locally and Supabase is not configured."""
     from packages.categorization.adapter_manager import AdapterManager
-    mgr = AdapterManager(local_dir=str(tmp_path))
+    mgr = AdapterManager(supabase_url="", supabase_key="", local_dir=str(tmp_path))
     result = mgr.load_global_base()
     assert result is None
 

@@ -6,6 +6,17 @@ import { supabase } from '../../lib/supabase/client';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const signupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+type SignupFormInputs = z.infer<typeof signupSchema>;
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 import rocketAnimation from '@/public/slush/rocket.json';
@@ -13,32 +24,38 @@ import coinAnimation from '@/public/slush/coin.json';
 import walletAnimation from '@/public/slush/wallet.json';
 
 export default function SignupPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupFormInputs>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { name: '', email: '', password: '' },
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const router = useRouter();
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: SignupFormInputs) => {
     setLoading(true);
     setError(null);
+    setSubmittedEmail(data.email);
 
-    const { data, error: signupError } = await supabase.auth.signUp({
-      email,
-      password,
+    const { data: authData, error: signupError } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
       options: {
         data: {
-          full_name: name,
+          full_name: data.name,
         },
       },
     });
 
     if (signupError) {
       setError(signupError.message);
-    } else if (data.session) {
+    } else if (authData.session) {
       // Direct redirect if session exists (e.g. auto confirm enabled or existing session)
       router.push('/dashboard');
     } else {
@@ -147,7 +164,7 @@ export default function SignupPage() {
                 </h2>
                 <p className="text-sm text-black/70 font-sans font-medium">
                   We&apos;ve sent a confirmation link to{' '}
-                  <strong className="text-black">{email}</strong>. Please check your inbox.
+                  <strong className="text-black">{submittedEmail}</strong>. Please check your inbox.
                 </p>
               </div>
               <Link
@@ -158,44 +175,71 @@ export default function SignupPage() {
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSignup} className="space-y-4 font-sans">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 font-sans">
               <div>
                 <input
-                  required
-                  value={name}
-                  onChange={e => setName(e.target.value)}
+                  {...register('name')}
                   type="text"
                   placeholder="Full Name"
-                  className="w-full px-6 py-4 bg-white border-2 border-black/10 rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
+                  className={`w-full px-6 py-4 bg-white border-2 rounded-full focus:outline-none focus:shadow-hard-sm transition-all text-black placeholder-black/40 font-bold ${
+                    errors.name
+                      ? 'border-brand-coral focus:border-brand-coral'
+                      : 'border-black/10 focus:border-brand-blue'
+                  }`}
                 />
+                {errors.name && (
+                  <span className="text-brand-coral text-xs font-bold ml-4 mt-1 block">
+                    {errors.name.message}
+                  </span>
+                )}
               </div>
+
               <div>
                 <input
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  {...register('email')}
                   type="email"
                   placeholder="name@example.com"
-                  className="w-full px-6 py-4 bg-white border-2 border-black/10 rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
+                  className={`w-full px-6 py-4 bg-white border-2 rounded-full focus:outline-none focus:shadow-hard-sm transition-all text-black placeholder-black/40 font-bold ${
+                    errors.email
+                      ? 'border-brand-coral focus:border-brand-coral'
+                      : 'border-black/10 focus:border-brand-blue'
+                  }`}
                 />
+                {errors.email && (
+                  <span className="text-brand-coral text-xs font-bold ml-4 mt-1 block">
+                    {errors.email.message}
+                  </span>
+                )}
               </div>
+
               <div>
                 <input
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  {...register('password')}
                   type="password"
                   placeholder="Password"
-                  className="w-full px-6 py-4 bg-white border-2 border-black/10 rounded-full focus:outline-none focus:shadow-hard-sm focus:border-brand-blue transition-all text-black placeholder-black/40 font-bold"
+                  className={`w-full px-6 py-4 bg-white border-2 rounded-full focus:outline-none focus:shadow-hard-sm transition-all text-black placeholder-black/40 font-bold ${
+                    errors.password
+                      ? 'border-brand-coral focus:border-brand-coral'
+                      : 'border-black/10 focus:border-brand-blue'
+                  }`}
                 />
+                {errors.password && (
+                  <span className="text-brand-coral text-xs font-bold ml-4 mt-1 block">
+                    {errors.password.message}
+                  </span>
+                )}
               </div>
 
               <button
-                disabled={loading}
+                disabled={loading || isSubmitting}
                 type="submit"
                 className="w-full py-4 bg-black text-white font-bold uppercase tracking-widest rounded-full hover:bg-brand-blue hover:text-white transition-all shadow-hard active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black mt-4"
               >
-                {loading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : 'Create Account'}
+                {loading || isSubmitting ? (
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                ) : (
+                  'Create Account'
+                )}
               </button>
 
               <div className="relative my-8">

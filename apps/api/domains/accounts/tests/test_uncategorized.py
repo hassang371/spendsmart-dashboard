@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from apps.api.main import app
-from apps.api.core.auth import get_user_client
+from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 
 class MockData:
@@ -46,6 +46,8 @@ class MockClient:
 @pytest.fixture
 def client():
     app.dependency_overrides[get_user_client] = lambda: MockClient()
+    app.dependency_overrides[get_current_user_id] = lambda: "user-1"
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="user-1", email=None)
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

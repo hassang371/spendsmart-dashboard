@@ -21,18 +21,22 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   title: 'SCALE — Personal Financing Made Easy',
-  description: 'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
+  description:
+    'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
   openGraph: {
     title: 'SCALE — Personal Financing Made Easy',
-    description: 'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
+    description:
+      'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
     images: ['/slush/6870e4e53832c8115a855885_slush_opengraph.jpg'],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'SCALE — Personal Financing Made Easy',
-    description: 'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
+    description:
+      'Real-time financial analytics, AI-powered spending predictions, and agentic AI accountants to manage your money.',
     images: ['/slush/6870e4e53832c8115a855885_slush_opengraph.jpg'],
   },
   icons: {
@@ -43,6 +47,7 @@ export const metadata: Metadata = {
 };
 
 import { ThemeProvider } from '../components/theme-provider';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export default function RootLayout({
   children,
@@ -50,13 +55,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body
         className={`${inter.variable} ${oswald.variable} ${spaceGrotesk.variable} font-sans antialiased bg-background text-foreground`}
       >
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

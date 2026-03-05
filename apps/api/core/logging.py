@@ -50,3 +50,7 @@ def setup_logging(log_level: str = "INFO", json_output: bool = True) -> None:
         stream=sys.stdout,
         level=getattr(logging, log_level.upper(), logging.INFO),
     )
+
+    # Silence chatty third-party loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)

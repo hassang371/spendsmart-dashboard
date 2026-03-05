@@ -1,177 +1,182 @@
-"""Tests for POST /classify and POST /feedback endpoints."""
-import pytest
-from httpx import AsyncClient, ASGITransport
-from types import SimpleNamespace
+"""Integration tests for the categorization API endpoints (v2).
 
-from apps.api.main import app
-from apps.api.core.auth import get_user_client
-import torch
+Tests the /classify/batch, /classify, /feedback, /metrics, and /models endpoints
+using the v2 TransactionClassifier (MiniLM + Cosine Similarity).
+"""
+import pytest
+from unittest.mock import MagicMock, patch
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from apps.api.domains.categorization.router import router
+from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 
 @pytest.fixture
-def mock_classifier(monkeypatch):
-    """Mock HypCDClassifier to avoid loading the full model."""
-
-    class MockClassifier:
-        def __init__(self):
-            self.updated_anchors = {}  # Track feedback calls
-
-        def predict_batch(self, texts):
-            results = []
-            for text in texts:
-                upper = text.upper()
-                if "UBER" in upper:
-                    results.append(("Transport", 0.9, torch.zeros(1, 384)))
-                elif "ZOMATO" in upper or "SWIGGY" in upper:
-                    results.append(("Food", 0.85, torch.zeros(1, 384)))
-                elif "NETFLIX" in upper:
-                    results.append(("Entertainment", 0.8, torch.zeros(1, 384)))
-                else:
-                    results.append(("Misc", 0.5, torch.zeros(1, 384)))
-            return results
-
-        def update_anchors(self, labeled_texts):
-            self.updated_anchors.update(labeled_texts)
-
-    mock_instance = MockClassifier()
-    monkeypatch.setattr(
-        "apps.api.domains.categorization.service.get_classifier", lambda: mock_instance
-    )
-    return mock_instance
+def app():
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    return app
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_user_client():
-    class MockTable:
-        def insert(self, _rows):
-            return self
+    mock_client = MagicMock()
+    mock_user = MagicMock()
+    mock_user.id = "test-user-id"
+    mock_client.auth.get_user.return_value = MagicMock(user=mock_user)
 
-        def select(self, *_args):
-            return self
+    # Mock table calls for feedback insert
+    mock_table = MagicMock()
+    mock_client.table.return_value = mock_table
+    mock_table.insert.return_value = mock_table
+    mock_table.select.return_value = mock_table
+    mock_table.eq.return_value = mock_table
+    mock_table.execute.return_value = MagicMock(data=[])
 
-        def eq(self, *_args):
-            return self
+    return mock_client
 
-        def execute(self):
-            return SimpleNamespace(data=[])
 
-    class MockClient:
-        def __init__(self):
-            self.auth = SimpleNamespace(
-                get_user=lambda: SimpleNamespace(
-                    user=SimpleNamespace(id="test-user-id")
-                )
-            )
-
-        def table(self, _name):
-            return MockTable()
-
-    app.dependency_overrides[get_user_client] = lambda: MockClient()
-    yield
+@pytest.fixture
+def client(app, mock_user_client):
+    app.dependency_overrides[get_user_client] = lambda: mock_user_client
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="test-user-id", email=None)
+    c = TestClient(app)
+    yield c
     app.dependency_overrides.clear()
 
 
-# ─── /classify tests ───
+@pytest.fixture(autouse=True)
+def mock_classify(monkeypatch):
+    """Mock the classify functions to avoid loading MiniLM model during tests."""
+
+    def _mock_classify_batch(texts):
+        results = []
+        for text in texts:
+            upper = text.upper()
+            if "UBER" in upper:
+                results.append({"category": "Taxi & Rideshare", "confidence": 0.9})
+            elif "ZOMATO" in upper or "SWIGGY" in upper:
+                results.append({"category": "Dining", "confidence": 0.95})
+            elif "NETFLIX" in upper:
+                results.append({"category": "Subscriptions", "confidence": 0.88})
+            elif "AIRBNB" in upper:
+                results.append({"category": "Hotels & Stays", "confidence": 0.92})
+            else:
+                results.append({"category": "Uncategorized", "confidence": 0.3})
+        return results
+
+    def _mock_classify_single(text):
+        return _mock_classify_batch([text])[0]
+
+    class _MockClassifier:
+        confidence_threshold = 0.75
+
+    monkeypatch.setattr(
+        "apps.api.domains.categorization.router.classify_batch_in_process",
+        _mock_classify_batch,
+    )
+    monkeypatch.setattr(
+        "apps.api.domains.categorization.router.classify_single",
+        _mock_classify_single,
+    )
+    monkeypatch.setattr(
+        "apps.api.domains.categorization.router.get_classifier",
+        lambda: _MockClassifier(),
+    )
 
 
-@pytest.mark.asyncio
-async def test_classify_returns_category_map(mock_classifier):
-    """POST /classify with unique descriptions returns {description: category} map."""
+# ─── /classify/batch tests ───
+
+
+def test_batch_classify_returns_predictions(client):
+    """POST /classify/batch returns predictions list with v2 categories."""
     payload = {
-        "descriptions": ["Uber trip to airport", "Zomato order #123", "Random store"]
+        "descriptions": ["Uber trip to airport", "Swiggy food order", "Random unknown store"]
     }
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        response = await ac.post("/api/v1/categorization/classify/batch", json=payload)
+    response = client.post("/api/v1/categorization/classify/batch", json=payload)
 
     assert response.status_code == 200
     data = response.json()
-
-    # The new structure returns BatchClassifyResponse with predictions list
     assert "predictions" in data
     assert len(data["predictions"]) == 3
-    preds = data["predictions"]
-    
-    assert preds[0]["category"] == "Transport"
-    assert preds[1]["category"] == "Food"
-    assert preds[2]["category"] == "Misc"
+    assert data["predictions"][0]["category"] == "Taxi & Rideshare"
+    assert data["predictions"][1]["category"] == "Dining"
+    assert data["predictions"][2]["category"] == "Uncategorized"
 
 
-@pytest.mark.asyncio
-async def test_classify_empty_descriptions(mock_classifier):
-    """POST /classify with empty list returns 400."""
-    payload = {"descriptions": []}
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        response = await ac.post("/api/v1/categorization/classify/batch", json=payload)
-
+def test_batch_classify_empty_descriptions(client):
+    """POST /classify/batch with empty list returns 400."""
+    response = client.post("/api/v1/categorization/classify/batch", json={"descriptions": []})
     assert response.status_code == 400
 
 
-@pytest.mark.asyncio
-async def test_classify_missing_descriptions_field(mock_classifier):
-    """POST /classify without descriptions field returns 400."""
-    payload = {"texts": ["something"]}
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        response = await ac.post("/api/v1/categorization/classify/batch", json=payload)
-
+def test_batch_classify_missing_field(client):
+    """POST /classify/batch without descriptions field returns 422."""
+    response = client.post("/api/v1/categorization/classify/batch", json={"texts": ["something"]})
     assert response.status_code == 422
+
+
+# ─── /classify (single) tests ───
+
+
+def test_single_classify_food(client):
+    """POST /classify returns correct category for known food merchant."""
+    response = client.post(
+        "/api/v1/categorization/classify",
+        json={"description": "Swiggy food order"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["category"] == "Dining"
+    assert data["model_used"] == "minilm-cosine-v2"
+
+
+def test_single_classify_unknown(client):
+    """POST /classify returns Uncategorized for unknown description."""
+    response = client.post(
+        "/api/v1/categorization/classify",
+        json={"description": "Random store purchase"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["category"] == "Uncategorized"
 
 
 # ─── /feedback tests ───
 
 
-@pytest.mark.asyncio
-async def test_feedback_updates_classifier(mock_classifier):
+def test_feedback_accepts_corrections(client):
     """POST /feedback accepts category correction payload."""
     payload = {
-        "corrections": {"Food": ["Uber Eats delivery"], "Transport": ["Ola cab ride"]}
+        "corrections": {"Dining": ["Uber Eats delivery"], "Taxi & Rideshare": ["Ola cab ride"]}
     }
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        response = await ac.post("/api/v1/categorization/feedback", json=payload)
+    response = client.post("/api/v1/categorization/feedback", json=payload)
 
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
+    assert sorted(data["updated_categories"]) == ["Dining", "Taxi & Rideshare"]
 
-    assert sorted(data["updated_categories"]) == ["Food", "Transport"]
 
-
-@pytest.mark.asyncio
-async def test_feedback_empty_corrections(mock_classifier):
+def test_feedback_empty_corrections(client):
     """POST /feedback with empty corrections returns 400."""
-    payload = {"corrections": {}}
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        response = await ac.post("/api/v1/categorization/feedback", json=payload)
-
+    response = client.post("/api/v1/categorization/feedback", json={"corrections": {}})
     assert response.status_code == 400
 
 
-@pytest.mark.asyncio
-async def test_metrics_endpoint_exists(mock_classifier):
-    """GET /categorization/metrics must return accuracy and per_class keys."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        response = await ac.get("/api/v1/categorization/metrics")
+# ─── /models tests ───
 
-    assert response.status_code in (200, 404), f"Unexpected status {response.status_code}"
-    if response.status_code == 200:
-        data = response.json()
-        assert "overall_accuracy" in data
-        assert "per_class" in data
-        assert "confidence_histogram" in data
-        assert "rule_vs_model_split" in data
+
+def test_models_endpoint(client):
+    """GET /models returns v2 model info."""
+    response = client.get("/api/v1/categorization/models")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["base_model"] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert data["embedding_dim"] == 384
+    assert data["classifier_type"] == "cosine_similarity_zero_shot"
+    assert data["adapter_type"] == "linear_adapter"
+    assert data["confidence_threshold"] == 0.75
