@@ -48,7 +48,7 @@ describe('API Client', () => {
       expect(result.status).toBe('healthy');
       expect(result.engines?.ingestion).toBe('ready');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8000/api/v1/health',
+        'http://localhost:8000/api/v1/health/ready',
         expect.objectContaining({
           method: 'GET',
         })

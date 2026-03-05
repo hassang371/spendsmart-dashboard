@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import structlog
 from celery import shared_task
 from apps.api.core.config import settings
@@ -24,7 +24,7 @@ def cleanup_stale_jobs() -> str:
         supabase = get_service_client()
         
         # Calculate exactly 2 hours ago
-        threshold_time = datetime.utcnow() - timedelta(hours=2)
+        threshold_time = datetime.now(timezone.utc) - timedelta(hours=2)
         threshold_iso = threshold_time.isoformat()
         
         # Find and update stuck jobs

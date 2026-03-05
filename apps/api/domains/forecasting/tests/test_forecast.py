@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 from apps.api.main import app
-from apps.api.core.auth import get_user_client
+from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 # CSV with enough data points for the forecasting engine
 # Need at least 37 days (30 context + 7 prediction) for TFT
@@ -30,10 +30,11 @@ def _make_mock_supabase():
     mock_table.insert.return_value = mock_table
     mock_table.execute.return_value = MagicMock(data=[])
 
-    # table("transactions").select(...).gte(...).order(...).execute() returns empty
+    # table("transactions").select(...).gte(...).order(...).limit(...).execute() returns empty
     mock_table.select.return_value = mock_table
     mock_table.gte.return_value = mock_table
     mock_table.order.return_value = mock_table
+    mock_table.limit.return_value = mock_table
 
     return mock_client
 
@@ -43,6 +44,8 @@ def override_auth():
     """Override auth dependency with a mock Supabase client."""
     mock_client = _make_mock_supabase()
     app.dependency_overrides[get_user_client] = lambda: mock_client
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="test-user-id", email=None)
     yield mock_client
     app.dependency_overrides.clear()
 

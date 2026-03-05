@@ -17,6 +17,19 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase/client';
 import { useTheme } from 'next-themes';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const profileSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name is too long'),
+});
+type ProfileFormInputs = z.infer<typeof profileSchema>;
+
+const deleteSchema = z.object({
+  password: z.string().min(1, 'Password is required to confirm deletion'),
+});
+type DeleteFormInputs = z.infer<typeof deleteSchema>;
 
 type Transaction = {
   id: string;
@@ -37,13 +50,20 @@ export default function SettingsPage() {
   const [deletingData, setDeletingData] = useState(false);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [newName, setNewName] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [exporting, setExporting] = useState(false);
-
-  const [password, setPassword] = useState('');
   const [verifying, setVerifying] = useState(false);
+
+  const profileForm = useForm<ProfileFormInputs>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { name: '' },
+  });
+
+  const deleteForm = useForm<DeleteFormInputs>({
+    resolver: zodResolver(deleteSchema),
+    defaultValues: { password: '' },
+  });
 
   // Toast States
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -74,7 +94,7 @@ export default function SettingsPage() {
           email: data.user.email || '',
           name: data.user.user_metadata?.full_name || 'User',
         });
-        setNewName(data.user.user_metadata?.full_name || '');
+        profileForm.reset({ name: data.user.user_metadata?.full_name || '' });
 
         // Fetch AI model metadata
         const { data: meta } = await supabase
@@ -90,20 +110,17 @@ export default function SettingsPage() {
 
   // --- Handlers ---
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-
+  const onProfileSubmit = async (data: ProfileFormInputs) => {
     setSavingProfile(true);
 
     try {
       const { error } = await supabase.auth.updateUser({
-        data: { full_name: newName },
+        data: { full_name: data.name },
       });
 
       if (error) throw error;
 
-      setUser(prev => (prev ? { ...prev, name: newName } : null));
+      setUser(prev => (prev ? { ...prev, name: data.name } : null));
       setToast({ type: 'success', message: 'Profile updated successfully.' });
       setIsEditingProfile(false);
     } catch (err) {
@@ -176,14 +193,9 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteAllData = async () => {
+  const onDeleteSubmit = async (data: DeleteFormInputs) => {
     if (!user?.id || !user.email) {
       setToast({ type: 'error', message: 'Unable to verify account. Please sign in again.' });
-      return;
-    }
-
-    if (!password) {
-      setToast({ type: 'error', message: 'Please enter your password to confirm.' });
       return;
     }
 
@@ -192,12 +204,12 @@ export default function SettingsPage() {
     // Verify password
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: user.email,
-      password: password,
+      password: data.password,
     });
 
     if (authError) {
       setVerifying(false);
-      setPassword('');
+      deleteForm.reset({ password: '' });
       setToast({ type: 'error', message: 'Incorrect password.' });
       return;
     }
@@ -205,45 +217,65 @@ export default function SettingsPage() {
     setDeletingData(true);
 
     try {
-      // 1. Delete Training Jobs
+      // 1. Delete Import Jobs
+      const { error: deleteImportJobsError } = await supabase
+        .from('import_jobs')
+        .delete()
+        .eq('user_id', user.id);
+      if (deleteImportJobsError) throw deleteImportJobsError;
+
+      // 2. Delete Training Jobs
       const { error: deleteJobsError } = await supabase
         .from('training_jobs')
         .delete()
         .eq('user_id', user.id);
       if (deleteJobsError) throw deleteJobsError;
 
-      // 2. Delete Uploaded Files
+      // 3. Delete Uploaded Files
       const { error: deleteFilesError } = await supabase
         .from('uploaded_files')
         .delete()
         .eq('user_id', user.id);
       if (deleteFilesError) throw deleteFilesError;
 
-      // 3. Delete Transactions
-      const { error: deleteError } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (deleteError) throw deleteError;
-
       // 4. Delete Training Corrections
       const { error: deleteCorrectionsError } = await supabase
         .from('training_corrections')
         .delete()
         .eq('user_id', user.id);
-
       if (deleteCorrectionsError) throw deleteCorrectionsError;
 
-      sessionStorage.removeItem(`overview-cache:${user.id}`);
-      sessionStorage.removeItem(`transactions-cache:${user.id}`);
+      // 4.5 Delete User Model Metadata
+      const { error: deleteModelMetaError } = await supabase
+        .from('user_model_metadata')
+        .delete()
+        .eq('user_id', user.id);
+      if (deleteModelMetaError) throw deleteModelMetaError;
+
+      // 5. Delete Transactions (last — other tables may reference it)
+      const { error: deleteError } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id);
+      if (deleteError) throw deleteError;
+
+      // Clear all cached state so every page reflects the deletion immediately
+      localStorage.removeItem(`overview-cache:${user.id}`);
+      localStorage.removeItem(`transactions-cache:${user.id}`);
+      localStorage.removeItem(`uncategorized-cache:${user.id}`);
+      localStorage.removeItem(`analytics-cache:${user.id}`);
+      localStorage.removeItem(`safe-to-spend-cache:${user.id}`);
+      localStorage.removeItem(`training-job-cache:${user.id}`);
 
       setToast({
         type: 'success',
         message: 'All your transaction data has been permanently deleted.',
       });
       setShowDeleteConfirm(false);
-      setPassword('');
+      deleteForm.reset({ password: '' });
+
+      // Hard reload so layout badge and transactions page drop their in-memory state
+      setTimeout(() => window.location.reload(), 1200);
     } catch (deleteError) {
       setToast({
         type: 'error',
@@ -309,29 +341,40 @@ export default function SettingsPage() {
             </div>
 
             {isEditingProfile ? (
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Full Name
                   </label>
                   <input
+                    {...profileForm.register('name')}
                     type="text"
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    className="w-full rounded-xl bg-muted/50 border border-border px-3 py-2 text-sm font-medium text-foreground transition-all focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50"
+                    className={`w-full rounded-xl bg-muted/50 border px-3 py-2 text-sm font-medium text-foreground transition-all focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                      profileForm.formState.errors.name
+                        ? 'border-destructive focus:border-destructive'
+                        : 'border-border focus:border-primary/50'
+                    }`}
                   />
+                  {profileForm.formState.errors.name && (
+                    <span className="text-destructive text-xs font-bold block">
+                      {profileForm.formState.errors.name.message}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsEditingProfile(false)}
+                    onClick={() => {
+                      setIsEditingProfile(false);
+                      profileForm.reset({ name: user?.name || '' });
+                    }}
                     className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted/50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={savingProfile}
+                    disabled={savingProfile || profileForm.formState.isSubmitting}
                     className="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                   >
                     {savingProfile && <Loader2 size={14} className="animate-spin" />}
@@ -520,7 +563,7 @@ export default function SettingsPage() {
               type="button"
               onClick={() => {
                 setShowDeleteConfirm(true);
-                setPassword('');
+                deleteForm.reset({ password: '' });
               }}
               className="w-full shrink-0 rounded-xl border border-destructive/30 bg-background px-4 py-2.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all shadow-sm active:scale-95"
             >
@@ -538,10 +581,7 @@ export default function SettingsPage() {
             onClick={() => (deletingData || verifying ? null : setShowDeleteConfirm(false))}
           />
           <form
-            onSubmit={e => {
-              e.preventDefault();
-              handleDeleteAllData();
-            }}
+            onSubmit={deleteForm.handleSubmit(onDeleteSubmit)}
             className="relative z-50 w-full max-w-sm rounded-2xl border border-destructive/30 bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           >
             <button
@@ -564,13 +604,19 @@ export default function SettingsPage() {
             </p>
 
             <input
+              {...deleteForm.register('password')}
               type="password"
               placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-border bg-muted/50 px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-destructive/50"
+              className={`w-full rounded-xl border bg-muted/50 px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-destructive/50 ${
+                deleteForm.formState.errors.password ? 'border-destructive' : 'border-border'
+              }`}
               autoFocus
             />
+            {deleteForm.formState.errors.password && (
+              <span className="text-destructive text-xs font-bold block mt-1">
+                {deleteForm.formState.errors.password.message}
+              </span>
+            )}
 
             <div className="mt-6 flex justify-end gap-2">
               <button
@@ -583,7 +629,7 @@ export default function SettingsPage() {
               </button>
               <button
                 type="submit"
-                disabled={deletingData || verifying || !password}
+                disabled={deletingData || verifying || deleteForm.formState.isSubmitting}
                 className="inline-flex items-center gap-2 rounded-xl bg-destructive px-3 py-2 text-xs font-bold text-destructive-foreground hover:opacity-90 disabled:opacity-60"
               >
                 {deletingData || verifying ? <Loader2 className="h-3 w-3 animate-spin" /> : null}

@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { supabase } from '../../lib/supabase/client';
 import { accountsApi, type Transaction } from '../../lib/api/client';
+import { getCachedData, setCachedData } from '../../lib/utils/cache';
 
 function firstNameFromDisplayName(value: string): string {
   const cleaned = value.trim().replace(/\s+/g, ' ');
@@ -34,7 +35,7 @@ type CategoryStat = {
   color: string;
 };
 
-const OVERVIEW_CACHE_TTL_MS = 60 * 1000;
+const OVERVIEW_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export default function OverviewPage() {
   const router = useRouter();
@@ -61,20 +62,12 @@ export default function OverviewPage() {
       setDisplayName(firstNameFromDisplayName(fullName || fallbackName));
 
       const cacheKey = `overview-cache:${user.id}`;
-      const cachedRaw = sessionStorage.getItem(cacheKey);
-      if (cachedRaw) {
-        try {
-          const cached = JSON.parse(cachedRaw) as {
-            timestamp: number;
-            rows: Transaction[];
-          };
-          if (Date.now() - cached.timestamp < OVERVIEW_CACHE_TTL_MS) {
-            setData(cached.rows);
-            setLoading(false);
-          }
-        } catch {
-          // Ignore bad cache and continue.
-        }
+      const cachedData = getCachedData<Transaction[]>(cacheKey, OVERVIEW_CACHE_TTL_MS);
+
+      if (cachedData) {
+        setData(cachedData);
+        setLoading(false);
+        return;
       }
 
       try {
@@ -87,33 +80,17 @@ export default function OverviewPage() {
           return;
         }
 
-        // Fetch transactions via FastAPI backend
-        const allItems: Transaction[] = [];
-        let cursor: string | undefined;
-        let hasMore = true;
-        const MAX_PAGES = 50; // Guard: cap at 5,000 transactions (50 × 100)
-        let pagesFetched = 0;
-
-        // Paginate to get all transactions (overview needs all for calculations)
-        while (hasMore && pagesFetched < MAX_PAGES) {
-          const response = await accountsApi.getTransactions(session.access_token, {
-            limit: 100,
-            cursor,
-          });
-          allItems.push(...response.items);
-          hasMore = response.has_more && !!response.next_cursor;
-          cursor = response.next_cursor ?? undefined;
-          pagesFetched++;
-        }
+        // Fetch last-30-days transactions for overview charts (scoped to reduce payload)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const response = await accountsApi.getTransactions(session.access_token, {
+          limit: 500,
+          date_from: thirtyDaysAgo.toISOString().split('T')[0],
+        });
+        const allItems: Transaction[] = response.items;
 
         setData(allItems);
-        sessionStorage.setItem(
-          cacheKey,
-          JSON.stringify({
-            timestamp: Date.now(),
-            rows: allItems,
-          })
-        );
+        setCachedData(cacheKey, allItems);
       } catch (err) {
         console.error('Error fetching transactions:', err);
         setError('Unable to load financial data.');
@@ -369,7 +346,7 @@ export default function OverviewPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex h-full flex-col gap-6 overflow-hidden p-1 transition-colors duration-300"
+      className="flex flex-col gap-6 p-1 transition-colors duration-300"
     >
       <motion.div
         variants={itemVariants}
@@ -516,7 +493,7 @@ export default function OverviewPage() {
                     No data
                   </p>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={120} minWidth={1}>
                     <PieChart>
                       <Pie
                         data={topCategories}
@@ -633,8 +610,8 @@ export default function OverviewPage() {
               </div>
             </div>
 
-            <div className="flex-1 w-full min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ width: '100%', height: '300px' }}>
+              <ResponsiveContainer width="100%" height={300} minWidth={1}>
                 <BarChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">

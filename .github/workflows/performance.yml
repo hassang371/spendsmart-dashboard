@@ -25,7 +25,7 @@ jobs:
       - name: Run local test server (if default)
         if: ${{ inputs.target_url == '' || github.event_name == 'schedule' }}
         run: |
-          docker compose up -d db redis api
+          docker compose up -d redis api
           sleep 15 # Wait for services to be ready
           API_URL=http://localhost:8000 k6 run tests/performance/load_test.js
 

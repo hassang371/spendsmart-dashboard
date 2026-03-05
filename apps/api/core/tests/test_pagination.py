@@ -63,9 +63,9 @@ class TestPaginationParams:
         assert params.limit == 25
 
     def test_max_limit_enforced(self):
-        """Limit above 100 should be capped at 100."""
+        """Limit above 500 should be capped at 500."""
         params = PaginationParams(limit=999)
-        assert params.limit == 100
+        assert params.limit == 500
 
     def test_min_limit_enforced(self):
         """Limit below 1 should be raised to 1."""

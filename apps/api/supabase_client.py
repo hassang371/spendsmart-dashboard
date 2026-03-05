@@ -25,7 +25,7 @@ def get_supabase_client(access_token: str | None = None) -> Client:
     client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
     if access_token:
-        # Override the session so PostgREST uses this user's JWT
-        client.auth.set_session(access_token, "")
+        # Set JWT on the PostgREST client directly — no network call, RLS enforced
+        client.postgrest.auth(access_token)
 
     return client

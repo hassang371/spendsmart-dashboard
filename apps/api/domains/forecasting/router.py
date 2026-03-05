@@ -14,7 +14,7 @@ import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from supabase import Client
 
-from apps.api.core.auth import get_user_client
+from apps.api.core.auth import get_current_user_id, get_user_client
 from packages.forecasting.dataset import TransactionLoader
 from packages.forecasting.inference import load_model, predict_with_tft
 from packages.ingestion_engine.import_transactions import parse_file
@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 @router.post("/predict")
 async def forecast_predict(
     file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
     """Accept a CSV of transactions and return predicted spending.
@@ -42,12 +43,6 @@ async def forecast_predict(
         and "text" not in file.content_type
     ):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
-
-    # Auth check first — fail fast before reading file
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-    user_id = user_response.user.id
 
     contents = await file.read()
     file_hash = hashlib.sha256(contents).hexdigest()
@@ -113,13 +108,11 @@ async def forecast_predict(
 
 
 @router.get("/safe-to-spend")
-async def safe_to_spend(client: Client = Depends(get_user_client)):
+async def safe_to_spend(
+    user_id: str = Depends(get_current_user_id),
+    client: Client = Depends(get_user_client),
+):
     """Returns predicted safe-to-spend amount for the authenticated user."""
-    # Auth check first — extract user_id once for all downstream use
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-    user_id = user_response.user.id
 
     horizon = 7
     lookback_days = 90
@@ -131,6 +124,7 @@ async def safe_to_spend(client: Client = Depends(get_user_client)):
             .select("transaction_date, amount, status")
             .gte("transaction_date", cutoff)
             .order("transaction_date", desc=False)
+            .limit(5000)
             .execute()
         )
         rows = response.data

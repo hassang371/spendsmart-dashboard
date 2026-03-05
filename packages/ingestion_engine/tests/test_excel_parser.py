@@ -99,9 +99,14 @@ def test_parse_encrypted_excel(mock_read_excel, mock_msoffcrypto, mock_excel_dat
     assert df.iloc[1]["description"] == "SALARY"
 
 
-def test_encrypted_file_without_password_raises():
-    """OLE2 file without password should immediately raise 'Password required'."""
-    with pytest.raises(ValueError, match="Password required"):
+@patch("packages.ingestion_engine.excel_parser.msoffcrypto")
+def test_encrypted_file_without_password_raises(mock_msoffcrypto):
+    """OLE2 file without password should immediately raise 'password-protected' error."""
+    mock_file = MagicMock()
+    mock_file.is_encrypted.return_value = True
+    mock_msoffcrypto.OfficeFile.return_value = mock_file
+    
+    with pytest.raises(ValueError, match="password-protected"):
         parse_excel_transaction_file(_FAKE_ENCRYPTED, password=None)
 
 

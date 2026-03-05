@@ -1,17 +1,16 @@
 """Tests for the ingestion domain router — CSV upload flow.
 
-Migrated from apps/api/tests/test_ingestion.py to test the new domain router.
+v2: Uses TransactionClassifier (MiniLM + Cosine Similarity).
 """
 
 import io
-import torch
 import pytest
 from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.domains.ingestion.router import router
-from apps.api.core.auth import get_user_client
+from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 
 @pytest.fixture
@@ -23,15 +22,18 @@ def app():
 
 @pytest.fixture(autouse=True)
 def mock_classifier(monkeypatch):
-    """Mock HypCDClassifier to avoid loading the full model."""
+    """Mock TransactionClassifier to avoid loading the MiniLM model."""
 
     class MockClassifier:
         def predict_batch(self, texts):
-            return [("Food", 0.8, torch.zeros(1, 384)) for _ in texts]
+            return [{"category": "Dining", "confidence": 0.8} for _ in texts]
+
+        def predict(self, text):
+            return {"category": "Dining", "confidence": 0.8}
 
     monkeypatch.setattr(
-        "apps.api.domains.ingestion.router.get_classifier",
-        lambda: MockClassifier(),
+        "apps.api.domains.categorization.service._classifier",
+        MockClassifier(),
         raising=False,
     )
 
@@ -48,6 +50,8 @@ def mock_user_client():
 @pytest.fixture
 def client(app, mock_user_client):
     app.dependency_overrides[get_user_client] = lambda: mock_user_client
+    app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="test-user-id", email=None)
     c = TestClient(app)
     yield c
     app.dependency_overrides.clear()

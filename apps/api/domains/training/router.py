@@ -1,7 +1,7 @@
-"""Training router — upload, train, status, checkpoints.
+"""Training router — upload, train adapter, status, checkpoints.
 
-Migrated from routers/training.py. Uses new unified fingerprint and
-core auth module.
+v2: Trains user's Linear Adapter from categorized transactions,
+not the full HypCD pipeline. The frozen MiniLM base model is never retrained.
 """
 
 import hashlib
@@ -12,9 +12,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from supabase import Client
 from typing import Optional
 
-from apps.api.core.auth import get_user_client
+from apps.api.core.auth import get_current_user_id, get_user_client
 from apps.api.domains.ingestion.service import generate_fingerprint
-from apps.api.tasks.training_tasks import train_model_task
+from apps.api.tasks.training_tasks import train_adapter_task
 from packages.ingestion_engine.import_transactions import parse_file
 
 router = APIRouter(prefix="/training", tags=["training"])
@@ -67,16 +67,12 @@ def prepare_transaction_payload(row, user_id: str) -> dict:
 async def upload_training_data(
     file: UploadFile = File(...),
     password: Optional[str] = Form(None),
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
-    """Upload transaction file, ingest into DB, and trigger training."""
+    """Upload transaction file, ingest into DB, and trigger adapter training."""
     contents = await file.read()
     file_hash = hashlib.sha256(contents).hexdigest()
-
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-    user_id = user_response.user.id
 
     # Check duplicates
     try:
@@ -169,17 +165,13 @@ async def upload_training_data(
 @router.get("/status/{job_id}")
 async def get_training_status(
     job_id: str,
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
     """Get training job status by ID.
 
     Only returns the job if it belongs to the authenticated user (prevents IDOR).
     """
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-
-    user_id = user_response.user.id
 
     try:
         res = (
@@ -201,17 +193,16 @@ async def get_training_status(
 
 
 @router.get("/latest")
-async def get_latest_training_job(client: Client = Depends(get_user_client)):
+async def get_latest_training_job(
+    user_id: str = Depends(get_current_user_id),
+    client: Client = Depends(get_user_client),
+):
     """Get the latest training job for the current user."""
     try:
-        user_response = client.auth.get_user()
-        if not user_response or not user_response.user:
-            raise HTTPException(status_code=401, detail="Invalid bearer token")
-
         res = (
             client.table("training_jobs")
             .select("*")
-            .eq("user_id", user_response.user.id)
+            .eq("user_id", user_id)
             .order("created_at", desc=True)
             .limit(1)
             .execute()
@@ -223,53 +214,51 @@ async def get_latest_training_job(client: Client = Depends(get_user_client)):
 
 
 @router.post("/train")
-async def train_model_async(
-    epochs: int = 10,
-    batch_size: int = 32,
-    learning_rate: float = 1e-4,
+async def train_adapter_async(
+    epochs: int = 5,
+    learning_rate: float = 1e-3,
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
-    """Start async training job. Returns immediately with job_id."""
-    try:
-        user_response = client.auth.get_user()
-        if not user_response or not user_response.user:
-            raise HTTPException(status_code=401, detail="Invalid bearer token")
-        user_id = user_response.user.id
+    """Start async adapter training job. Returns immediately with job_id.
 
+    v2: Trains the user's Linear Adapter from categorized transactions.
+    The frozen MiniLM base model is never retrained.
+    """
+    try:
+        # Fetch user's manually categorized transactions
         res = (
             client.table("transactions")
             .select("description, category")
             .eq("user_id", user_id)
-            .not_.is_("category", None)
+            .eq("is_manual", True)
+            .limit(10000)
             .execute()
         )
 
-        if not res.data or len(res.data) < 10:
+        if not res.data or len(res.data) < 5:
             raise HTTPException(
                 status_code=400,
-                detail="Need at least 10 labeled transactions for training.",
+                detail="Need at least 5 manually categorized transactions for adapter training.",
             )
 
         texts = [tx["description"] for tx in res.data]
-        from packages.categorization.constants import CATEGORIES
-        category_to_idx = {cat: idx for idx, cat in enumerate(CATEGORIES)}
-        labels = [category_to_idx.get(tx["category"], 0) for tx in res.data]
+        categories = [tx["category"] for tx in res.data]
 
         job_data = {
             "user_id": user_id,
             "status": "pending",
-            "logs": f"Queued training with {len(res.data)} samples...",
+            "logs": f"Queued adapter training with {len(res.data)} samples...",
         }
         job_res = client.table("training_jobs").insert(job_data).execute()
         job_id = job_res.data[0]["id"]
 
-        task = train_model_task.delay(
+        task = train_adapter_task.delay(
             texts=texts,
-            labels=labels,
+            categories=categories,
             user_id=user_id,
             job_id=job_id,
             epochs=epochs,
-            batch_size=batch_size,
             learning_rate=learning_rate,
         )
 
@@ -280,7 +269,7 @@ async def train_model_async(
 
         return {
             "status": "queued",
-            "message": f"Training job queued with {len(res.data)} samples",
+            "message": f"Adapter training job queued with {len(res.data)} samples",
             "job_id": job_id,
             "task_id": task.id,
             "epochs": epochs,

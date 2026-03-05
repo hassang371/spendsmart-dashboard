@@ -40,7 +40,13 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase/client';
-import { accountsApi, categorizationApi, ingestionApi, type UncategorizedTransaction } from '../../../lib/api/client';
+import {
+  accountsApi,
+  categorizationApi,
+  ingestionApi,
+  type TransactionCountsResponse,
+  type UncategorizedTransaction,
+} from '../../../lib/api/client';
 
 type TransactionRow = {
   id: string;
@@ -49,9 +55,10 @@ type TransactionRow = {
   amount: number;
   description: string;
   category: string;
-  original_category?: string | null;
   suggested_category?: string | null;
   confidence_score?: number | null;
+  informative_text?: string | null;
+  bank_name?: string | null;
   payment_method: string;
   merchant_name: string;
   status: string;
@@ -111,9 +118,9 @@ const monthLookup: Record<string, number> = {
   dec: 11,
 };
 
-const TRANSACTIONS_CACHE_TTL_MS = 60 * 1000;
-const INITIAL_VISIBLE_COUNT = 50;
-const LOAD_MORE_STEP = 50;
+const TRANSACTIONS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const UNCATEGORIZED_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const PAGE_SIZE = 100;
 
 function normalizeStatus(value: string): string {
   const status = value.trim().toLowerCase();
@@ -253,7 +260,8 @@ export default function TransactionsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const categoryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Suppresses the length-change scroll-to-top when Load More appends rows
+  const suppressScrollRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -286,11 +294,13 @@ export default function TransactionsPage() {
   const [savingReviewId, setSavingReviewId] = useState<string | null>(null);
   const [consumedOpenTxId, setConsumedOpenTxId] = useState<string | null>(null);
   const [spotlightTxId, setSpotlightTxId] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [serverCounts, setServerCounts] = useState<TransactionCountsResponse | null>(null);
 
-  // Reset pagination when filters change
+  // Scroll to top when filters/tab change
   useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE_COUNT);
     listRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [tab, search, filters]);
 
@@ -312,7 +322,12 @@ export default function TransactionsPage() {
   }, [tab]);
 
   // After refetch/import, reset list viewport so rows are visible immediately.
+  // Suppressed when Load More appends rows (suppressScrollRef guards that case).
   useEffect(() => {
+    if (suppressScrollRef.current) {
+      suppressScrollRef.current = false;
+      return;
+    }
     const frame = requestAnimationFrame(() => {
       if (listRef.current) {
         listRef.current.scrollTop = 0;
@@ -348,6 +363,25 @@ export default function TransactionsPage() {
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [isFilterOpen, editingCategoryTxId]);
 
+  const mapItem = (item: Record<string, any>): TransactionRow => ({
+    id: item.id,
+    user_id: item.user_id,
+    transaction_date: item.transaction_date || new Date().toISOString(),
+    amount: item.amount,
+    description: item.description || 'Imported transaction',
+    merchant_name: item.merchant_name || 'Unknown Merchant',
+    category: item.category || 'Uncategorized',
+    suggested_category: item.suggested_category,
+    confidence_score: item.confidence_score,
+    informative_text: item.informative_text,
+    bank_name: item.bank_name,
+    payment_method: item.payment_method || 'Cash',
+    status: item.status || 'completed',
+    type: item.type || (item.amount >= 0 ? 'credit' : 'debit'),
+    created_at: item.created_at || new Date().toISOString(),
+    raw_data: item.raw_data as Record<string, any>,
+  });
+
   const fetchTransactions = useCallback(async () => {
     const {
       data: { user },
@@ -361,7 +395,6 @@ export default function TransactionsPage() {
 
     setUserId(user.id);
 
-    // Get auth token
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -371,73 +404,176 @@ export default function TransactionsPage() {
     }
 
     const cacheKey = `transactions-cache:${user.id}`;
-    const cachedRaw = sessionStorage.getItem(cacheKey);
+    const cachedRaw = localStorage.getItem(cacheKey);
     if (cachedRaw) {
       try {
-        const cached = JSON.parse(cachedRaw) as { timestamp: number; rows: TransactionRow[] };
+        const cached = JSON.parse(cachedRaw) as {
+          timestamp: number;
+          rows: TransactionRow[];
+          nextCursor?: string;
+          hasMore?: boolean;
+          counts?: TransactionCountsResponse;
+        };
         if (
           Date.now() - cached.timestamp < TRANSACTIONS_CACHE_TTL_MS &&
           Array.isArray(cached.rows)
         ) {
           setTransactions(cached.rows);
+          setNextCursor(cached.nextCursor);
+          setHasMore(cached.hasMore ?? false);
+          if (cached.counts) setServerCounts(cached.counts);
           setLoading(false);
+          return;
         }
       } catch {
         // ignore JSON parse error
       }
     }
 
-    // Fetch all transactions via FastAPI backend with pagination
-    const allItems: TransactionRow[] = [];
-    let cursor: string | undefined;
-    let hasMore = true;
+    // Fetch first page only — user loads more on demand
+    const response = await accountsApi.getTransactions(session.access_token, {
+      limit: PAGE_SIZE,
+    });
+    const rows = response.items.map(mapItem);
 
-    while (hasMore) {
-      const response = await accountsApi.getTransactions(session.access_token, {
-        limit: 100,
-        cursor,
-      });
-      // Map API response items to TransactionRow
-      for (const item of response.items) {
-        allItems.push({
-          id: item.id,
-          user_id: item.user_id,
-          transaction_date: item.transaction_date || new Date().toISOString(),
-          amount: item.amount,
-          description: item.description || 'Imported transaction',
-          merchant_name: item.merchant_name || 'Unknown Merchant',
-          category: item.category || 'Uncategorized',
-          original_category: item.original_category,
-          payment_method: item.payment_method || 'Cash',
-          status: item.status || 'completed',
-          type: item.type || (item.amount >= 0 ? 'credit' : 'debit'),
-          created_at: item.created_at || new Date().toISOString(),
-          raw_data: item.raw_data as Record<string, any>,
-        });
-      }
-      hasMore = response.has_more;
-      cursor = response.next_cursor ?? undefined;
-    }
-
-    setTransactions(allItems);
-    sessionStorage.setItem(
+    setTransactions(rows);
+    setNextCursor(response.next_cursor ?? undefined);
+    setHasMore(response.has_more);
+    localStorage.setItem(
       cacheKey,
       JSON.stringify({
         timestamp: Date.now(),
-        rows: allItems,
+        rows,
+        nextCursor: response.next_cursor ?? undefined,
+        hasMore: response.has_more,
       })
     );
   }, [router]);
 
-  const fetchUncategorized = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+  const fetchMoreTransactions = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session?.access_token) return;
+
+    setLoadingMore(true);
+    try {
+      const response = await accountsApi.getTransactions(session.access_token, {
+        limit: PAGE_SIZE,
+        cursor: nextCursor,
+      });
+      const newRows = response.items.map(mapItem);
+
+      suppressScrollRef.current = true; // keep scroll position after appending
+      setTransactions(prev => {
+        const combined = [...prev, ...newRows];
+        if (userId) {
+          const ck = `transactions-cache:${userId}`;
+          // Preserve existing cached counts so they survive Load More rewrites
+          let existingCounts: TransactionCountsResponse | undefined;
+          try {
+            const ex = localStorage.getItem(ck);
+            if (ex) existingCounts = (JSON.parse(ex) as any).counts;
+          } catch {
+            /* ignore */
+          }
+          localStorage.setItem(
+            ck,
+            JSON.stringify({
+              timestamp: Date.now(),
+              rows: combined,
+              nextCursor: response.next_cursor ?? undefined,
+              hasMore: response.has_more,
+              ...(existingCounts ? { counts: existingCounts } : {}),
+            })
+          );
+        }
+        return combined;
+      });
+      setNextCursor(response.next_cursor ?? undefined);
+      setHasMore(response.has_more);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, userId]);
+
+  const fetchTotalCounts = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+
+    const cacheKey = `transactions-cache:${user.id}`;
+
+    // Use cached counts if still within TTL
+    const cachedRaw = localStorage.getItem(cacheKey);
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as {
+          timestamp: number;
+          counts?: TransactionCountsResponse;
+        };
+        if (Date.now() - cached.timestamp < TRANSACTIONS_CACHE_TTL_MS && cached.counts) {
+          setServerCounts(cached.counts);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    try {
+      const counts = await accountsApi.getTransactionCounts(session.access_token);
+      setServerCounts(counts);
+      // Merge counts into the existing cache entry so the next navigation is free
+      const existing = localStorage.getItem(cacheKey);
+      if (existing) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ ...JSON.parse(existing), counts }));
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      // non-critical — tab headers fall back to local counts
+    }
+  }, []);
+
+  const fetchUncategorized = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+
+    const cacheKey = `uncategorized-cache:${session.user.id}`;
+    const cachedRaw = localStorage.getItem(cacheKey);
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as {
+          timestamp: number;
+          items: UncategorizedTransaction[];
+        };
+        if (Date.now() - cached.timestamp < UNCATEGORIZED_CACHE_TTL_MS) {
+          setUncategorized(cached.items);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     setLoadingUncategorized(true);
     try {
       const res = await accountsApi.getUncategorized(session.access_token, 200);
       setUncategorized(res.items);
+      localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: res.items }));
     } catch {
-      // silently ignore — badge disappears if offline
+      // silently ignore
     } finally {
       setLoadingUncategorized(false);
     }
@@ -449,46 +585,62 @@ export default function TransactionsPage() {
   }, [tab, fetchUncategorized]);
 
   const handleReviewSave = async (tx: UncategorizedTransaction, category: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session?.access_token) return;
     setSavingReviewId(tx.id);
 
-    // Optimistic: remove all transactions from the same merchant immediately
+    // Optimistic: remove all transactions from the same merchant from review list
     const merchantKey = tx.merchant_name || tx.description;
     setUncategorized(prev => prev.filter(t => (t.merchant_name || t.description) !== merchantKey));
+
+    // Optimistic: update matching transactions in the All tab state too
+    setTransactions(prev =>
+      prev.map(t =>
+        (t.merchant_name || t.description) === merchantKey && t.category === 'Uncategorized'
+          ? { ...t, category }
+          : t
+      )
+    );
     setReviewEditId(null);
 
     try {
-      await accountsApi.updateTransaction(tx.id, { category, old_category: 'Uncategorized' }, session.access_token);
+      await accountsApi.updateTransaction(
+        tx.id,
+        { category, old_category: 'Uncategorized' },
+        session.access_token
+      );
       setMessage('Category saved.');
+      // Invalidate caches so next navigation picks up server state
+      if (userId) {
+        localStorage.removeItem(`transactions-cache:${userId}`);
+        localStorage.removeItem(`uncategorized-cache:${userId}`);
+      }
+      fetchTransactions();
     } catch (e) {
-      // Revert by re-fetching
+      // Revert both states by re-fetching
       fetchUncategorized();
+      fetchTransactions();
       setError(e instanceof Error ? e.message : 'Failed to save category.');
     } finally {
       setSavingReviewId(null);
     }
   };
 
-  // Poll for category updates after import — background classification takes a few seconds.
-  // Stops after 15 polls (30s) or on unmount.
-  const startCategoryPolling = useCallback(() => {
-    if (categoryPollRef.current) clearInterval(categoryPollRef.current);
-    let polls = 0;
-    categoryPollRef.current = setInterval(async () => {
-      polls++;
-      await fetchTransactions();
-      if (polls >= 15) {
-        clearInterval(categoryPollRef.current!);
-        categoryPollRef.current = null;
-      }
-    }, 2000);
-  }, [fetchTransactions]);
-
-  // Cleanup poll on unmount
-  useEffect(() => () => {
-    if (categoryPollRef.current) clearInterval(categoryPollRef.current);
-  }, []);
+  // After import: refresh once at 4s and once at 10s to pick up background classification
+  const refreshAfterImport = useCallback(() => {
+    [4000, 10000].forEach(delay =>
+      setTimeout(() => {
+        if (userId) {
+          localStorage.removeItem(`transactions-cache:${userId}`);
+          localStorage.removeItem(`uncategorized-cache:${userId}`);
+        }
+        fetchTransactions();
+        fetchTotalCounts(); // also refresh Review badge count after classification
+      }, delay)
+    );
+  }, [fetchTransactions, fetchTotalCounts, userId]);
 
   useEffect(() => {
     let mounted = true;
@@ -504,6 +656,8 @@ export default function TransactionsPage() {
     (async () => {
       try {
         await fetchTransactions();
+        // Fetch server-side total counts in background (non-blocking for main UI)
+        fetchTotalCounts();
       } catch (fetchError) {
         if (mounted) {
           setError(
@@ -520,7 +674,7 @@ export default function TransactionsPage() {
       mounted = false;
       clearTimeout(spinnerGuard);
     };
-  }, [fetchTransactions]);
+  }, [fetchTransactions, fetchTotalCounts]);
 
   const categories = useMemo(() => {
     const values = new Set<string>();
@@ -532,19 +686,39 @@ export default function TransactionsPage() {
 
   const categoryOptions = useMemo(() => {
     const defaults = [
+      'Bank Fees',
+      'Clothing & Fashion',
+      'Coffee & Snacks',
+      'Electricity & Water',
+      'Electronics',
+      'Fitness',
+      'Flights',
       'Food',
-      'Grocery',
-      'Shopping',
-      'Transport',
-      'Utilities',
+      'Fuel',
+      'Gaming',
+      'General Retail',
+      'Groceries',
+      'Home Maintenance',
+      'Hotels & Stays',
+      'Insurance',
+      'Interest',
+      'Internet & Phone',
+      'Investments',
+      'Loan EMI',
+      'Medical',
+      'Movies & Events',
+      'Pharmacy',
+      'Public Transit',
+      'Received from People',
+      'Refunds',
+      'Rent & Mortgage',
+      'Salary',
       'Subscriptions',
-      'Healthcare',
-      'Education',
-      'Entertainment',
-      'Finance',
-      'Income',
-      'People',
-      'Misc',
+      'Taxes',
+      'Taxi & Rideshare',
+      'Transfers to People',
+      'Travel Booking',
+      'Uncategorized',
     ];
     const set = new Set(defaults);
     for (const tx of transactions) {
@@ -604,11 +778,15 @@ export default function TransactionsPage() {
     });
   }, [transactions, search, filters]);
 
+  // tabCounts: server totals when loaded, otherwise local fallback (grows with Load More)
   const tabCounts = useMemo(() => {
+    if (serverCounts) {
+      return { all: serverCounts.all, debit: serverCounts.debit, credit: serverCounts.credit };
+    }
     const debit = filteredBase.filter(tx => Number(tx.amount) < 0).length;
     const credit = filteredBase.filter(tx => Number(tx.amount) >= 0).length;
     return { all: filteredBase.length, debit, credit };
-  }, [filteredBase]);
+  }, [serverCounts, filteredBase]);
 
   const filteredTransactions = useMemo(() => {
     if (tab === 'debit') return filteredBase.filter(tx => Number(tx.amount) < 0);
@@ -645,25 +823,6 @@ export default function TransactionsPage() {
       })
       .sort((a, b) => (a.year !== b.year ? b.year - a.year : b.month - a.month));
   }, [filteredTransactions]);
-
-  const visibleGroups = useMemo(() => {
-    let currentCount = 0;
-    const result = [];
-
-    for (const group of groupedTransactions) {
-      if (currentCount >= visibleCount) break;
-
-      const remaining = visibleCount - currentCount;
-      if (remaining >= group.rows.length) {
-        result.push(group);
-        currentCount += group.rows.length;
-      } else {
-        result.push({ ...group, rows: group.rows.slice(0, remaining) });
-        currentCount += remaining;
-      }
-    }
-    return result;
-  }, [groupedTransactions, visibleCount]);
 
   // Deduplicate uncategorized by merchant_name — show one row per merchant
   const distinctUncategorized = useMemo(() => {
@@ -747,11 +906,10 @@ export default function TransactionsPage() {
       newAmount = -Math.abs(currentAmount);
     }
 
-    const updates: { category: string; amount?: number; original_category?: string; old_category?: string } = {
+    const updates: { category: string; amount?: number; old_category?: string } = {
       category: editingCategoryValue,
       old_category: oldCategory,
     };
-    if (!tx.original_category) updates.original_category = oldCategory;
     if (newAmount !== currentAmount) updates.amount = newAmount;
 
     // Optimistic update: close editor immediately and update this tx + all same-merchant same-category txs
@@ -768,6 +926,8 @@ export default function TransactionsPage() {
     try {
       await accountsApi.updateTransaction(txId, updates, accessToken);
       setMessage('Category updated.');
+      // Invalidate cache so fetchTransactions fetches fresh data (not cached stale rows)
+      if (userId) localStorage.removeItem(`transactions-cache:${userId}`);
       // Refresh in background to sync any additional batch updates from server
       fetchTransactions();
 
@@ -781,7 +941,11 @@ export default function TransactionsPage() {
       setTransactions(prev =>
         prev.map(t => {
           if (t.id === txId) return { ...t, category: oldCategory, amount: currentAmount };
-          if (merchantName && t.merchant_name === merchantName && t.category === editingCategoryValue)
+          if (
+            merchantName &&
+            t.merchant_name === merchantName &&
+            t.category === editingCategoryValue
+          )
             return { ...t, category: oldCategory };
           return t;
         })
@@ -828,6 +992,10 @@ export default function TransactionsPage() {
     // Send file to backend — it handles ALL parsing, classification, dedup, and insertion
     const result = await ingestionApi.importFile(file, accessToken, password);
 
+    // Clear local caches so that immediately subsequent UI fetch requests retrieve fresh data
+    localStorage.removeItem(`transactions-cache:${userId}`);
+    localStorage.removeItem(`uncategorized-cache:${userId}`);
+
     setImportProgress(100);
     return result.inserted;
   };
@@ -849,13 +1017,14 @@ export default function TransactionsPage() {
     try {
       const count = await handleDataImport(file);
       await fetchTransactions();
+      fetchTotalCounts();
       setTab('all');
       listRef.current?.scrollTo({ top: 0, behavior: 'auto' });
       setMessage(`Imported ${count} transactions from ${file.name}.`);
       setSaving(false);
       setImportProgress(null);
       event.target.value = '';
-      if (count > 0) startCategoryPolling();
+      if (count > 0) refreshAfterImport();
     } catch (importError) {
       const msg = importError instanceof Error ? importError.message : 'Import failed.';
 
@@ -863,7 +1032,9 @@ export default function TransactionsPage() {
       setImportProgress(null);
 
       if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('encrypted')) {
-        // Password modal is already open from handleDataImport
+        // Prompt user for password and retry
+        setPendingFile(file);
+        setIsPasswordModalOpen(true);
         event.target.value = '';
       } else {
         setError(msg);
@@ -890,8 +1061,9 @@ export default function TransactionsPage() {
     try {
       const count = await handleDataImport(file, password);
       await fetchTransactions();
+      fetchTotalCounts();
       setMessage(`Imported ${count} transactions.`);
-      if (count > 0) startCategoryPolling();
+      if (count > 0) refreshAfterImport();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Import failed');
     } finally {
@@ -1083,15 +1255,17 @@ export default function TransactionsPage() {
               )}
               <span className="relative z-10 flex items-center gap-2">
                 Review
-                {distinctUncategorized.length > 0 && (
+                {(distinctUncategorized.length > 0 ||
+                  (serverCounts?.uncategorized ? serverCounts.uncategorized > 0 : false)) && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold">
-                    {distinctUncategorized.length}
+                    {distinctUncategorized.length > 0
+                      ? distinctUncategorized.length
+                      : serverCounts?.uncategorized}
                   </span>
                 )}
               </span>
             </button>
           </div>
-
         </div>
 
         <AnimatePresence>
@@ -1305,15 +1479,39 @@ export default function TransactionsPage() {
                 {distinctUncategorized.map(({ tx, count }) => {
                   const amount = Number(tx.amount || 0);
                   const isCredit = amount >= 0;
-                  const confidencePct = tx.confidence_score != null
-                    ? Math.round(tx.confidence_score * 100)
-                    : null;
+                  const confidencePct =
+                    tx.confidence_score != null ? Math.round(tx.confidence_score * 100) : null;
                   const isEditing = reviewEditId === tx.id;
                   const isSaving = savingReviewId === tx.id;
 
                   return (
-                    <div key={tx.id} className="flex items-center justify-between px-6 py-4 hover:bg-muted/20 transition-colors">
-                      <div className="flex items-center gap-5 min-w-0 flex-1">
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between px-6 py-4 hover:bg-muted/20 transition-colors"
+                    >
+                      <div
+                        className="flex items-center gap-5 min-w-0 flex-1 cursor-pointer"
+                        onClick={() =>
+                          setSelected({
+                            id: tx.id,
+                            user_id: '',
+                            transaction_date: tx.transaction_date,
+                            amount: tx.amount,
+                            description: tx.description,
+                            merchant_name: tx.merchant_name,
+                            category: tx.category,
+                            suggested_category: tx.suggested_category,
+                            confidence_score: tx.confidence_score,
+                            payment_method: tx.payment_method,
+                            status: 'completed',
+                            type: tx.type,
+                            created_at: tx.created_at,
+                            raw_data: tx.raw_data as Record<string, any> | undefined,
+                            informative_text: tx.informative_text,
+                            bank_name: tx.bank_name,
+                          })
+                        }
+                      >
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20">
                           <HelpCircle className="h-5 w-5 text-amber-400" />
                         </div>
@@ -1341,7 +1539,9 @@ export default function TransactionsPage() {
                                 <span className="text-xs text-amber-400 font-medium">
                                   Suggested: {tx.suggested_category}
                                   {confidencePct !== null && (
-                                    <span className="ml-1 text-muted-foreground">({confidencePct}%)</span>
+                                    <span className="ml-1 text-muted-foreground">
+                                      ({confidencePct}%)
+                                    </span>
                                   )}
                                 </span>
                               </>
@@ -1351,7 +1551,9 @@ export default function TransactionsPage() {
                       </div>
 
                       <div className="flex items-center gap-3 pl-4 shrink-0">
-                        <p className={`font-mono text-base font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <p
+                          className={`font-mono text-base font-bold ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}
+                        >
                           {isCredit ? '+' : ''}₹{Math.abs(amount).toLocaleString('en-IN')}
                         </p>
 
@@ -1364,7 +1566,9 @@ export default function TransactionsPage() {
                               disabled={isSaving}
                             >
                               {categoryOptions.map(opt => (
-                                <option key={opt} value={opt}>{opt}</option>
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
                               ))}
                             </select>
                             <button
@@ -1374,7 +1578,11 @@ export default function TransactionsPage() {
                               className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1 text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-60"
                               title="Save"
                             >
-                              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                              {isSaving ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
                             </button>
                             <button
                               type="button"
@@ -1395,14 +1603,20 @@ export default function TransactionsPage() {
                                 disabled={isSaving}
                                 className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-60"
                               >
-                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin inline" /> : 'Accept'}
+                                {isSaving ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
+                                ) : (
+                                  'Accept'
+                                )}
                               </button>
                             )}
                             <button
                               type="button"
                               onClick={() => {
                                 setReviewEditId(tx.id);
-                                setReviewEditValue(tx.suggested_category || categoryOptions[0] || 'Misc');
+                                setReviewEditValue(
+                                  tx.suggested_category || categoryOptions[0] || 'Misc'
+                                );
                               }}
                               className="rounded-xl border border-border bg-secondary/30 px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                             >
@@ -1421,215 +1635,227 @@ export default function TransactionsPage() {
       )}
 
       {/* Transactions List */}
-      {tab !== 'review' && <div
-        ref={listRef}
-        key={tab}
-        className="min-h-0 flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-6 pb-20"
-      >
-        {visibleGroups.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-20 text-center"
-          >
-            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted/30 border border-border">
-              <Search className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground">No transactions found</h3>
-            <p className="mt-2 text-muted-foreground max-w-sm">
-              Try adjusting your filters or import a new statement to get started.
-            </p>
-            <button onClick={clearFilters} className="mt-6 text-blue-400 font-bold hover:underline">
-              Clear all filters
-            </button>
-          </motion.div>
-        ) : (
-          <>
-            {visibleGroups.map(group => {
-              const headerLabel =
-                tab === 'credit' ? 'Total Credited' : tab === 'debit' ? 'Total Spent' : 'Net Total';
-              const headerValue =
-                tab === 'credit' ? group.credited : tab === 'debit' ? group.spent : group.net;
-              const headerColor =
-                tab === 'credit'
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : tab === 'debit'
-                    ? 'text-red-600 dark:text-red-400'
-                    : headerValue >= 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-red-600 dark:text-red-400';
-
-              return (
-                <div
-                  key={group.key}
-                  className="rounded-[2rem] border border-border bg-card overflow-hidden shadow-lg"
-                >
-                  <div className="flex items-center justify-between bg-muted/30 px-8 py-5 border-b border-border">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-primary/80 mb-0.5">
-                        {group.year}
-                      </p>
-                      <h3 className="text-2xl font-black text-foreground">
-                        {monthName(group.month)}
-                      </h3>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs uppercase font-bold text-muted-foreground mb-0.5">
-                        {headerLabel}
-                      </p>
-                      <p className={`text-2xl font-mono font-bold ${headerColor}`}>
-                        {tab === 'all' && headerValue > 0 ? '+' : ''}
-                        {tab === 'all' && headerValue < 0 ? '-' : ''}₹
-                        {Math.abs(headerValue).toLocaleString('en-IN')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="divide-y divide-border">
-                    {group.rows.map(tx => {
-                      const amount = Number(tx.amount || 0);
-                      const isCredit = amount >= 0;
-                      const status = normalizeStatus(tx.status ?? 'completed');
-                      return (
-                        <motion.div
-                          key={tx.id}
-                          data-tx-row-id={tx.id}
-                          onClick={() => setSelected(tx)}
-                          className={`flex cursor-pointer items-center justify-between px-6 py-4 transition-colors hover:bg-muted/40 group ${
-                            spotlightTxId === tx.id ? 'ring-1 ring-blue-400/50 bg-blue-500/10' : ''
-                          }`}
-                        >
-                          <div className="flex items-center gap-5 min-w-0">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/30 text-xl border border-border/50 group-hover:border-border group-hover:bg-muted/50 transition-colors">
-                              {categoryIcon(tx.category ?? 'Misc')}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-3">
-                                <p className="truncate text-base font-bold text-foreground group-hover:text-primary transition-colors">
-                                  {tx.description || 'Transaction'}
-                                </p>
-                                {status !== 'completed' && (
-                                  <span
-                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-                                      status === 'failed'
-                                        ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                                        : status === 'cancelled'
-                                          ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                          : status === 'refunded'
-                                            ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                                            : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                                    }`}
-                                  >
-                                    {status}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="mt-0.5 flex items-center gap-2">
-                                <p className="text-xs font-medium text-muted-foreground">
-                                  {new Date(tx.transaction_date).toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    weekday: 'short',
-                                  })}
-                                </p>
-                                <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
-                                {editingCategoryTxId === tx.id ? (
-                                  <div
-                                    data-category-editor="true"
-                                    className="flex items-center gap-1"
-                                    onClick={event => event.stopPropagation()}
-                                  >
-                                    <select
-                                      name={`category-edit-${tx.id}`}
-                                      id={`category-edit-${tx.id}`}
-                                      value={editingCategoryValue}
-                                      onChange={event =>
-                                        setEditingCategoryValue(event.target.value)
-                                      }
-                                      className="rounded-lg border border-border bg-secondary/80 px-2 py-1 text-[11px] font-medium text-foreground outline-none"
-                                      disabled={updatingCategory}
-                                    >
-                                      {categoryOptions.map(option => (
-                                        <option key={option} value={option}>
-                                          {option}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <button
-                                      type="button"
-                                      onClick={saveCategoryEdit}
-                                      disabled={updatingCategory}
-                                      className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1 text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-60"
-                                      title="Save category"
-                                    >
-                                      <Check className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingCategoryTxId(null)}
-                                      disabled={updatingCategory}
-                                      className="rounded-md border border-border bg-secondary/50 p-1 text-muted-foreground hover:bg-secondary disabled:opacity-60"
-                                      title="Cancel"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <p className="max-w-[140px] truncate text-xs font-medium text-gray-500">
-                                      {tx.category}
-                                    </p>
-                                    <button
-                                      type="button"
-                                      onClick={event => {
-                                        event.stopPropagation();
-                                        startCategoryEdit(tx);
-                                      }}
-                                      data-category-edit-trigger="true"
-                                      className="rounded-md border border-transparent hover:border-border hover:bg-secondary/50 p-1 text-muted-foreground hover:text-foreground"
-                                      title="Edit category"
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right pl-4">
-                            <p
-                              className={`font-mono text-lg font-bold ${
-                                isCredit
-                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                  : 'text-red-600 dark:text-red-400'
-                              }`}
-                            >
-                              {isCredit ? '+' : ''}₹{Math.abs(amount).toLocaleString('en-IN')}
-                            </p>
-                            <p className="text-[10px] font-bold uppercase text-muted-foreground mt-0.5">
-                              {tx.payment_method}
-                            </p>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-
-            {filteredTransactions.length > visibleCount && (
-              <div className="flex justify-center py-4">
-                <button
-                  onClick={() => setVisibleCount(prev => prev + LOAD_MORE_STEP)}
-                  className="rounded-xl border border-border bg-secondary/50 px-6 py-2 text-sm font-bold text-foreground hover:bg-secondary transition-colors"
-                >
-                  Load More
-                </button>
+      {tab !== 'review' && (
+        <div
+          ref={listRef}
+          key={tab}
+          className="min-h-0 flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-6 pb-20"
+        >
+          {groupedTransactions.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-20 text-center"
+            >
+              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted/30 border border-border">
+                <Search className="h-8 w-8 text-muted-foreground" />
               </div>
-            )}
-          </>
-        )}
-      </div>}
+              <h3 className="text-xl font-bold text-foreground">No transactions found</h3>
+              <p className="mt-2 text-muted-foreground max-w-sm">
+                Try adjusting your filters or import a new statement to get started.
+              </p>
+              <button
+                onClick={clearFilters}
+                className="mt-6 text-blue-400 font-bold hover:underline"
+              >
+                Clear all filters
+              </button>
+            </motion.div>
+          ) : (
+            <>
+              {groupedTransactions.map(group => {
+                const headerLabel =
+                  tab === 'credit'
+                    ? 'Total Credited'
+                    : tab === 'debit'
+                      ? 'Total Spent'
+                      : 'Net Total';
+                const headerValue =
+                  tab === 'credit' ? group.credited : tab === 'debit' ? group.spent : group.net;
+                const headerColor =
+                  tab === 'credit'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : tab === 'debit'
+                      ? 'text-red-600 dark:text-red-400'
+                      : headerValue >= 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400';
+
+                return (
+                  <div
+                    key={group.key}
+                    className="rounded-[2rem] border border-border bg-card overflow-hidden shadow-lg"
+                  >
+                    <div className="flex items-center justify-between bg-muted/30 px-8 py-5 border-b border-border">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-primary/80 mb-0.5">
+                          {group.year}
+                        </p>
+                        <h3 className="text-2xl font-black text-foreground">
+                          {monthName(group.month)}
+                        </h3>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs uppercase font-bold text-muted-foreground mb-0.5">
+                          {headerLabel}
+                        </p>
+                        <p className={`text-2xl font-mono font-bold ${headerColor}`}>
+                          {tab === 'all' && headerValue > 0 ? '+' : ''}
+                          {tab === 'all' && headerValue < 0 ? '-' : ''}₹
+                          {Math.abs(headerValue).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {group.rows.map(tx => {
+                        const amount = Number(tx.amount || 0);
+                        const isCredit = amount >= 0;
+                        const status = normalizeStatus(tx.status ?? 'completed');
+                        return (
+                          <motion.div
+                            key={tx.id}
+                            data-tx-row-id={tx.id}
+                            onClick={() => setSelected(tx)}
+                            className={`flex cursor-pointer items-center justify-between px-6 py-4 transition-colors hover:bg-muted/40 group ${
+                              spotlightTxId === tx.id
+                                ? 'ring-1 ring-blue-400/50 bg-blue-500/10'
+                                : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-5 min-w-0">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/30 text-xl border border-border/50 group-hover:border-border group-hover:bg-muted/50 transition-colors">
+                                {categoryIcon(tx.category ?? 'Misc')}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-3">
+                                  <p className="truncate text-base font-bold text-foreground group-hover:text-primary transition-colors">
+                                    {tx.merchant_name || tx.description || 'Transaction'}
+                                  </p>
+                                  {status !== 'completed' && (
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                                        status === 'failed'
+                                          ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                          : status === 'cancelled'
+                                            ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                            : status === 'refunded'
+                                              ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                              : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                      }`}
+                                    >
+                                      {status}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-2">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {new Date(tx.transaction_date).toLocaleDateString('en-IN', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      weekday: 'short',
+                                    })}
+                                  </p>
+                                  <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                                  {editingCategoryTxId === tx.id ? (
+                                    <div
+                                      data-category-editor="true"
+                                      className="flex items-center gap-1"
+                                      onClick={event => event.stopPropagation()}
+                                    >
+                                      <select
+                                        name={`category-edit-${tx.id}`}
+                                        id={`category-edit-${tx.id}`}
+                                        value={editingCategoryValue}
+                                        onChange={event =>
+                                          setEditingCategoryValue(event.target.value)
+                                        }
+                                        className="rounded-lg border border-border bg-secondary/80 px-2 py-1 text-[11px] font-medium text-foreground outline-none"
+                                        disabled={updatingCategory}
+                                      >
+                                        {categoryOptions.map(option => (
+                                          <option key={option} value={option}>
+                                            {option}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        type="button"
+                                        onClick={saveCategoryEdit}
+                                        disabled={updatingCategory}
+                                        className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1 text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-60"
+                                        title="Save category"
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingCategoryTxId(null)}
+                                        disabled={updatingCategory}
+                                        className="rounded-md border border-border bg-secondary/50 p-1 text-muted-foreground hover:bg-secondary disabled:opacity-60"
+                                        title="Cancel"
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="max-w-[140px] truncate text-xs font-medium text-gray-500">
+                                        {tx.category}
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={event => {
+                                          event.stopPropagation();
+                                          startCategoryEdit(tx);
+                                        }}
+                                        data-category-edit-trigger="true"
+                                        className="rounded-md border border-transparent hover:border-border hover:bg-secondary/50 p-1 text-muted-foreground hover:text-foreground"
+                                        title="Edit category"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right pl-4">
+                              <p
+                                className={`font-mono text-lg font-bold ${
+                                  isCredit
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-red-600 dark:text-red-400'
+                                }`}
+                              >
+                                {isCredit ? '+' : ''}₹{Math.abs(amount).toLocaleString('en-IN')}
+                              </p>
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground mt-0.5">
+                                {tx.payment_method}
+                              </p>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {hasMore && (
+                <div className="flex justify-center py-4">
+                  <button
+                    onClick={fetchMoreTransactions}
+                    disabled={loadingMore}
+                    className="rounded-xl border border-border bg-secondary/50 px-6 py-2 text-sm font-bold text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+                  >
+                    {loadingMore ? 'Loading...' : 'Load More'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Detail Modal */}
       <AnimatePresence>
@@ -1663,7 +1889,7 @@ export default function TransactionsPage() {
                   {categoryIcon(selected.category ?? 'Misc')}
                 </div>
                 <h3 className="text-center text-2xl font-black text-foreground px-4 leading-tight">
-                  {selected.description || 'Transaction'}
+                  {selected.merchant_name || selected.description || 'Transaction'}
                 </h3>
                 <p className="mt-2 text-sm font-medium text-primary/70 uppercase tracking-widest">
                   {selected.category || 'Uncategorized'}
@@ -1704,11 +1930,37 @@ export default function TransactionsPage() {
                 </div>
                 <div className="h-px bg-border w-full" />
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground font-medium">Merchant / Ref</span>
-                  <span className="text-foreground font-bold truncate max-w-[200px]">
-                    {selected.merchant_name || selected.description || '-'}
+                  <span className="text-muted-foreground font-medium shrink-0">Merchant / Ref</span>
+                  <span className="text-foreground font-bold text-right break-all ml-4">
+                    {selected.description || selected.merchant_name || '-'}
                   </span>
                 </div>
+
+                {selected.informative_text && (
+                  <>
+                    <div className="h-px bg-border w-full" />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground font-medium shrink-0">
+                        Informative Details
+                      </span>
+                      <span className="text-foreground font-bold text-right break-words ml-4 max-w-[65%]">
+                        {selected.informative_text}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {selected.bank_name && (
+                  <>
+                    <div className="h-px bg-border w-full" />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground font-medium shrink-0">Bank Used</span>
+                      <span className="text-foreground font-bold text-right ml-4">
+                        {selected.bank_name}
+                      </span>
+                    </div>
+                  </>
+                )}
 
                 {/* Structured Data Section */}
                 {selected.raw_data && (

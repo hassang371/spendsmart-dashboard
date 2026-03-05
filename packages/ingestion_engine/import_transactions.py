@@ -148,50 +148,73 @@ def parse_csv_content(file_content: IO) -> pd.DataFrame:
     return _normalize_dataframe(df)
 
 
+def _parse_pdf(file_content: bytes) -> pd.DataFrame:
+    """Extract transaction table from a PDF bank statement using pdfplumber.
+
+    Scans every page for the largest table and concatenates them. Normalises
+    the result with _normalize_dataframe so downstream code gets standard columns.
+    """
+    import io
+    import pdfplumber
+
+    all_rows: list[list] = []
+    header: list | None = None
+
+    with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+        for page in pdf.pages:
+            tables = page.extract_tables()
+            if not tables:
+                continue
+            # Pick the widest table on the page
+            table = max(tables, key=lambda t: len(t[0]) if t else 0)
+            if not table:
+                continue
+            if header is None:
+                # First non-empty row is the header
+                header = [str(c).strip() if c else "" for c in table[0]]
+                all_rows.extend(table[1:])
+            else:
+                # Subsequent pages: skip row if it matches the header (repeated header)
+                for row in table:
+                    row_strs = [str(c).strip() if c else "" for c in row]
+                    if row_strs != header:
+                        all_rows.append(row)
+
+    if not all_rows or header is None:
+        raise ValueError("No table found in PDF. Ensure it is a bank statement with tabular data.")
+
+    df = pd.DataFrame(all_rows, columns=header)
+    # Drop fully-empty rows
+    df = df.dropna(how="all")
+    df = df[df.apply(lambda r: r.astype(str).str.strip().ne("").any(), axis=1)]
+    return _normalize_dataframe(df)
+
+
 def parse_file(
     file_content: bytes, filename: str, password: str = None
 ) -> pd.DataFrame:
     """
-    Parses a transaction file (CSV, Excel, JSON, TSV) based on extension/content.
+    Parses a transaction file (CSV, Excel, JSON, TSV, PDF) based on extension/content.
     """
     import io
     import json as _json
 
     filename_lower = filename.lower()
 
+    if filename_lower.endswith(".pdf"):
+        return _parse_pdf(file_content)
+
     if (
         filename_lower.endswith(".xlsx")
         or filename_lower.endswith(".xls")
         or filename_lower.endswith(".xlsm")
     ):
-        # Use new BankStatementParser
-        from packages.categorization.data_loader import BankStatementParser
+        pass
 
-        parser = BankStatementParser(file_content, password=password)
-        try:
-            df = parser.parse()
-        except Exception as e:
-            # Fallback or re-raise
-            # If password error, re-raise specifically
-            if "Decryption failed" in str(e) or "Password" in str(e):
-                raise ValueError("Invalid password")
-            raise e
+        # Use v2 excel parser
+        from packages.ingestion_engine.excel_parser import parse_excel_transaction_file
 
-        # Normalize columns to match ingestion expectation
-        # Parser returns: Date, Details, Amount, Cleaned_Details, method, entity, ref, location, type, meta
-        rename_map = {
-            "Date": "date",
-            "Details": "description",
-            "Amount": "amount",
-            "Cleaned_Details": "merchant",  # Use our cleaned entity as merchant
-        }
-        df = df.rename(columns=rename_map)
-
-        # Standardize dates to ISO format (YYYY-MM-DD) for PostgreSQL
-        if "date" in df.columns:
-            df["date"] = pd.to_datetime(
-                df["date"], dayfirst=True, errors="coerce"
-            ).dt.strftime("%Y-%m-%d")
+        df = parse_excel_transaction_file(file_content, password=password)
 
         # Ensure we have the standard columns
         for col in ["date", "description", "amount", "merchant"]:
@@ -212,21 +235,18 @@ def parse_file(
         text_stream = io.StringIO(file_content.decode("utf-8"))
         df = parse_csv_content(text_stream)
 
-    # Generate merchant if missing (Common post-processing)
-    # Only if we didn't use BankStatementParser (which already generates it)
-    if not filename_lower.endswith(".xlsx") and not filename_lower.endswith(".xls"):
-        from .merchant_extractor import MerchantExtractor
+    # Generate / clean merchant for ALL file types (including xlsx)
+    from .merchant_extractor import MerchantExtractor
 
-        extractor = MerchantExtractor()
+    extractor = MerchantExtractor()
 
-        if "merchant" not in df.columns and "description" in df.columns:
-            # Extract clean merchant from description
-            df["merchant"] = df["description"].apply(extractor.extract)
-        elif "merchant" not in df.columns:
-            df["merchant"] = ""
-        else:
-            # Even if merchant column exists, clean it if it looks like raw description
-            df["merchant"] = df["merchant"].astype(str).apply(extractor.extract)
+    if "merchant" not in df.columns and "description" in df.columns:
+        df["merchant"] = df["description"].apply(extractor.extract)
+    elif "merchant" not in df.columns:
+        df["merchant"] = ""
+    else:
+        # Even if merchant column exists, clean it if it looks like raw description
+        df["merchant"] = df["merchant"].astype(str).apply(extractor.extract)
 
     # Standardize result columns + Extended columns
     standard_cols = ["date", "amount", "description", "merchant"]

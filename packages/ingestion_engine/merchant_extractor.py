@@ -193,6 +193,10 @@ def infer_payment_method(description: str) -> str:
 
     Returns one of: "UPI", "Bank Transfer", "IMPS", "Auto Debit",
                     "Cash", "Card", "Other"
+
+    Note: subscription services (Netflix, YouTube, etc.) can be paid via
+    any method — without a UPI/POS/NEFT marker in the description we
+    cannot determine the method, so they fall through to "Other".
     """
     if not description:
         return "Other"

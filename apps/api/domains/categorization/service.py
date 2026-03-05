@@ -1,72 +1,43 @@
-"""Categorization service — HypCD classifier management and batch inference.
+"""Categorization service — singleton classifier access.
 
-Fixes:
-- ARCH-04: Classifier singleton via module-level caching (not per-request).
-- BUG-04: In-process batch classification (no N+1 Celery calls).
+Provides a module-level TransactionClassifier singleton and
+helper functions for batch/single classification.
 """
 
-import os
-import threading
-import structlog
+from packages.categorization.classifier import TransactionClassifier
 
-logger = structlog.get_logger()
-
-# Module-level singleton (thread-safe init)
-_classifier = None
-_classifier_lock = threading.Lock()
+_classifier: TransactionClassifier | None = None
 
 
-def get_classifier():
-    """Get or create the HypCD classifier singleton.
-
-    Fixes ARCH-04: The old code created a new HypCDClassifier() on every
-    single request, loading the model from disk each time. This version
-    initializes once and reuses.
-    """
+def get_classifier() -> TransactionClassifier:
+    """Get or create the global TransactionClassifier singleton."""
     global _classifier
     if _classifier is None:
-        with _classifier_lock:
-            if _classifier is None:  # Double-checked locking
-                try:
-                    from packages.categorization.hypcd import HypCDClassifier
-                    _classifier = HypCDClassifier()
-                    logger.info("classifier_initialized", model="HypCDClassifier")
-                except Exception as e:
-                    logger.error("classifier_init_failed", error=str(e))
-                    raise
+        _classifier = TransactionClassifier()
     return _classifier
 
 
 def classify_batch_in_process(descriptions: list[str]) -> list[dict]:
-    """Classify a batch of descriptions in-process.
+    """Classify a batch of transaction descriptions.
 
-    Fixes BUG-04: The old code dispatched a separate Celery task per
-    description with .delay().get(timeout=30), causing N+1 Redis round-trips.
-    This version runs inference directly — it's fast PyTorch inference,
-    no need for Celery.
+    Args:
+        descriptions: List of raw transaction description strings.
 
-    Returns list of {category, confidence} dicts.
+    Returns:
+        List of {"category": str, "confidence": float} dicts.
     """
-    classifier = get_classifier()
-    predictions = classifier.predict_batch(descriptions)
-
-    results = []
-    for pred in predictions:
-        if isinstance(pred, dict):
-            results.append({
-                "category": str(pred.get("category", "Misc")),
-                "confidence": float(pred.get("confidence", 0.0)),
-            })
-        else:
-            # Tuple format: (category, confidence, embedding)
-            results.append({
-                "category": str(pred[0]),
-                "confidence": float(pred[1]),
-            })
-    return results
+    clf = get_classifier()
+    return clf.predict_batch(descriptions)
 
 
-def classify_single_in_process(description: str) -> dict:
-    """Classify a single description in-process."""
-    results = classify_batch_in_process([description])
-    return results[0] if results else {"category": "Uncategorized", "confidence": 0.0}
+def classify_single(description: str) -> dict:
+    """Classify a single transaction description.
+
+    Args:
+        description: Raw transaction description string.
+
+    Returns:
+        {"category": str, "confidence": float}
+    """
+    clf = get_classifier()
+    return clf.predict(description)

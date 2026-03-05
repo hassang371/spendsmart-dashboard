@@ -10,6 +10,8 @@
  * The Next.js API routes have been deleted as part of M1.
  */
 
+import * as Sentry from '@sentry/nextjs';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 interface ApiOptions {
@@ -97,7 +99,6 @@ export interface Transaction {
   description: string;
   merchant_name: string;
   category: string;
-  original_category?: string | null;
   suggested_category?: string | null;
   confidence_score?: number | null;
   payment_method: string;
@@ -121,6 +122,9 @@ export interface UncategorizedTransaction {
   payment_method: string;
   type: string;
   created_at: string;
+  raw_data?: Record<string, unknown> | null;
+  informative_text?: string | null;
+  bank_name?: string | null;
 }
 
 export interface UncategorizedListResponse {
@@ -146,10 +150,16 @@ export interface TransactionListResponse {
   has_more: boolean;
 }
 
+export interface TransactionCountsResponse {
+  all: number;
+  debit: number;
+  credit: number;
+  uncategorized: number;
+}
+
 export interface TransactionUpdatePayload {
   category?: string;
   amount?: number;
-  original_category?: string;
   old_category?: string;
 }
 
@@ -174,18 +184,38 @@ async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promis
     requestHeaders['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers: requestHeaders,
-    body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: requestHeaders,
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new ApiError(errorData.detail || 'Request failed', response.status, errorData);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      const apiError = new ApiError(
+        errorData.detail || 'Request failed',
+        response.status,
+        errorData
+      );
+
+      Sentry.captureException(apiError, {
+        extra: { path, method, status: response.status, response: errorData },
+      });
+
+      throw apiError;
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (!(error instanceof ApiError)) {
+      // Capture pure network errors or JSON parse errors
+      Sentry.captureException(error, {
+        extra: { path, method, type: 'network_or_parse_error' },
+      });
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 // --- Domain-specific helpers ---
@@ -301,16 +331,20 @@ export const accountsApi = {
 
   /** Fetch transactions where category='Uncategorized' (for Review tab) */
   getUncategorized: (token: string, limit = 50): Promise<UncategorizedListResponse> =>
-    apiFetch<UncategorizedListResponse>(
-      `/accounts/transactions/uncategorized?limit=${limit}`,
-      { token }
-    ),
+    apiFetch<UncategorizedListResponse>(`/accounts/transactions/uncategorized?limit=${limit}`, {
+      token,
+    }),
+
+  /** Return total transaction counts (all/debit/credit/uncategorized) unaffected by pagination */
+  getTransactionCounts: (token: string): Promise<TransactionCountsResponse> =>
+    apiFetch<TransactionCountsResponse>('/accounts/transactions/count', { token }),
 
   getProfile: (token: string) => apiFetch('/accounts/profile', { token }),
 };
 
 export const healthApi = {
-  check: () => apiFetch('/health'),
+  // /health/ready returns { status, services: { api, redis } }
+  check: () => apiFetch('/health/ready'),
 };
 
 export { ApiError, apiFetch };

@@ -1,226 +1,232 @@
-from typing import Dict, Optional
+"""Keyword-based transaction categorization rules (v2).
+
+Fast O(1) deterministic matching layer. Runs BEFORE the neural network
+classifier to instantly resolve known merchants/patterns.
+"""
+
 import re
+from packages.categorization.constants import Category
 
 
 class KeywordMatcher:
-    def __init__(self):
-        # Explicit rules: key -> category
-        # Keys should be lowercase for case-insensitive matching.
-        # predict() sorts by key length (longest first) so multi-word keys
-        # like "tata power" match before shorter overlapping keys like "tata".
-        self.rules: Dict[str, str] = {
-            # ── Food & Dining ──────────────────────────────────────────────────
-            "swiggy":          "Food",
-            "zomato":          "Food",
-            "blinkit":         "Food",
-            "zepto":           "Food",
-            "bigbasket":       "Food",
-            "dunzo":           "Food",
-            "eatfit":          "Food",
-            "licious":         "Food",
-            "box8":            "Food",
-            "freshmenu":       "Food",
-            "milkbasket":      "Food",
-            "jiomart":         "Food",
-            "domin":           "Food",   # Dominos
-            "pizza":           "Food",
-            "burger":          "Food",
-            "kfc":             "Food",
-            "mcdonald":        "Food",
-            "starbuck":        "Food",
-            "cafe":            "Food",
-            "restaurant":      "Food",
-            "barbeque":        "Food",
-            "haldiram":        "Food",
-            "amul":            "Food",
-            "country delight": "Food",
-            "faasos":          "Food",
-            "behrouz":         "Food",
-            "biryani":         "Food",
-            "ola foods":       "Food",
+    """Deterministic keyword matcher for transaction descriptions.
 
-            # ── Transport ──────────────────────────────────────────────────────
-            "bharat petroleum": "Transport",
-            "air india":       "Transport",
-            "makemytrip":      "Transport",
-            "uber":            "Transport",
-            "rapido":          "Transport",
-            "indrive":         "Transport",
-            "blusmart":        "Transport",
-            "metro":           "Transport",
-            "irctc":           "Transport",
-            "indigo":          "Transport",
-            "spicejet":        "Transport",
-            "airindia":        "Transport",
-            "vistara":         "Transport",
-            "goair":           "Transport",
-            "akasa":           "Transport",
-            "ixigo":           "Transport",
-            "redbus":          "Transport",
-            "yatra":           "Transport",
-            "goibibo":         "Transport",
-            "cleartrip":       "Transport",
-            "fuel":            "Transport",
-            "petrol":          "Transport",
-            "diesel":          "Transport",
-            "shell":           "Transport",
-            "hpcl":            "Transport",
-            "iocl":            "Transport",
-            "indianoil":       "Transport",
-            "parking":         "Transport",
-            "fastag":          "Transport",
-            "ksrtc":           "Transport",
-            "bmtc":            "Transport",
-            "ola":             "Transport",
+    Matches cleaned transaction text against known vendors and patterns.
+    Returns category with confidence 1.0 for exact matches.
+    """
 
-            # ── Shopping ───────────────────────────────────────────────────────
-            "reliance digital": "Shopping",
-            "tata cliq":       "Shopping",
-            "max fashion":     "Shopping",
-            "big bazaar":      "Shopping",
-            "vijay sales":     "Shopping",
-            "amazon":          "Shopping",
-            "flipkart":        "Shopping",
-            "myntra":          "Shopping",
-            "ajio":            "Shopping",
-            "meesho":          "Shopping",
-            "nykaa":           "Shopping",
-            "snapdeal":        "Shopping",
-            "decathlon":       "Shopping",
-            "croma":           "Shopping",
-            "zudio":           "Shopping",
-            "westside":        "Shopping",
-            "lifestyle":       "Shopping",
-            "pantaloons":      "Shopping",
-            "dmart":           "Shopping",
-            "retail":          "Shopping",
+    def __init__(self) -> None:
+        self._rules = self._build_rules()
+        self._p2p_debit_pattern = re.compile(
+            r"(?:transfer\s+to|sent\s+to|paid\s+to|payment\s+to|upi\s+(?:debit\s+)?transfer\s+to"
+            r"|neft\s+(?:dr|debit)\b|imps\s+(?:dr|debit)\b|rtgs\s+(?:dr|debit)\b)",
+            re.IGNORECASE,
+        )
+        self._p2p_credit_pattern = re.compile(
+            r"(?:received\s+from|credit\s+from|upi\s+received\s+from|upi\s+credit\s+from"
+            r"|neft\s+(?:cr|credit)\b|imps\s+(?:cr|credit)\b|rtgs\s+(?:cr|credit)\b"
+            r"|(?:neft|imps|rtgs)[/-][A-Z][A-Za-z\s]{2,}-[A-Z]{2,})",
+            re.IGNORECASE,
+        )
 
-            # ── Entertainment ──────────────────────────────────────────────────
-            "apple tv":        "Entertainment",
-            "music premium":   "Entertainment",
-            "movie rental":    "Entertainment",
-            "cloud storage":   "Entertainment",
-            "play pass":       "Entertainment",
-            "google play":     "Entertainment",
-            "samay raina":     "Entertainment",
-            "netflix":         "Entertainment",
-            "spotify":         "Entertainment",
-            "prime":           "Entertainment",
-            "hotstar":         "Entertainment",
-            "jiocinema":       "Entertainment",
-            "sonyliv":         "Entertainment",
-            "zee5":            "Entertainment",
-            "mubi":            "Entertainment",
-            "lionsgate":       "Entertainment",
-            "gaana":           "Entertainment",
-            "jiosaavn":        "Entertainment",
-            "wynk":            "Entertainment",
-            "youtube":         "Entertainment",
-            "steam":           "Entertainment",
-            "pvr":             "Entertainment",
-            "inox":            "Entertainment",
-            "bookmyshow":      "Entertainment",
+    def _build_rules(self) -> list[tuple[str, list[str]]]:
+        """Build keyword rules mapping vendors to categories.
 
-            # ── Utilities ──────────────────────────────────────────────────────
-            "act fibernet":    "Utilities",
-            "you broadband":   "Utilities",
-            "tata power":      "Utilities",
-            "bescom":          "Utilities",
-            "bwssb":           "Utilities",
-            "msedcl":          "Utilities",
-            "tneb":            "Utilities",
-            "bses":            "Utilities",
-            "airtel":          "Utilities",
-            "vodafone":        "Utilities",
-            "hathway":         "Utilities",
-            "bsnl":            "Utilities",
-            "tikona":          "Utilities",
-            "bill":            "Utilities",
-            "recharge":        "Utilities",
-            "jio":             "Utilities",
-
-            # ── Health ─────────────────────────────────────────────────────────
-            "pharmacy":        "Health",
-            "apollo":          "Health",
-            "medplus":         "Health",
-            "practo":          "Health",
-            "1mg":             "Health",
-            "netmeds":         "Health",
-            "pharmeasy":       "Health",
-            "healthifyme":     "Health",
-            "cult.fit":        "Health",
-            "cultfit":         "Health",
-            "lybrate":         "Health",
-            "portea":          "Health",
-            "clinic":          "Health",
-            "hospital":        "Health",
-            "gym":             "Health",
-            "fitness":         "Health",
-
-            # ── Finance ────────────────────────────────────────────────────────
-            "bajaj finance":   "Finance",
-            "axis bank":       "Finance",
-            "mutual fund":     "Finance",
-            "zerodha":         "Finance",
-            "groww":           "Finance",
-            "angel":           "Finance",  # Angel One
-            "upstox":          "Finance",
-            "indmoney":        "Finance",
-            "phonepe":         "Finance",
-            "phonepay":        "Finance",
-            "paytm":           "Finance",
-            "cred":            "Finance",
-            "loan":            "Finance",
-            "insurance":       "Finance",
-            "hdfc":            "Finance",
-            "icici":           "Finance",
-            "kotak":           "Finance",
-            "tax":             "Finance",
-            "sip":             "Finance",
-            "gpay":            "Finance",
-            "sbi":             "Finance",
-            "emi":             "Finance",
-
-            # ── Education ──────────────────────────────────────────────────────
-            "physics wallah":  "Education",
-            "byju":            "Education",
-            "unacademy":       "Education",
-            "vedantu":         "Education",
-            "upgrad":          "Education",
-            "simplilearn":     "Education",
-            "udemy":           "Education",
-            "coursera":        "Education",
-            "course":          "Education",
-            "tuition":         "Education",
-
-            # ── Salary / Income ────────────────────────────────────────────────
-            "salary":          "Salary",
-            "payroll":         "Salary",
-            "stipend":         "Salary",
-        }
-
-    def predict(self, text: str) -> Optional[str]:
+        Rules are ordered from most specific to least. Each rule is a
+        (category, [keywords]) tuple. Matching is case-insensitive substring.
         """
-        Check if text contains any known keywords.
-        Returns Category if match found, else None.
+        return [
+            # ── Food & Dining ────────────────────────────────────────────
+            (Category.GROCERIES.value, [
+                "blinkit", "zepto", "bigbasket", "jiomart",
+                "instamart", "grocery", "swiggy instamart", "dunzo grocery",
+                "dmart", "reliance fresh", "more supermarket", "nature basket",
+            ]),
+            (Category.COFFEE_SNACKS.value, [
+                "starbucks", "cafe coffee", "third wave", "chaayos",
+                "blue tokai", "barista", "bakery", "pastry", "chai point",
+            ]),
+            (Category.FOOD.value, [
+                "swiggy", "zomato", "food", "restaurant", "dining",
+                "dunzo food", "eatfit", "dominos", "domino",
+                "kfc", "burger king", "mcdonalds", "mcdonald",
+                "pizza hut", "subway", "haldiram", "barbeque nation",
+                "box8", "faasos", "behrouz",
+            ]),
 
-        Longer keywords are tested first so that multi-word keys like
-        "tata power" match before shorter overlapping keys like "tata".
-        Short keywords (<=4 chars) use word-boundary matching to avoid
-        false positives (e.g. "emi" inside "premium", "jio" inside "jiocinema").
+            # ── Transport ────────────────────────────────────────────────
+            (Category.TAXI_RIDESHARE.value, [
+                "uber", "ola", "rapido", "bluesmart",
+            ]),
+            (Category.PUBLIC_TRANSIT.value, [
+                "metro", "irctc", "redbus", "train ticket", "bus ticket",
+                "railway", "smartcard",
+            ]),
+            (Category.FLIGHTS.value, [
+                "indigo", "spicejet", "air india", "vistara", "goair",
+                "akasa", "airline", "flight",
+            ]),
+            (Category.FUEL.value, [
+                "petrol", "diesel", "hpcl", "iocl", "bpcl",
+                "fuel", "fastag", "toll", "indian oil", "bharat petroleum",
+            ]),
+
+            # ── Housing & Utilities ──────────────────────────────────────
+            (Category.RENT_MORTGAGE.value, [
+                "rent", "mortgage", "landlord", "housing society",
+                "nobroker", "nestaway",
+            ]),
+            (Category.ELECTRICITY_WATER.value, [
+                "electric", "bescom", "tata power", "bwssb",
+                "water bill", "gas cylinder", "lpg",
+            ]),
+            (Category.INTERNET_PHONE.value, [
+                "airtel", "jio", "vodafone", "vi recharge", "vi prepaid", "vi postpaid",
+                "bsnl", "act fibernet", "broadband", "recharge",
+            ]),
+            (Category.HOME_MAINTENANCE.value, [
+                "plumber", "electrician", "carpenter",
+                "home repair", "pest control", "urban company", "urbanclap",
+            ]),
+
+            # ── Shopping ─────────────────────────────────────────────────
+            (Category.CLOTHING_FASHION.value, [
+                "myntra", "ajio", "meesho fashion", "nykaa",
+                "h&m", "zara", "westside", "pantaloons",
+                "shoppers stop", "lifestyle", "max fashion",
+            ]),
+            (Category.ELECTRONICS.value, [
+                "croma", "reliance digital", "laptop", "computer",
+                "electronic", "gadget", "smartwatch",
+            ]),
+            (Category.GENERAL_RETAIL.value, [
+                "amazon", "flipkart", "meesho",
+                "decathlon", "online shopping",
+            ]),
+
+            # ── Entertainment ────────────────────────────────────────────
+            (Category.SUBSCRIPTIONS.value, [
+                "netflix", "spotify", "jiocinema", "sonyliv",
+                "hotstar", "youtube", "play pass",
+                "apple music", "subscription", "prime video",
+            ]),
+            (Category.MOVIES_EVENTS.value, [
+                "bookmyshow", "pvr", "inox", "cinema",
+                "concert", "event", "theater",
+            ]),
+            (Category.GAMING.value, [
+                "dream11", "steam", "playstation", "xbox",
+                "game pass", "in-app purchase", "mpl",
+            ]),
+
+            # ── Health ───────────────────────────────────────────────────
+            (Category.MEDICAL.value, [
+                "hospital", "doctor", "clinic", "diagnostic",
+                "health checkup", "apollo clinic", "fortis",
+                "max healthcare", "practo",
+            ]),
+            (Category.PHARMACY.value, [
+                "pharmacy", "1mg", "netmeds", "pharmeasy",
+                "apollo pharmacy", "medicine",
+            ]),
+            (Category.FITNESS.value, [
+                "cultfit", "cult.fit", "gym", "yoga",
+                "fitness", "healthifyme", "gold gym",
+            ]),
+
+            # ── Finance ──────────────────────────────────────────────────
+            (Category.INVESTMENTS.value, [
+                "zerodha", "groww", "upstox", "mutual fund",
+                "sip", "investment",
+            ]),
+            (Category.INSURANCE.value, [
+                "insurance", "policy premium", "bajaj allianz",
+                "lic premium", "hdfc life",
+            ]),
+            (Category.LOAN_EMI.value, [
+                "loan", "emi", "bajaj finance", "installment",
+            ]),
+            (Category.TAXES.value, [
+                "income tax", "gst payment", "property tax",
+                "tax challan", "tds",
+            ]),
+            (Category.BANK_FEES.value, [
+                "bank charge", "processing fee", "convenience fee",
+                "maintenance charge", "sms alert charge",
+                "atm surcharge", "penalty fee",
+            ]),
+
+            # ── Travel & Lodging ─────────────────────────────────────────
+            (Category.HOTELS_STAYS.value, [
+                "airbnb", "oyo", "treebo", "fabhotel",
+                "hotel", "resort", "homestay", "booking.com",
+                "goibibo hotel", "trivago",
+            ]),
+            (Category.TRAVEL_BOOKING.value, [
+                "makemytrip", "ixigo", "cleartrip", "yatra",
+                "goibibo", "travel", "trip",
+            ]),
+
+            # ── Income ───────────────────────────────────────────────────
+            (Category.SALARY.value, [
+                "salary", "payroll", "stipend", "wages",
+            ]),
+            (Category.REFUNDS.value, [
+                "refund", "cashback", "reversal", "return order",
+            ]),
+            (Category.INTEREST.value, [
+                "interest credit", "fd maturity", "interest earned",
+            ]),
+
+            # ── Finance (CRED) ───────────────────────────────────────────
+            (Category.BANK_FEES.value, [
+                "cred",
+            ]),
+        ]
+
+    def predict(self, text: str) -> dict | None:
+        """Match text against keyword rules.
+
+        Args:
+            text: Cleaned or informative transaction description.
+
+        Returns:
+            {"category": str, "confidence": 1.0} if matched, None otherwise.
         """
         if not text:
             return None
 
-        text_lower = text.lower()
+        lower = text.lower()
 
-        for keyword in sorted(self.rules.keys(), key=len, reverse=True):
-            category = self.rules[keyword]
-            if len(keyword) <= 4:
-                if re.search(r"\b" + re.escape(keyword) + r"\b", text_lower):
-                    return category
-            else:
-                if keyword in text_lower:
-                    return category
+        # ── P2P Transfer Detection ───────────────────────────────────────
+        # Must run before keyword rules so "UPI Transfer to Allan" doesn't
+        # match "transfer" as a generic keyword.
+        # Use original text for patterns that match uppercase names (e.g. SBI NEFT-NAME-BANK)
+        if self._p2p_debit_pattern.search(text):
+            # Check it's not a known merchant being paid via UPI
+            for _, keywords in self._rules:
+                for kw in keywords:
+                    if kw in lower:
+                        return {"category": _, "confidence": 1.0}
+            return {
+                "category": Category.TRANSFERS_TO_PEOPLE.value,
+                "confidence": 1.0,
+            }
+
+        if self._p2p_credit_pattern.search(text):
+            for _, keywords in self._rules:
+                for kw in keywords:
+                    if kw in lower:
+                        return {"category": _, "confidence": 1.0}
+            return {
+                "category": Category.RECEIVED_FROM_PEOPLE.value,
+                "confidence": 1.0,
+            }
+
+        # ── Standard Keyword Matching ────────────────────────────────────
+        for category, keywords in self._rules:
+            for kw in keywords:
+                if kw in lower:
+                    return {"category": category, "confidence": 1.0}
 
         return None

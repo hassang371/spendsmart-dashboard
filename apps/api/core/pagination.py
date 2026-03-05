@@ -45,7 +45,7 @@ class PaginationParams:
         limit: int = 50,
         cursor: Optional[str] = None,
     ):
-        self.limit = max(1, min(limit, 100))  # Clamp to [1, 100]
+        self.limit = max(1, min(limit, 500))  # Clamp to [1, 500]
         self.cursor = cursor
 
 

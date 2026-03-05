@@ -19,10 +19,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     raw_data JSONB,
     fingerprint TEXT,
     type TEXT DEFAULT 'debit',
-    original_category TEXT,
     is_manual BOOLEAN DEFAULT FALSE,
     suggested_category TEXT,
     confidence_score   FLOAT,
+    -- Parsed during ingestion by cleaner.process_description()
+    informative_text   TEXT,
+    bank_name          TEXT,
 
     -- Constraints
     -- No CHECK on amount: cancelled transactions have amount=0
@@ -83,7 +85,7 @@ CREATE TABLE IF NOT EXISTS training_jobs (
     status TEXT DEFAULT 'pending',
     logs TEXT,
     metrics JSONB,
-    checkpoint_path TEXT,
+    checkpoint_path TEXT,   -- DEPRECATED: v2 classifier uses user_model_metadata.adapter_url instead
     transaction_count INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -102,6 +104,7 @@ ON training_jobs FOR ALL
 USING (true);
 
 -- 6. Classification Jobs Table
+-- NOTE: v3 ingestion classifies inline in background tasks; this table may be unused
 CREATE TABLE IF NOT EXISTS classification_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -115,6 +118,15 @@ CREATE TABLE IF NOT EXISTS classification_jobs (
 ALTER TABLE classification_jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own classification jobs"
 ON classification_jobs FOR SELECT
+USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own classification jobs"
+ON classification_jobs FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own classification jobs"
+ON classification_jobs FOR UPDATE
+USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own classification jobs"
+ON classification_jobs FOR DELETE
 USING (auth.uid() = user_id);
 
 -- 7. Training Corrections Table (Active Learning)

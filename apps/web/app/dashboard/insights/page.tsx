@@ -29,6 +29,8 @@ import { getBrowserSupabaseClient } from '../../../lib/supabase/client';
 import SafeToSpendCard from '../../../components/dashboard/SafeToSpendCard';
 import TrainingJobCard from '../../../components/dashboard/TrainingJobCard';
 
+const HEALTH_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 // ── Animation Variants ──────────────────────────────────────────
 
 const containerVariants: Variants = {
@@ -103,14 +105,32 @@ export default function AIInsightsPage() {
   // ── Health Check ────────────────────────────────────────────
 
   const checkGateway = useCallback(async () => {
+    // Use cached status if fresh — avoids re-check on every navigation
+    const cachedRaw = localStorage.getItem('health-cache');
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as { timestamp: number; data: HealthResponse };
+        if (Date.now() - cached.timestamp < HEALTH_CACHE_TTL_MS) {
+          setHealthData(cached.data);
+          setGatewayOnline(true);
+          setCheckingHealth(false);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     setCheckingHealth(true);
     try {
       const data = await healthApi.check();
       setHealthData(data);
       setGatewayOnline(true);
+      localStorage.setItem('health-cache', JSON.stringify({ timestamp: Date.now(), data }));
     } catch {
       setGatewayOnline(false);
       setHealthData(null);
+      localStorage.removeItem('health-cache');
     } finally {
       setCheckingHealth(false);
     }
@@ -192,7 +212,11 @@ export default function AIInsightsPage() {
         if (!session?.access_token) {
           throw new Error('Session expired. Please sign in again.');
         }
-        const data = await trainingApi.upload(file, session.access_token, trainingPassword || undefined);
+        const data = await trainingApi.upload(
+          file,
+          session.access_token,
+          trainingPassword || undefined
+        );
         setTrainingResult(data);
       } catch (err) {
         setTrainingError(err instanceof Error ? err.message : 'Failed to trigger training job');
@@ -296,20 +320,22 @@ export default function AIInsightsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">API</span>
-                  <span className="text-xs font-mono font-bold text-foreground">
+                  <span
+                    className={`text-xs font-mono font-bold ${
+                      healthData.services?.api === 'up' ? 'text-emerald-500' : 'text-foreground'
+                    }`}
+                  >
                     {healthData.services?.api || healthData.engines?.ingestion || 'unknown'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Redis</span>
-                  <span className="text-xs font-mono font-bold text-foreground">
+                  <span
+                    className={`text-xs font-mono font-bold ${
+                      healthData.services?.redis === 'up' ? 'text-emerald-500' : 'text-amber-400'
+                    }`}
+                  >
                     {healthData.services?.redis || 'unknown'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Celery</span>
-                  <span className="text-xs font-mono font-bold text-foreground">
-                    {healthData.services?.celery || 'unknown'}
                   </span>
                 </div>
               </div>
@@ -404,8 +430,8 @@ export default function AIInsightsPage() {
               </div>
 
               {/* Chart */}
-              <div className="flex-1 min-h-0 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div style={{ width: '100%', height: '300px' }}>
+                <ResponsiveContainer width="100%" height={300} minWidth={1}>
                   <BarChart
                     data={forecast.predictions}
                     margin={{ top: 10, right: 10, left: 0, bottom: 0 }}

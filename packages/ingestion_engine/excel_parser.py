@@ -21,25 +21,30 @@ def parse_excel_transaction_file(
     Parses an encrypted (or unencrypted) Excel file into a standardized DataFrame.
     Returns columns: date, description, amount.
     """
+    decrypted_workbook = io.BytesIO(file_content)
+
     if _is_ole2(file_content):
         # File is in OLE2 format — either a legacy .xls or an encrypted .xlsx
-        if not password:
-            raise ValueError("Password required")
-
-        decrypted_workbook = io.BytesIO()
         try:
             with io.BytesIO(file_content) as f:
                 office_file = msoffcrypto.OfficeFile(f)
-                office_file.load_key(password=password)
-                office_file.decrypt(decrypted_workbook)
+                if office_file.is_encrypted():
+                    if not password:
+                        raise ValueError(
+                            "File is password-protected. Please provide the password."
+                        )
+                    decrypted_workbook = io.BytesIO()
+                    office_file.load_key(password=password)
+                    office_file.decrypt(decrypted_workbook)
+        except ValueError as e:
+            raise e
         except Exception as e:
             msg = str(e).lower()
             if "password" in msg or "decrypt" in msg or "key" in msg:
                 raise ValueError("Invalid password")
-            raise ValueError(f"Failed to decrypt file: {e}")
-    else:
-        # Plain .xlsx (ZIP-based OOXML) — no decryption needed
-        decrypted_workbook = io.BytesIO(file_content)
+            # If msoffcrypto fails to parse it as an encrypted container,
+            # it is likely just a standard .xls file. We fall back to standard pandas logic.
+            pass
 
     # Read Excel, finding header
     # We read first 20 rows to find header
@@ -47,7 +52,11 @@ def parse_excel_transaction_file(
 
     # Read raw to find header
     decrypted_workbook.seek(0)
-    df_raw = pd.read_excel(decrypted_workbook, header=None, nrows=30, engine="openpyxl")
+    try:
+        df_raw = pd.read_excel(decrypted_workbook, header=None, nrows=30)
+    except Exception:
+        decrypted_workbook.seek(0)
+        df_raw = pd.read_excel(decrypted_workbook, header=None, nrows=30, engine="openpyxl")
 
     header_row_idx = -1
     for i, row in df_raw.iterrows():
@@ -63,9 +72,15 @@ def parse_excel_transaction_file(
 
     # Read actual data
     decrypted_workbook.seek(0)
-    df = pd.read_excel(
-        decrypted_workbook, header=header_row_idx, engine="openpyxl", dtype=object
-    )
+    try:
+        df = pd.read_excel(
+            decrypted_workbook, header=header_row_idx, dtype=object
+        )
+    except Exception:
+        decrypted_workbook.seek(0)
+        df = pd.read_excel(
+            decrypted_workbook, header=header_row_idx, engine="openpyxl", dtype=object
+        )
 
     # Normalize Columns
     df.columns = [str(c).strip().lower() for c in df.columns]

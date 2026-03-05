@@ -12,7 +12,8 @@ def test_merchant_name_extracted_from_description_when_empty():
         "status": "completed",
     }
     result = _build_transaction_row(row, "user-1", "fp123")
-    assert result["merchant_name"] == "YouTube"
+    # v2 cleaner preserves richer merchant name when not a known pattern
+    assert "YouTube" in result["merchant_name"]
     assert result["merchant_name"] != ""
 
 
@@ -45,7 +46,7 @@ def test_payment_method_preserved_when_csv_provides_it():
 
 
 def test_google_play_gets_other_payment_method():
-    # "Play Pass Monthly" has no UPI/NEFT/card indicator — should be "Other"
+    # "Play Pass Monthly" has no UPI/NEFT/card indicator — payment method cannot be inferred
     row = {
         "date": "2026-01-01",
         "amount": -129.0,

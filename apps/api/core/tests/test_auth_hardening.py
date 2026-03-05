@@ -4,6 +4,7 @@ Verifies that expired JWTs are rejected with 401 instead of relying solely
 on Supabase to catch them later.
 """
 
+import asyncio
 import time
 import base64
 import json
@@ -41,43 +42,42 @@ class TestJWTDecoder:
             _decode_jwt_payload(token)
 
 
-@pytest.mark.asyncio
 class TestGetUserToken:
     """Tests for the Dependency extracting and pre-validating the token."""
 
-    async def test_missing_header_raises_401(self):
+    def test_missing_header_raises_401(self):
         with pytest.raises(HTTPException) as exc:
-            await get_user_token("")
+            asyncio.run(get_user_token(""))
         assert exc.value.status_code == 401
         assert "Missing" in exc.value.detail
 
-    async def test_invalid_scheme_raises_401(self):
+    def test_invalid_scheme_raises_401(self):
         with pytest.raises(HTTPException) as exc:
-            await get_user_token("Basic dXNlcjpwYXNz")
+            asyncio.run(get_user_token("Basic dXNlcjpwYXNz"))
         assert exc.value.status_code == 401
         assert "Bearer" in exc.value.detail
 
-    async def test_valid_unexpired_token_returns_token(self):
+    def test_valid_unexpired_token_returns_token(self):
         # Expires 1 hour from now
         future_exp = int(time.time()) + 3600
         token = _make_dummy_jwt({"exp": future_exp, "sub": "user-1"})
-        
-        result = await get_user_token(f"Bearer {token}")
+
+        result = asyncio.run(get_user_token(f"Bearer {token}"))
         assert result == token
 
-    async def test_expired_token_raises_401(self):
+    def test_expired_token_raises_401(self):
         # Expired 1 hour ago
         past_exp = int(time.time()) - 3600
         token = _make_dummy_jwt({"exp": past_exp, "sub": "user-1"})
-        
+
         with pytest.raises(HTTPException) as exc:
-            await get_user_token(f"Bearer {token}")
-        
+            asyncio.run(get_user_token(f"Bearer {token}"))
+
         assert exc.value.status_code == 401
         assert "expired" in exc.value.detail.lower()
 
-    async def test_token_without_exp_claim_passes_preflight(self):
+    def test_token_without_exp_claim_passes_preflight(self):
         # If no exp claim is present, we defer validation to Supabase
         token = _make_dummy_jwt({"sub": "user-1"})
-        result = await get_user_token(f"Bearer {token}")
+        result = asyncio.run(get_user_token(f"Bearer {token}"))
         assert result == token

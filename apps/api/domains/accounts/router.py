@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from supabase import Client
 from typing import Optional
 
-from apps.api.core.auth import get_user_client
+from apps.api.core.auth import get_current_user, get_current_user_id, get_user_client
 from apps.api.core.filtering import TransactionFilter
 from apps.api.core.pagination import CursorPage, PaginationParams
 from apps.api.domains.accounts.schemas import ProfileOut, TransactionOut
@@ -31,30 +31,26 @@ def _run_supervised_finetuning_bg(
     texts: list[str],
     categories: list[str],
 ) -> None:
-    """Background task: supervised fine-tuning of user adapter on corrected transactions.
+    """Background task: supervised fine-tuning of user's Linear Adapter on corrected transactions.
 
-    Triggered after merchant-batch reclassification. Trains projector + HypFFN
-    on the newly labeled (description, category) pairs.
+    Triggered after merchant-batch reclassification. Trains the lightweight
+    Linear Adapter (~10KB) on the newly labeled (description, category) pairs.
+    The frozen MiniLM base model is never retrained.
     """
     if not texts or len(texts) != len(categories):
         return
 
     try:
-        from apps.api.domains.categorization.service import get_classifier
         from packages.categorization.adapter_manager import AdapterManager
 
-        classifier = get_classifier()
         mgr = AdapterManager()
-
-        user_state = mgr.load_user_adapter(user_id)
-        if user_state:
-            try:
-                classifier.load_state_dict(user_state)
-            except Exception:
-                pass
-
-        mgr.fine_tune_supervised(classifier, texts, categories, epochs=5)
-        mgr.save_user_adapter(user_id, classifier.state_dict())
+        adapter_state = mgr.fine_tune_supervised(
+            texts=texts,
+            categories=categories,
+            epochs=5,
+        )
+        if adapter_state:
+            mgr.save_user_adapter(user_id, adapter_state)
 
         logger.info(
             "supervised_finetuning_complete",
@@ -90,13 +86,11 @@ def _extract_merchant_keyword(description: str) -> str | None:
 
 class TransactionUpdate(BaseModel):
     """Updateable fields for a single transaction."""
-    category: Optional[str] = Field(default=None, description="New category")
+    category: Optional[str] = Field(default=None, max_length=255, description="New category")
     amount: Optional[float] = Field(default=None, description="New amount (for income flip)")
-    original_category: Optional[str] = Field(
-        default=None, description="Backfill original category if missing"
-    )
     old_category: Optional[str] = Field(
         default=None,
+        max_length=255,
         description="Previous category — used for merchant-batch reclassification",
     )
 
@@ -104,18 +98,18 @@ class TransactionUpdate(BaseModel):
 class BatchUpdateItem(BaseModel):
     """A single item in a batch update request."""
     id: str = Field(description="Transaction UUID to update")
-    category: str = Field(description="New category to set")
+    category: str = Field(..., max_length=255, description="New category to set")
     amount: Optional[float] = Field(default=None, description="New amount if changed")
 
 
 class BatchUpdateRequest(BaseModel):
     """Batch update request for reclassifying multiple transactions."""
-    updates: list[BatchUpdateItem] = Field(description="List of transactions to update")
+    updates: list[BatchUpdateItem] = Field(..., max_items=1000, description="List of transactions to update")
 
 
 @router.get("/transactions")
 async def list_transactions(
-    limit: int = Query(default=50, ge=1, le=100, description="Items per page"),
+    limit: int = Query(default=50, ge=1, le=500, description="Items per page"),
     cursor: str = Query(default=None, description="Opaque pagination cursor"),
     date_from: str = Query(default=None, description="Filter: start date (ISO 8601)"),
     date_to: str = Query(default=None, description="Filter: end date (ISO 8601)"),
@@ -124,6 +118,7 @@ async def list_transactions(
     category: str = Query(default=None, description="Filter: exact category match"),
     merchant: str = Query(default=None, description="Filter: merchant name (case-insensitive)"),
     type: str = Query(default=None, description="Filter: transaction type (credit/debit)"),
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ) -> CursorPage[dict]:
     """List user's transactions with cursor-based pagination and filtering.
@@ -132,10 +127,6 @@ async def list_transactions(
     Pass `next_cursor` from a previous response as the `cursor` query param
     to fetch the next page.
     """
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-
     pagination = PaginationParams(limit=limit, cursor=cursor)
     filters = TransactionFilter(
         date_from=date_from,
@@ -149,7 +140,7 @@ async def list_transactions(
 
     return list_user_transactions(
         client=client,
-        user_id=user_response.user.id,
+        user_id=user_id,
         pagination=pagination,
         filters=filters,
     )
@@ -158,13 +149,10 @@ async def list_transactions(
 @router.get("/transactions/uncategorized")
 async def list_uncategorized_transactions(
     limit: int = Query(default=50, ge=1, le=200),
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
     """Return transactions where category='Uncategorized', including suggested_category."""
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-    user_id = user_response.user.id
 
     try:
         res = (
@@ -172,7 +160,8 @@ async def list_uncategorized_transactions(
             .select(
                 "id, description, amount, category, suggested_category, "
                 "confidence_score, transaction_date, merchant_name, "
-                "payment_method, type, created_at"
+                "payment_method, type, created_at, raw_data, "
+                "informative_text, bank_name"
             )
             .eq("user_id", user_id)
             .eq("category", "Uncategorized")
@@ -186,9 +175,54 @@ async def list_uncategorized_transactions(
         raise HTTPException(status_code=500, detail="Failed to fetch uncategorized transactions")
 
 
+@router.get("/transactions/count")
+async def get_transaction_counts(
+    user_id: str = Depends(get_current_user_id),
+    client: Client = Depends(get_user_client),
+):
+    """Return total transaction counts split by type (all, debit, credit, uncategorized).
+
+    Uses HEAD requests with count=exact so no row data is transferred.
+    """
+
+    try:
+        all_res = (
+            client.table("transactions")
+            .select("*", count="exact", head=True)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        debit_res = (
+            client.table("transactions")
+            .select("*", count="exact", head=True)
+            .eq("user_id", user_id)
+            .eq("type", "debit")
+            .execute()
+        )
+        uncat_res = (
+            client.table("transactions")
+            .select("*", count="exact", head=True)
+            .eq("user_id", user_id)
+            .eq("category", "Uncategorized")
+            .execute()
+        )
+        total = all_res.count or 0
+        debit = debit_res.count or 0
+        return {
+            "all": total,
+            "debit": debit,
+            "credit": total - debit,
+            "uncategorized": uncat_res.count or 0,
+        }
+    except Exception as e:
+        logger.error("transaction_count_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to fetch transaction counts")
+
+
 @router.patch("/transactions/batch")
 async def batch_update_transactions(
     request: BatchUpdateRequest = Body(...),
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
     """Batch update multiple transactions (e.g., reclassify similar).
@@ -199,46 +233,51 @@ async def batch_update_transactions(
     NOTE: This route must be registered BEFORE /transactions/{transaction_id}
     so FastAPI matches the literal "batch" path before the dynamic segment.
     """
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-
-    user_id = user_response.user.id
 
     if not request.updates:
         raise HTTPException(status_code=400, detail="No updates provided")
 
     updated = 0
     failed = 0
+
+    # Group items by (category, amount) to collapse N serial round-trips into
+    # one Supabase call per unique update payload.
+    from collections import defaultdict
+    groups: dict[tuple, list[str]] = defaultdict(list)
     for item in request.updates:
+        key = (item.category, item.amount)
+        groups[key].append(item.id)
+
+    for (category, amount), ids in groups.items():
         try:
-            updates: dict = {"category": item.category}
-            if item.amount is not None:
-                updates["amount"] = item.amount
+            payload: dict = {"category": category}
+            if amount is not None:
+                payload["amount"] = amount
 
             result = (
                 client.table("transactions")
-                .update(updates)
-                .eq("id", item.id)
+                .update(payload)
                 .eq("user_id", user_id)
+                .in_("id", ids)
                 .execute()
             )
             if result.data:
-                updated += 1
+                updated += len(result.data)
             else:
-                failed += 1
+                failed += len(ids)
         except Exception as e:
-            logger.warning("batch_update_item_failed", error=str(e), tx_id=item.id)
-            failed += 1
+            logger.warning("batch_update_group_failed", error=str(e), count=len(ids))
+            failed += len(ids)
 
     return {"status": "ok", "updated": updated, "failed": failed}
 
 
 @router.patch("/transactions/{transaction_id}")
 async def update_transaction(
+    background_tasks: BackgroundTasks,
     transaction_id: str = Path(description="Transaction UUID"),
     update: TransactionUpdate = Body(...),
-    background_tasks: BackgroundTasks = None,
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
     """Update a single transaction and auto-reclassify all matching merchant transactions.
@@ -247,11 +286,6 @@ async def update_transaction(
     same merchant that had the old category are automatically updated to the new
     category and marked is_manual=True (merchant-batch reclassification).
     """
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-
-    user_id = user_response.user.id
 
     updates: dict = {}
     if update.category is not None:
@@ -261,8 +295,6 @@ async def update_transaction(
         updates["confidence_score"] = None
     if update.amount is not None:
         updates["amount"] = update.amount
-    if update.original_category is not None:
-        updates["original_category"] = update.original_category
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -376,14 +408,12 @@ async def update_transaction(
 
 
 @router.get("/profile", response_model=ProfileOut)
-async def get_profile(client: Client = Depends(get_user_client)) -> ProfileOut:
+async def get_profile(
+    current_user=Depends(get_current_user),
+) -> ProfileOut:
     """Get user profile."""
-    user_response = client.auth.get_user()
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-
     return ProfileOut(
-        id=user_response.user.id,
-        email=user_response.user.email,
+        id=current_user.id,
+        email=current_user.email,
     )
 

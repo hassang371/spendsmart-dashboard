@@ -1,8 +1,8 @@
-"""Category constants for transaction classification.
+"""Category constants for transaction classification (v2).
 
-This module defines the standard categories used throughout the SCALE application
-for transaction classification. Using constants instead of hardcoded strings
-ensures consistency and makes it easier to add new categories.
+Expanded taxonomy with ~25 categories for better user visibility.
+Categories are stored as a flat enum — the model uses semantic embeddings
+so adding a new category requires zero retraining.
 """
 
 from enum import Enum
@@ -11,94 +11,245 @@ from enum import Enum
 class Category(str, Enum):
     """Standard transaction categories for classification."""
 
+    # ── Food & Dining ────────────────────────────────────────────────────
     FOOD = "Food"
-    TRANSPORT = "Transport"
-    UTILITIES = "Utilities"
+    GROCERIES = "Groceries"
+    COFFEE_SNACKS = "Coffee & Snacks"
+
+    # ── Transport ────────────────────────────────────────────────────────
+    TAXI_RIDESHARE = "Taxi & Rideshare"
+    PUBLIC_TRANSIT = "Public Transit"
+    FLIGHTS = "Flights"
+    FUEL = "Fuel"
+
+    # ── Housing & Utilities ──────────────────────────────────────────────
+    RENT_MORTGAGE = "Rent & Mortgage"
+    ELECTRICITY_WATER = "Electricity & Water"
+    INTERNET_PHONE = "Internet & Phone"
+    HOME_MAINTENANCE = "Home Maintenance"
+
+    # ── Shopping ─────────────────────────────────────────────────────────
+    CLOTHING_FASHION = "Clothing & Fashion"
+    ELECTRONICS = "Electronics"
+    GENERAL_RETAIL = "General Retail"
+
+    # ── Entertainment ────────────────────────────────────────────────────
+    SUBSCRIPTIONS = "Subscriptions"
+    MOVIES_EVENTS = "Movies & Events"
+    GAMING = "Gaming"
+
+    # ── Health ───────────────────────────────────────────────────────────
+    MEDICAL = "Medical"
+    PHARMACY = "Pharmacy"
+    FITNESS = "Fitness"
+
+    # ── Finance ──────────────────────────────────────────────────────────
+    INVESTMENTS = "Investments"
+    INSURANCE = "Insurance"
+    LOAN_EMI = "Loan EMI"
+    TAXES = "Taxes"
+    BANK_FEES = "Bank Fees"
+
+    # ── Travel & Lodging ─────────────────────────────────────────────────
+    HOTELS_STAYS = "Hotels & Stays"
+    TRAVEL_BOOKING = "Travel Booking"
+
+    # ── People ───────────────────────────────────────────────────────────
+    TRANSFERS_TO_PEOPLE = "Transfers to People"
+    RECEIVED_FROM_PEOPLE = "Received from People"
+
+    # ── Income ───────────────────────────────────────────────────────────
     SALARY = "Salary"
-    SHOPPING = "Shopping"
-    ENTERTAINMENT = "Entertainment"
-    HEALTH = "Health"
-    EDUCATION = "Education"
-    FINANCE = "Finance"
-    PEOPLE = "People"
-    MISC = "Misc"
+    REFUNDS = "Refunds"
+    INTEREST = "Interest"
+
+    # ── Misc ─────────────────────────────────────────────────────────────
     UNCATEGORIZED = "Uncategorized"
 
 
-# Default category keywords for HypCD classifier
+# Seed phrases for category embedding anchors (used by zero-shot classifier)
 DEFAULT_CATEGORY_KEYWORDS: dict[str, list[str]] = {
     Category.FOOD.value: [
-        "swiggy order", "zomato payment", "restaurant bill",
-        "blinkit grocery delivery", "zepto quick delivery",
-        "bigbasket grocery order", "dunzo delivery payment",
-        "eatfit healthy meal", "dominos pizza order",
-        "cafe coffee purchase", "food delivery payment",
+        "swiggy food order", "zomato restaurant payment", "dining out",
+        "food delivery", "restaurant bill", "eatfit meal", "dunzo food",
+        "dominos pizza", "kfc chicken", "burger king", "mcdonald meal",
     ],
-    Category.TRANSPORT.value: [
+    Category.GROCERIES.value: [
+        "blinkit grocery delivery", "zepto quick delivery", "bigbasket order",
+        "supermarket purchase", "grocery store shopping", "vegetables fruits",
+        "swiggy instamart", "dunzo grocery delivery", "jiomart order",
+    ],
+    Category.COFFEE_SNACKS.value: [
+        "starbucks coffee", "cafe coffee day", "third wave coffee",
+        "tea snack purchase", "bakery pastry order", "juice smoothie",
+    ],
+    Category.TAXI_RIDESHARE.value: [
         "uber ride payment", "ola cab trip", "rapido bike taxi",
-        "metro card recharge", "irctc train ticket",
-        "indigo flight booking", "makemytrip travel",
-        "fastag toll payment", "petrol pump payment",
-        "redbus bus ticket booking",
+        "uber auto ride", "ola share cab", "rideshare payment",
     ],
-    Category.UTILITIES.value: [
-        "electricity bill payment", "water bill bescom",
+    Category.PUBLIC_TRANSIT.value: [
+        "metro card recharge", "bus ticket booking", "local train pass",
+        "redbus bus ticket", "irctc train ticket", "railway pass renewal",
+    ],
+    Category.FLIGHTS.value: [
+        "indigo flight booking", "spicejet airline ticket",
+        "air india flight", "vistara airline", "goair booking",
+        "flight ticket purchase", "airline booking payment",
+    ],
+    Category.FUEL.value: [
+        "petrol pump payment", "diesel fuel purchase",
+        "hp petrol", "indian oil fuel", "bharat petroleum",
+        "fastag toll payment", "fuel station refueling",
+    ],
+    Category.RENT_MORTGAGE.value: [
+        "rent payment monthly", "house rent transfer",
+        "landlord rental payment", "mortgage emi debit",
+        "property maintenance fee", "housing society charges",
+    ],
+    Category.ELECTRICITY_WATER.value: [
+        "electricity bill payment", "bescom power bill",
+        "tata power electricity", "bwssb water bill",
+        "gas cylinder booking", "lpg refill delivery",
+    ],
+    Category.INTERNET_PHONE.value: [
         "airtel mobile recharge", "jio prepaid recharge",
-        "act fibernet broadband bill", "tata power electricity",
-        "bwssb water bill payment", "vodafone postpaid bill",
-        "gas cylinder booking", "broadband monthly bill",
+        "act fibernet broadband bill", "vodafone postpaid bill",
+        "bsnl broadband payment", "vi recharge plan",
     ],
-    Category.SALARY.value: [
-        "salary credited", "monthly payroll credit",
-        "salary transfer neft", "payroll deposit",
-        "salary for month of", "stipend payment",
-        "wages credited account", "monthly income transfer",
+    Category.HOME_MAINTENANCE.value: [
+        "plumber service payment", "electrician home repair",
+        "carpenter furniture fix", "home cleaning service",
+        "painting renovation charge", "pest control service",
     ],
-    Category.SHOPPING.value: [
+    Category.CLOTHING_FASHION.value: [
+        "myntra fashion purchase", "ajio clothing order",
+        "meesho fashion sale", "nykaa beauty order",
+        "h&m clothing purchase", "zara fashion store",
+    ],
+    Category.ELECTRONICS.value: [
+        "croma electronics purchase", "reliance digital store",
+        "laptop computer purchase", "mobile phone accessory",
+        "electronic gadget order", "smartwatch purchase",
+    ],
+    Category.GENERAL_RETAIL.value: [
         "amazon purchase order", "flipkart product order",
-        "myntra fashion purchase", "nykaa beauty order",
-        "meesho clothing order", "croma electronics purchase",
-        "decathlon sports equipment", "ajio fashion sale",
-        "retail shopping payment", "online shopping order",
+        "online shopping payment", "retail store purchase",
+        "decathlon sports equipment", "dmart shopping bill",
     ],
-    Category.ENTERTAINMENT.value: [
+    Category.SUBSCRIPTIONS.value: [
         "netflix monthly subscription", "spotify premium payment",
         "jiocinema subscription", "sonyliv monthly plan",
         "hotstar disney subscription", "youtube premium individual",
+        "apple one subscription", "play pass monthly google",
+    ],
+    Category.MOVIES_EVENTS.value: [
         "bookmyshow movie ticket", "pvr cinema ticket",
-        "play pass monthly google", "music premium subscription",
+        "event concert booking", "inox movie hall",
+        "comedy show ticket", "theater performance booking",
     ],
-    Category.HEALTH.value: [
-        "pharmacy medicine purchase", "hospital bill payment",
-        "clinic doctor consultation", "1mg medicine order",
-        "netmeds pharmacy delivery", "cult.fit gym membership",
-        "healthifyme subscription", "apollo pharmacy order",
-        "lab test payment diagnostics", "pharmeasy medicine",
+    Category.GAMING.value: [
+        "google play games purchase", "steam gaming purchase",
+        "playstation store", "xbox game pass", "dream11 contest",
+        "mobile game purchase", "in-app gaming payment",
     ],
-    Category.EDUCATION.value: [
-        "udemy course payment", "unacademy subscription",
-        "byju learning app", "coursera online course",
-        "tuition fee school", "college exam fee payment",
-        "physics wallah subscription", "upgrad course enrollment",
-        "simplilearn certification", "book purchase education",
+    Category.MEDICAL.value: [
+        "hospital bill payment", "clinic doctor consultation",
+        "medical test diagnostics", "health checkup package",
+        "surgery operation charges", "dental treatment payment",
     ],
-    Category.FINANCE.value: [
-        "loan emi payment", "insurance premium payment",
+    Category.PHARMACY.value: [
+        "1mg medicine order", "netmeds pharmacy delivery",
+        "apollo pharmacy order", "pharmeasy medicine purchase",
+        "medical store prescription", "pharmacy health products",
+    ],
+    Category.FITNESS.value: [
+        "cultfit gym membership", "gold gym monthly plan",
+        "yoga class subscription", "fitness studio payment",
+        "healthifyme premium", "sports club membership",
+    ],
+    Category.INVESTMENTS.value: [
         "mutual fund sip investment", "zerodha brokerage",
-        "groww investment transfer", "cred credit card payment",
-        "bajaj finance emi debit", "fd interest deposit bank",
-        "tax payment government", "upstox trading account",
+        "groww investment transfer", "upstox trading account",
+        "stock market purchase", "fixed deposit investment",
     ],
-    Category.PEOPLE.value: [
-        "transfer to friend upi", "sent money family member",
-        "gift payment personal", "reimbursement from colleague",
-        "upi transfer person", "money sent contact",
-        "personal transfer neft", "family expense payment",
+    Category.INSURANCE.value: [
+        "insurance premium payment", "life insurance policy",
+        "health insurance renewal", "vehicle insurance premium",
+        "term plan premium", "bajaj allianz insurance",
     ],
-    Category.MISC.value: [
+    Category.LOAN_EMI.value: [
+        "loan emi payment", "bajaj finance emi debit",
+        "home loan emi monthly", "personal loan installment",
+        "credit card emi payment", "education loan emi",
+    ],
+    Category.TAXES.value: [
+        "income tax payment", "gst payment government",
+        "property tax municipal", "advance tax challan",
+        "tds tax deducted source", "professional tax debit",
+    ],
+    Category.BANK_FEES.value: [
+        "bank charge fee debit", "processing fee payment",
+        "convenience fee transaction", "annual maintenance charge",
+        "sms alert charges", "atm usage surcharge",
+    ],
+    Category.HOTELS_STAYS.value: [
+        "airbnb accommodation booking", "oyo hotel room",
+        "hotel stay reservation", "resort booking payment",
+        "makemytrip hotel", "goibibo hotel booking",
+        "booking.com accommodation", "treebo hotel stay",
+    ],
+    Category.TRAVEL_BOOKING.value: [
+        "makemytrip travel booking", "ixigo trip planning",
+        "cleartrip holiday package", "yatra travel booking",
+        "goibibo flight hotel", "travel agency package",
+    ],
+    Category.TRANSFERS_TO_PEOPLE.value: [
+        "upi transfer to friend", "sent money family member",
+        "personal payment transfer", "money sent contact person",
+        "neft imps transfer individual", "upi debit transfer person",
+    ],
+    Category.RECEIVED_FROM_PEOPLE.value: [
+        "upi received from friend", "money received family",
+        "reimbursement from colleague", "personal credit transfer",
+        "neft credit individual", "upi credit from person",
+    ],
+    Category.SALARY.value: [
+        "salary credited monthly", "payroll credit transfer",
+        "salary neft deposit", "wages credited account",
+        "monthly income payment", "stipend credit",
+    ],
+    Category.REFUNDS.value: [
+        "refund credited account", "return order refund",
+        "cashback credit received", "payment reversal credit",
+        "order cancellation refund", "reimbursement received",
+    ],
+    Category.INTEREST.value: [
+        "interest credit savings", "fd maturity interest",
+        "bank interest deposit", "interest earned account",
+        "savings account interest", "recurring deposit interest",
+    ],
+    Category.UNCATEGORIZED.value: [
         "miscellaneous payment service", "general charge fee",
         "other payment unknown", "service fee charge",
-        "processing fee payment", "convenience fee transaction",
-        "bank charge fee debit", "penalty fine payment",
     ],
+}
+
+
+# ── Legacy Mapping ──────────────────────────────────────────────────────
+# Maps old 11-class category names to new expanded equivalents.
+# Used when migrating existing data or handling old API requests.
+
+LEGACY_CATEGORY_MAP: dict[str, str] = {
+    "Food": Category.FOOD.value,
+    "Transport": Category.TAXI_RIDESHARE.value,
+    "Utilities": Category.ELECTRICITY_WATER.value,
+    "Salary": Category.SALARY.value,
+    "Shopping": Category.GENERAL_RETAIL.value,
+    "Entertainment": Category.SUBSCRIPTIONS.value,
+    "Health": Category.MEDICAL.value,
+    "Education": Category.UNCATEGORIZED.value,  # Removed — reclassify
+    "Finance": Category.INVESTMENTS.value,
+    "People": Category.TRANSFERS_TO_PEOPLE.value,
+    "Misc": Category.UNCATEGORIZED.value,
+    "Uncategorized": Category.UNCATEGORIZED.value,
 }
