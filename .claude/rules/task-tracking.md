@@ -12,21 +12,21 @@ Use built-in task tools for ALL multi-step work. Create tasks at the START, not 
 | `TaskList` | Check for in-progress tasks from prior sessions at startup |
 | `TaskGet` | Get details on a specific task |
 
-**Never create `task.md` files.** Tasks live in Claude Code's task system only.
+**Do NOT create `task.md`, `implementation_plan.md`, or `walkthrough.md`.**
+These are Gemini's native artifact equivalents — Claude uses the tools above instead.
+Each agent uses its own native tracking method. The shared project space is `docs/`.
 
-## Artifact Mapping
+## Shared Project Docs (cross-agent)
+
+Design docs live in `docs/` and are shared by all agents and humans:
 
 | What | Where |
 |---|---|
 | Feature LLD | `docs/features/NNN-name.md` |
 | Bug reports | `docs/bugs/BUG-NNN-name.md` |
-| RFCs / big decisions | `docs/rfcs/RFC-NNN-name.md` |
+| RFCs / decisions | `docs/rfcs/RFC-NNN-name.md` |
 | HLD (living docs) | `docs/design/*.md` |
-| Session state / notes | auto memory (`MEMORY.md`) |
+| Policies | `docs/policies/*.md` |
+| Session state / notes | auto memory (`MEMORY.md`) — local to Claude only |
 
-**NEVER create:**
-- `task.md`
-- `implementation_plan.md`
-- `walkthrough.md`
-- `plan.md`
-- `docs/plans/` directory
+**Doc format standard:** See `docs/STANDARDS.md` for required metadata, sections, naming, and status lifecycle.

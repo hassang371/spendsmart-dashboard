@@ -88,11 +88,19 @@ git commit -m "docs: add LLD for <feature-name>"
 | RFC | 2+ diagrams: current state + proposed state |
 | HLD | 3+ diagrams: architecture, data flow, deployment |
 
+## Doc Standards
+
+**Canonical standard:** `docs/STANDARDS.md` — required metadata, sections, status lifecycle, naming, Mermaid requirements.
+Read this before filling in any template. It wins over all agent-specific guidance.
+
+**Short-form RFC:** For small decisions, use `templates/rfc-short.md` instead of `templates/rfc.md`.
+
 ## Reference Index (load on demand — do NOT preload all)
 
 | File | Load when |
 |---|---|
-| `references/doc-standards.md` | Unsure what good LLD/HLD looks like |
+| `docs/STANDARDS.md` | Before writing any doc — canonical required fields and sections |
+| `references/doc-standards.md` | Need implementation notes specific to Claude (scripts, auto-numbering) |
 | `references/hld-sync-protocol.md` | After writing any LLD |
 | `references/resilient-workflow.md` | Generating or validating diagrams |
 | `references/troubleshooting.md` | Diagram fails to render |
