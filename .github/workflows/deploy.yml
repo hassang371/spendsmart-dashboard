@@ -1,7 +1,12 @@
 name: Deploy
 
+# BUG-001 fix: Trigger ONLY when CI workflow completes successfully.
+# This replaces the fake echo-only wait-for-ci job that never verified anything.
+# The deploy will NOT run if any CI job fails.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
 
 # Ensure only one deployment runs at a time
@@ -9,16 +14,23 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
+# Minimal permissions
+permissions:
+  contents: read
+
 jobs:
-  # The CI workflow will also run on push to main (defined in ci.yml)
-  # But we run a lightweight wait-for-ci job here to ensure it passes before deploying
-  # Waits for the CI workflow (ci.yml) to succeed on the same commit before deploying.
-  # Requires: Settings → Actions → General → "Require status checks to pass" with "CI" selected.
-  wait-for-ci:
+  # Real CI gate: abort immediately if the triggering CI run did not succeed
+  check-ci-success:
     runs-on: ubuntu-latest
     steps:
-      - name: Confirm CI passed
-        run: echo "CI passed — proceeding to deploy."
+      - name: Abort if CI did not succeed
+        if: ${{ github.event.workflow_run.conclusion != 'success' }}
+        run: |
+          echo "CI workflow concluded with: ${{ github.event.workflow_run.conclusion }}"
+          echo "Aborting deployment — CI must pass before deploying."
+          exit 1
+      - name: CI passed — proceeding
+        run: echo "CI succeeded (run ${{ github.event.workflow_run.id }}). Proceeding to deploy."
 
   deploy-staging:
     name: Deploy to Staging
