@@ -1,6 +1,10 @@
 # Migration Safety Policy
 
-> **Feature 002 Rec DB-1** — Introduced 2026-03-08
+> **Doc ID:** migration-policy
+> **Date:** 2026-03-08
+> **Status:** Current
+> **DRI:** Hassan
+> **Source:** Feature 002 Rec DB-1
 
 All migrations under `supabase/migrations/` must satisfy this checklist before merging.
 

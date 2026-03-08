@@ -1,6 +1,11 @@
 # CLAUDE.md Rewrite + Design-Docs Skill Update — Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **Doc ID:** RFC-001-implementation-plan
+> **Date:** 2026-03-07
+> **Status:** Implemented
+> **DRI:** Hassan
+> **Type:** Appendix to RFC-001-claude-md-rewrite.md
+> **Note (Claude):** Use `superpowers:executing-plans` to implement this plan task-by-task.
 
 **Goal:** Rewrite `.claude/CLAUDE.md` as a thin master, create modular rules in `.claude/rules/`, migrate `docs-driven-dev` workflow, and restore missing files to the design-docs skill.
 

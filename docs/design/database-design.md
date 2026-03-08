@@ -1,7 +1,10 @@
 # Database Design — HLD
 
+> **Doc ID:** database-design
 > **Last Updated:** 2026-03-06
 > **Status:** Current
+> **Version:** 1.0
+> **DRI:** Hassan
 
 ## Overview
 
@@ -157,3 +160,4 @@ graph TB
 | Date | Feature | Change |
 |---|---|---|
 | 2026-03-06 | Initial HLD | Created from archived database/testing docs |
+| 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata |
