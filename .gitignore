@@ -37,9 +37,9 @@ __pycache__/
 .agents/
 .gemini/
 .vscode/
-references/
-misc/
-tools/csvs/
+/references/
+/misc/
+/tools/csvs/
 
 # Claude Code (track config, not local settings)
 .claude/settings.local.json
