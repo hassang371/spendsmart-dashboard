@@ -102,21 +102,6 @@ const defaultFilters: FilterState = {
   paymentMethod: 'all',
 };
 
-const monthLookup: Record<string, number> = {
-  jan: 0,
-  feb: 1,
-  mar: 2,
-  apr: 3,
-  may: 4,
-  jun: 5,
-  jul: 6,
-  aug: 7,
-  sep: 8,
-  sept: 8,
-  oct: 9,
-  nov: 10,
-  dec: 11,
-};
 
 const TRANSACTIONS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const UNCATEGORIZED_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -131,14 +116,6 @@ function normalizeStatus(value: string): string {
   return status || 'completed';
 }
 
-function toTitleCase(value: string): string {
-  return value
-    .toLowerCase()
-    .split(' ')
-    .filter(Boolean)
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
 
 function categoryIcon(category: string) {
   const cat = category.toLowerCase().trim();
@@ -284,6 +261,7 @@ export default function TransactionsPage() {
 
   const [editingCategoryTxId, setEditingCategoryTxId] = useState<string | null>(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState<string>('Misc');
+  // BUG-034 fix: restored state + wired setUpdatingCategory in saveCategoryEdit below
   const [updatingCategory, setUpdatingCategory] = useState(false);
 
   // Review tab
@@ -922,7 +900,8 @@ export default function TransactionsPage() {
       })
     );
     setEditingCategoryTxId(null);
-
+    // BUG-034 fix: actually toggle saving state so JSX disabled props work
+    setUpdatingCategory(true);
     try {
       await accountsApi.updateTransaction(txId, updates, accessToken);
       setMessage('Category updated.');
@@ -951,6 +930,8 @@ export default function TransactionsPage() {
         })
       );
       setError(updateError instanceof Error ? updateError.message : 'Unable to update category.');
+    } finally {
+      setUpdatingCategory(false);
     }
   };
 

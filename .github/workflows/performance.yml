@@ -26,7 +26,20 @@ jobs:
         if: ${{ inputs.target_url == '' || github.event_name == 'schedule' }}
         run: |
           docker compose up -d redis api
-          sleep 15 # Wait for services to be ready
+          # BUG-028 fix: Poll health endpoint instead of blind sleep.
+          # Retries up to 30 times (60 seconds max) before failing.
+          echo "Waiting for API to be ready..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/v1/health/ready; then
+              echo "API is ready after ${i} attempts."
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "API did not become ready within 60 seconds. Aborting."
+              exit 1
+            fi
+            sleep 2
+          done
           API_URL=http://localhost:8000 k6 run tests/performance/load_test.js
 
       - name: Run remote test
