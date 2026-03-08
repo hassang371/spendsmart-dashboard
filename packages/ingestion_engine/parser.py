@@ -626,7 +626,7 @@ class BankStatementParser:
         return None
 
     def _parse_amount(self, amount_value) -> float:
-        """Parse amount, handling currency symbols and commas."""
+        """Parse amount, handling currency symbols, commas, and DR/CR suffixes."""
         if pd.isna(amount_value):
             return 0.0
 
@@ -634,7 +634,14 @@ class BankStatementParser:
             return float(amount_value)
 
         # Clean amount string
-        amount_str = str(amount_value)
+        amount_str = str(amount_value).strip()
+
+        # BUG-021 fix: Handle trailing DR/CR suffix (e.g. "1234.00CR", "1,234.56DR").
+        # Many Indian bank statement exports use this format.
+        is_credit_suffix = bool(re.search(r'CR$', amount_str, re.IGNORECASE))
+        is_debit_suffix = bool(re.search(r'DR$', amount_str, re.IGNORECASE))
+        # Strip the suffix before further processing
+        amount_str = re.sub(r'[CcDd][Rr]$', '', amount_str).strip()
 
         # Remove currency symbols and whitespace
         amount_str = re.sub(r"[₹$€£¥\s]", "", amount_str)
@@ -647,16 +654,34 @@ class BankStatementParser:
         amount_str = amount_str.replace(",", "")
 
         try:
-            return float(amount_str)
+            value = float(amount_str)
         except ValueError:
             return 0.0
 
+        # Apply sign from DR/CR suffix
+        if is_credit_suffix:
+            return abs(value)
+        if is_debit_suffix:
+            return -abs(value)
+        return value
+
     def _calculate_amount(self, row: pd.Series) -> float:
         """Calculate net amount from debit/credit or amount columns."""
-        # If amount column exists
+        has_debit = "debit" in row and not pd.isna(row["debit"])
+        has_credit = "credit" in row and not pd.isna(row["credit"])
+
+        # BUG-022 fix: Prefer debit/credit columns for sign derivation when
+        # both are present alongside 'amount'. Relying solely on 'amount'
+        # can produce wrong signs when the source uses separate debit/credit
+        # columns with an ambiguous net amount column.
+        if has_debit or has_credit:
+            debit = self._parse_amount(row.get("debit", 0))
+            credit = self._parse_amount(row.get("credit", 0))
+            return credit - debit
+
+        # Fall back to amount column with optional type-based sign derivation
         if "amount" in row:
             amt = self._parse_amount(row["amount"])
-            # Check if type indicates debit
             if "type" in row:
                 txn_type = str(row["type"]).lower()
                 if any(x in txn_type for x in ["debit", "dr", "withdrawal", "out"]):
@@ -665,11 +690,7 @@ class BankStatementParser:
                     return abs(amt)
             return amt
 
-        # Otherwise use debit/credit
-        debit = self._parse_amount(row.get("debit", 0))
-        credit = self._parse_amount(row.get("credit", 0))
-
-        return credit - debit
+        return 0.0
 
     def _categorize_transaction(
         self, description: str, merchant: str, method: str

@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase/client';
+import { getCacheKey } from '../../../lib/utils/cache';
 import { useTheme } from 'next-themes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -152,11 +153,22 @@ export default function SettingsPage() {
 
       const transactions = txsd as Transaction[];
 
+      // BUG-027 fix: Sanitize CSV formula injection.
+      // Values starting with =, @, +, - can execute as formulas in spreadsheets.
+      // Prefix with a single quote to render as plain text.
+      const sanitizeFormula = (value: string): string => {
+        if (/^[=+\-@]/.test(value)) {
+          return `'${value}`;
+        }
+        return value;
+      };
+
       // Convert to CSV with proper escaping
       const escapeCSV = (value: string): string => {
-        const str = value ?? '';
+        const str = sanitizeFormula(value ?? '');
         if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
           return `"${str.replace(/"/g, '""')}"`;
+
         }
         return str;
       };
@@ -259,13 +271,17 @@ export default function SettingsPage() {
         .eq('user_id', user.id);
       if (deleteError) throw deleteError;
 
-      // Clear all cached state so every page reflects the deletion immediately
-      localStorage.removeItem(`overview-cache:${user.id}`);
-      localStorage.removeItem(`transactions-cache:${user.id}`);
-      localStorage.removeItem(`uncategorized-cache:${user.id}`);
-      localStorage.removeItem(`analytics-cache:${user.id}`);
-      localStorage.removeItem(`safe-to-spend-cache:${user.id}`);
-      localStorage.removeItem(`training-job-cache:${user.id}`);
+      // BUG-024 fix: Use getCacheKey() so keys match what getCachedData() wrote
+      // and clearAppCache() can find them when evicting by prefix.
+      const cacheKeys = [
+        'overview-cache',
+        'transactions-cache',
+        'uncategorized-cache',
+        'analytics-cache',
+        'safe-to-spend-cache',
+        'training-job-cache',
+      ];
+      cacheKeys.forEach((key) => localStorage.removeItem(getCacheKey(`${key}:${user.id}`)));
 
       setToast({
         type: 'success',

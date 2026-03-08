@@ -206,7 +206,18 @@ async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promis
       throw apiError;
     }
 
-    return await response.json();
+    // BUG-025 fix: Do not unconditionally call response.json().
+    // 204 No Content and other no-body success responses throw SyntaxError.
+    // Check status and Content-Type before attempting to parse.
+    const contentType = response.headers.get('content-type') ?? '';
+    const hasBody =
+      response.status !== 204 &&
+      response.status !== 205 &&
+      response.headers.get('content-length') !== '0' &&
+      contentType.includes('application/json');
+
+    return hasBody ? await response.json() : (undefined as unknown as T);
+
   } catch (error) {
     if (!(error instanceof ApiError)) {
       // Capture pure network errors or JSON parse errors
