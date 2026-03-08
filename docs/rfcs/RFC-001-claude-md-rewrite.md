@@ -1,8 +1,10 @@
 # RFC-001: CLAUDE.md Rewrite + Design-Docs Skill Update
 
-> **Status:** Implemented
+> **Doc ID:** RFC-001-claude-md-rewrite
 > **Date:** 2026-03-07
+> **Status:** Implemented
 > **DRI:** Hassan
+> **OKR Alignment:** Developer velocity — reduce agent friction and enforce consistent workflow discipline
 
 ## Problem Statement
 
@@ -14,6 +16,23 @@ The current `.claude/CLAUDE.md` was ported from `GEMINI.md` and has fundamental 
 4. **Broken artifact mapping** — CLAUDE.md paths conflict with the design-docs skill paths.
 5. **Design-docs skill gaps** — Missing progressive disclosure, error recovery, and validation pipeline from the original `design-doc-mermaid` repo.
 6. **`.agents/` dependency** — CLAUDE.md references `.agents/workflows/` which is Gemini-only territory.
+
+## Before State
+
+The configuration before this RFC — monolithic CLAUDE.md with Gemini artifacts:
+
+```mermaid
+graph TB
+    subgraph Before["❌ Before — Monolithic + Gemini-ported"]
+        CM["CLAUDE.md<br/>~200 lines<br/>Everything embedded"]
+        AG[".agents/workflows/<br/>Gemini-only, Claude can't use"]
+        TM["task.md / walkthrough.md<br/>File artifacts — not Claude native"]
+        SK["skills/design-docs/<br/>Missing 4 upstream files<br/>No progressive disclosure"]
+    end
+    CM -->|"references"| AG
+    CM -->|"creates"| TM
+    CM -->|"loads all"| SK
+```
 
 ## Proposed Solution
 
@@ -163,6 +182,27 @@ Level 3: skills/design-docs/references/ (loaded per decision tree)
 - **`.claude/skills/design-docs/`**: SKILL.md rewritten, 4 files restored from original repo.
 - **No code changes**: This RFC only affects agent configuration, not application code.
 
+## Success Metrics
+
+| Metric | Before | After |
+|---|---|---|
+| CLAUDE.md line count | ~200 lines (bloated) | ~75 lines (thin master) |
+| Always-loaded context | 1 file, ~200 lines | 6 files, ~210 lines (modular) |
+| Plugin skills mapped | 0 | 22 situations → skill |
+| Design-docs upstream files | Missing 4 | All restored |
+| Progressive disclosure | None (load-all) | 3-level decision tree |
+| `.agents/` references in Claude config | 6+ | 0 |
+
+## Timeline
+
+| Phase | Date | Deliverable |
+|---|---|---|
+| Brainstorm + design | 2026-03-07 | RFC-001 written, approach approved |
+| Implementation | 2026-03-07 → 2026-03-08 | All 8 tasks executed (see RFC-001-implementation-plan.md) |
+| Verification + commit | 2026-03-08 | Committed as `cd63a8e` — 29 files, 8107 insertions |
+
 ## Decision
 
-Approved by user during brainstorming session 2026-03-07.
+> **Decision:** Approved
+> **Date:** 2026-03-07
+> **Rationale:** Eliminates Gemini/Claude config conflicts, enforces brainstorming gate, restores missing upstream files, reduces CLAUDE.md to manageable size.

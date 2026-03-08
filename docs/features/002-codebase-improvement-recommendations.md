@@ -1,10 +1,10 @@
 # Feature LLD: Codebase Improvement Recommendations and Hardening Roadmap
 
-> **Doc Number:** 002  
-> **Type:** Feature LLD / Engineering Improvement Plan  
-> **Status:** Proposed  
-> **Date:** 2026-03-08  
-> **Related Docs:** `docs/bugs/2026-03-08-exhaustive-code-review-report.md`
+> **Doc ID:** 002-codebase-improvement-recommendations
+> **Date:** 2026-03-08
+> **Status:** Proposed
+> **DRI:** Hassan
+> **Related Docs:** `docs/bugs/BUG-001-consolidated-code-review.md`
 
 ---
 
@@ -382,7 +382,77 @@ It complements the bug report by focusing on system-level improvements, standard
 
 This recommendations doc is intentionally broader than bug-level fixes and should be used alongside:
 
-- `docs/bugs/2026-03-08-exhaustive-code-review-report.md`
+- `docs/bugs/BUG-001-consolidated-code-review.md`
 
-Bug report = concrete defects and direct fixes.  
+Bug report = concrete defects and direct fixes.
 This doc = strategic engineering improvements and operating model upgrades.
+
+---
+
+## 10. Success Criteria
+
+- [ ] All Phase 1 (CI + API contract) improvements implemented and passing CI
+- [ ] All Phase 2 (DB safety + ML reliability) improvements implemented
+- [ ] All Phase 3 (observability + security) improvements implemented
+- [ ] Escaped vulnerability count in main branch = 0 (Critical/High)
+- [ ] CI pass rate on first run ≥ 95%
+- [ ] Categorization and forecasting quality delta vs baseline ≥ 0
+
+## 11. Scope
+
+### In Scope
+- Code quality gates (linting, type checking, test coverage thresholds)
+- API contract hardening and auth failure paths
+- Database migration safety and index strategy
+- ML reliability (model versioning, inference validation)
+- Observability (structured logging, metrics, alerting)
+- Security hardening (dependency scanning, secret detection)
+
+### Out of Scope
+- New product features
+- Vendor migration (database, cloud provider)
+- Frontend redesign
+
+## 12. Design — Improvement Phases
+
+```mermaid
+graph LR
+    subgraph P1["🔴 Phase 1 — High Risk (Weeks 1–4)"]
+        CI["⚙️ CI/CD\nQuality Gates"]
+        API["🌐 API\nContract Hardening"]
+    end
+    subgraph P2["🟡 Phase 2 — Reliability (Weeks 5–8)"]
+        DB["💾 DB Safety\n+ Index Strategy"]
+        ML["🤖 ML\nReliability"]
+    end
+    subgraph P3["🟢 Phase 3 — Operations (Weeks 9–12)"]
+        OBS["📊 Observability\n+ Alerting"]
+        SEC["🔐 Security\nHardening"]
+    end
+    P1 --> P2 --> P3
+```
+
+## 13. Edge Cases
+
+| Scenario | Mitigation |
+|---|---|
+| Quality gates block existing PRs on day 1 | Stage gates with baselines — current state = floor, not ceiling |
+| Improvement ownership ambiguous | Assign single DRI per theme before execution starts |
+| Phase overlap (e.g. security needed in Phase 1) | P0 security findings from BUG-001 are pre-Phase-1 — fix immediately |
+
+## 14. Security Considerations
+
+- Auth failure paths (multi-tenant isolation) are Priority 0 — must be fixed before Phase 1
+- Secret scanning and dependency audits are Phase 3 but critical findings treated as P0
+- All API changes follow existing Supabase RLS model
+
+## 15. Testing Strategy
+
+- Each recommendation produces its own test (unit + integration) as part of implementation
+- CI pass rate tracked as primary quality metric
+- BUG-001 regression checklist used as acceptance baseline
+
+## 16. Related Documents
+
+- Bug report: `docs/bugs/BUG-001-consolidated-code-review.md`
+- HLDs to update on completion: `docs/design/api-design.md`, `docs/design/database-design.md`, `docs/design/system-architecture.md`

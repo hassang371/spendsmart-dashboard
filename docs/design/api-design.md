@@ -1,7 +1,10 @@
 # API Design — HLD
 
+> **Doc ID:** api-design
 > **Last Updated:** 2026-03-06
 > **Status:** Current
+> **Version:** 1.0
+> **DRI:** Hassan
 
 ## Overview
 
@@ -151,8 +154,36 @@ Cursor-based (keyset) pagination for collection endpoints:
 | Rate limit windows | Redis | 60s | Auto-expire |
 | Static assets | Vercel CDN | 1 year | Hashed filenames |
 
+## Domain Endpoint Map
+
+```mermaid
+graph LR
+    subgraph Client["🌐 Next.js Client"]
+        FE["Frontend"]
+    end
+    subgraph API["⚙️ FastAPI /api/v1"]
+        AU["🔐 /auth"]
+        TR["💳 /transactions"]
+        CA["🏷️ /categorization"]
+        FO["📈 /forecasting"]
+        AN["📊 /anomaly"]
+        IN["📥 /ingestion"]
+    end
+    subgraph DB["💾 Supabase"]
+        PG["Postgres + RLS"]
+    end
+    FE -->|"JWT"| AU
+    FE --> TR
+    FE --> CA
+    FE --> FO
+    FE --> AN
+    FE --> IN
+    AU & TR & CA & FO & AN & IN --> PG
+```
+
 ## Changelog
 
 | Date | Feature | Change |
 |---|---|---|
 | 2026-03-06 | Initial HLD | Created from archived API design and implementation plan docs |
+| 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata; added domain endpoint map diagram |

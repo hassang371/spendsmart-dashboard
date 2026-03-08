@@ -1,7 +1,10 @@
 # System Architecture — HLD
 
+> **Doc ID:** system-architecture
 > **Last Updated:** 2026-03-06
 > **Status:** Current
+> **Version:** 1.0
+> **DRI:** Hassan
 
 ## Overview
 
@@ -124,8 +127,38 @@ graph LR
 | Auth | Supabase JWT | Stateless, no server sessions |
 | ML inference | In-process (Phase 1) | Single container simplicity |
 
+## Data Flow — Transaction Ingestion to Forecast
+
+```mermaid
+sequenceDiagram
+    participant U as 👤 User
+    participant W as 🌐 Next.js
+    participant A as ⚙️ FastAPI
+    participant Q as 📬 Redis/Celery
+    participant P as 🔍 Ingestion Engine
+    participant C as 🤖 Categorizer
+    participant F as 📈 Forecasting
+    participant D as 💾 Supabase
+
+    U->>W: Upload bank CSV
+    W->>A: POST /api/v1/ingestion/upload
+    A->>D: Store raw file reference
+    A->>Q: enqueue parse_transactions task
+    Q->>P: parse_transactions(file_id)
+    P->>D: INSERT transactions (deduped)
+    P->>Q: enqueue categorize_batch task
+    Q->>C: categorize_batch(transaction_ids)
+    C->>D: UPDATE transactions.category
+    C->>Q: enqueue retrain_forecast task
+    Q->>F: retrain_forecast(user_id)
+    F->>D: UPDATE forecast_snapshots
+    D-->>W: Realtime subscription update
+    W-->>U: Dashboard refreshes
+```
+
 ## Changelog
 
 | Date | Feature | Change |
 |---|---|---|
 | 2026-03-06 | Initial HLD | Created from archived architecture docs |
+| 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata; added data flow diagram |
