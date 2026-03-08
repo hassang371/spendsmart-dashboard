@@ -8,6 +8,7 @@ with a Redis-backed sliding window using sorted sets.
 - Returns 429 Too Many Requests with Retry-After header when limit exceeded
 """
 
+import hashlib
 import time
 import structlog
 from typing import Optional, Tuple
@@ -20,13 +21,18 @@ logger = structlog.get_logger()
 def get_user_id_from_request(request: Request) -> str:
     """Extract a rate-limit key from the request.
 
-    Uses the Authorization header's token hash as the key.
-    Falls back to client IP if no auth header.
+    BUG-031 fix: Using the last 16 chars of a JWT is collision-prone
+    because two distinct tokens can share the same suffix.
+    We now use a SHA-256 hash of the full bearer token for a
+    stable, collision-free rate limit key with no PII leakage.
+    Falls back to client IP if no auth header is present.
     """
     auth = request.headers.get("authorization", "")
     if auth.startswith("Bearer ") and len(auth) > 20:
-        # Use last 16 chars of token as key (enough for uniqueness, no PII)
-        return f"jwt:{auth[-16:]}"
+        token = auth[7:]  # strip "Bearer " prefix
+        # Truncate to 32 hex chars (128 bits) — more than enough for uniqueness
+        token_hash = hashlib.sha256(token.encode()).hexdigest()[:32]
+        return f"jwt:{token_hash}"
     # Fallback to IP
     return f"ip:{request.client.host if request.client else 'unknown'}"
 
