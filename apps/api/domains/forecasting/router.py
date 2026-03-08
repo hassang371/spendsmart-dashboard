@@ -122,6 +122,11 @@ async def safe_to_spend(
         response = (
             client.table("transactions")
             .select("transaction_date, amount, status")
+            # BUG-002 fix: Explicit user_id filter as defense-in-depth.
+            # RLS on the user-scoped client already enforces isolation, but
+            # this explicit filter prevents cross-tenant leakage if RLS ever
+            # has a misconfiguration gap.
+            .eq("user_id", user_id)
             .gte("transaction_date", cutoff)
             .order("transaction_date", desc=False)
             .limit(5000)

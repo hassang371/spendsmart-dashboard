@@ -16,6 +16,7 @@ from packages.forecasting.trainer import (
     prepare_training_data,
     MAX_ENCODER_LENGTH,
 )
+from packages.forecasting.dataset import create_timeseries_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -185,9 +186,30 @@ def predict_with_tft(
     # method: use TimeSeriesDataSet.from_dataset(..., predict=True) on the NEW combined data
     # This creates samples. We want the sample that ends at the last known point.
 
+    # 3. Create prediction dataset
+    # BUG-004 fix: TimeSeriesDataSet.from_dataset() requires a TimeSeriesDataSet
+    # *instance* as its first argument, not a dict.
+    # model.dataset_parameters is a dict of constructor kwargs saved at training time.
+    # We must rebuild a reference TimeSeriesDataSet from the history data using
+    # those saved parameters, then use it as the template for from_dataset().
+
+    try:
+        # Rebuild the training-time reference dataset from history only.
+        # We pass the saved parameters as overrides so the schema matches exactly.
+        params = model.dataset_parameters  # dict of TimeSeriesDataSet kwargs
+        reference_ds = create_timeseries_dataset(
+            history_df,
+            max_encoder_length=params.get("max_encoder_length", MAX_ENCODER_LENGTH),
+            max_prediction_length=params.get("max_prediction_length", horizon),
+        )
+    except Exception as e:
+        logger.error(f"Failed to reconstruct reference dataset for from_dataset: {e}")
+        return {"error": f"Inference dataset construction failed: {e}"}
+
     pred_ds = TimeSeriesDataSet.from_dataset(
-        model.dataset_parameters, combined_df, predict=True, stop_randomization=True
+        reference_ds, combined_df, predict=True, stop_randomization=True
     )
+
 
     # We predict for the specific group "0" (there is only one anyway)
     # The dataset should produce logic to cover the future if configured right.

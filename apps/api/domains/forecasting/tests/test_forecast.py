@@ -24,17 +24,18 @@ def _make_mock_supabase():
     mock_user.user.id = "test-user-id"
     mock_client.auth.get_user.return_value = mock_user
 
-    # table("uploaded_files").insert(...).execute() succeeds
+    # Full chainable query mock — supports .select().eq().eq().gte().order().limit().execute()
     mock_table = MagicMock()
     mock_client.table.return_value = mock_table
     mock_table.insert.return_value = mock_table
-    mock_table.execute.return_value = MagicMock(data=[])
-
-    # table("transactions").select(...).gte(...).order(...).limit(...).execute() returns empty
     mock_table.select.return_value = mock_table
+    # BUG-002: .eq() is now called in safe-to-spend for user_id filtering
+    mock_table.eq.return_value = mock_table
     mock_table.gte.return_value = mock_table
     mock_table.order.return_value = mock_table
     mock_table.limit.return_value = mock_table
+    # Return empty transactions — safe-to-spend handles empty gracefully
+    mock_table.execute.return_value = MagicMock(data=[])
 
     return mock_client
 

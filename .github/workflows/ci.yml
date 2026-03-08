@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# BUG-035 fix: Minimal permissions for all jobs
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint & Format
@@ -31,12 +35,13 @@ jobs:
           fetch-depth: 0
       
       - name: Secret Scanning (TruffleHog)
-        uses: trufflesecurity/trufflehog@main
+        # BUG-009 fix: Pinned to immutable SHA (v3.88.1 — 2026-03)
+        uses: trufflesecurity/trufflehog@648aca6bae95a1b76e6dd5bfccc7d07e72572396
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: --only-verified
 
       - uses: actions/setup-python@v5
         with:
@@ -50,7 +55,8 @@ jobs:
         run: bandit -r apps/api/ -c pyproject.toml || bandit -r apps/api/ -ll
 
       - name: Run pip-audit (SCA)
-        run: pip-audit -r requirements.txt || echo "Warning: Vulnerabilities found"
+        # BUG-008 fix: Hard-fail on vulnerabilities — no more soft suppression
+        run: pip-audit -r requirements.txt
 
   test-backend:
     name: Backend Tests
@@ -88,7 +94,8 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner on API image
-        uses: aquasecurity/trivy-action@master
+        # BUG-009 fix: Pinned to immutable SHA (v0.29.0 — 2026-03)
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
         with:
           image-ref: 'scale-api:latest'
           format: 'table'

@@ -91,30 +91,65 @@ def test_predict_with_tft():
     horizon = 30
     fake_preds = torch.tensor([[[10.0, 50.0, 90.0]] * horizon])
     mock_model.predict.return_value = fake_preds
+    mock_model.dataset_parameters = {
+        "max_encoder_length": 60,
+        "max_prediction_length": 30,
+    }
 
-    # We need to mock TimeSeriesDataSet because it requires specific column types/structures
-    # that are hard to fake perfectly without real data setup.
-    # However, predict_with_tft calls prepare_training_data which calls TransactionLoader.
-    # We can rely on the real trainer logic if it works, or mock it if complex.
-    # The real trainer logic works on simple DFs.
+    # BUG-004 fix verification: from_dataset must receive a TimeSeriesDataSet
+    # INSTANCE, not a dict. We patch create_timeseries_dataset to return a
+    # mock dataset instance, then assert from_dataset received that instance.
+    mock_reference_ds = MagicMock()
+    mock_pred_ds = MagicMock()
+    mock_pred_ds.to_dataloader.return_value = MagicMock()
 
-    # One issue: TimeSeriesDataSet inside prediction might verify columns.
-    # We'll try running it. If TimeSeriesDataSet fails validation, we might mock it.
+    with (
+        patch(
+            "packages.forecasting.inference.create_timeseries_dataset",
+            return_value=mock_reference_ds,
+        ) as mock_create_ds,
+        patch("packages.forecasting.inference.TimeSeriesDataSet") as mock_ts_cls,
+    ):
+        mock_ts_cls.from_dataset.return_value = mock_pred_ds
 
-    with patch("packages.forecasting.inference.TimeSeriesDataSet") as mock_ts_cls:
-        # Mock dataset instance
-        mock_ds = MagicMock()
-        mock_ts_cls.from_dataset.return_value = mock_ds
-        mock_ds.to_dataloader.return_value = MagicMock()
+        result = predict_with_tft(mock_model, df, horizon=horizon)
 
-        # We also need model.dataset_parameters
-        mock_model.dataset_parameters = {}
+        # Verify create_timeseries_dataset was called (not raw from_dataset with dict)
+        mock_create_ds.assert_called_once()
 
-        result = predict_with_tft(mock_model, df, horizon=30)
+        # Verify from_dataset received the dataset INSTANCE (not the dict)
+        call_args = mock_ts_cls.from_dataset.call_args
+        first_arg = call_args[0][0]
+        assert first_arg is mock_reference_ds, (
+            "BUG-004: from_dataset must receive a TimeSeriesDataSet instance, "
+            f"got {type(first_arg)}"
+        )
 
         assert "forecast" in result
         forecast = result["forecast"]
-        assert len(forecast) == 30
+        assert len(forecast) == horizon
         assert forecast[0]["p10"] == 10.0
         assert forecast[0]["p50"] == 50.0
         assert forecast[0]["p90"] == 90.0
+
+
+def test_predict_with_tft_dataset_construction_failure():
+    """BUG-004: If reference dataset construction fails, return error dict (no crash)."""
+    mock_model = MagicMock()
+    mock_model.loss.quantiles = [0.1, 0.5, 0.9]
+    mock_model.dataset_parameters = {}
+
+    dates = pd.date_range("2025-01-01", periods=100, freq="D")
+    df = pd.DataFrame(
+        {"date": dates, "amount": np.random.uniform(-100, 100, 100)}
+    )
+
+    with patch(
+        "packages.forecasting.inference.create_timeseries_dataset",
+        side_effect=ValueError("schema mismatch"),
+    ):
+        result = predict_with_tft(mock_model, df, horizon=7)
+
+    assert "error" in result
+    assert "Inference dataset construction failed" in result["error"]
+
