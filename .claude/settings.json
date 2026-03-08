@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make *)",
+      "Bash(npm run *)",
+      "Bash(npm test*)",
+      "Bash(npx tsc*)",
+      "Bash(git *)",
+      "Bash(ls *)",
+      "Bash(ls)",
+      "Bash(cat *)",
+      "Bash(bash *)",
+      "Bash(source *)",
+      "Bash(python3 *)",
+      "Bash(.venv/bin/python -m pytest*)",
+      "Bash(.venv/bin/python3 *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/pip *)",
+      "Bash(docker compose *)",
+      "Bash(docker build*)",
+      "Bash(PRE_COMMIT_ALLOW_NO_CONFIG=1 git*)",
+      "Bash(PRE_COMMIT_ALLOW_NO_CONFIG=1 .venv/bin/python*)",
+      "Bash(claude mcp*)",
+      "Bash(cd *)",
+      "WebSearch"
+    ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "context-engineering-fundamentals@context-engineering-marketplace": true,
+    "cognitive-architecture@context-engineering-marketplace": false,
+    "agent-evaluation@context-engineering-marketplace": false,
+    "agent-development@context-engineering-marketplace": false,
+    "agent-architecture@context-engineering-marketplace": false,
+    "monitoring-observability@devops-skills": true,
+    "ci-cd@devops-skills": true,
+    "gitops-workflows@devops-skills": true,
+    "skill-creator@claude-plugins-official": true,
+    "fullstack-dev-skills@fullstack-dev-skills": false
+  },
+  "autoMemoryEnabled": true
+}

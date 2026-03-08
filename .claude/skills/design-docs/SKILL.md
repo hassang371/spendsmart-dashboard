@@ -1,0 +1,112 @@
+---
+name: design-docs
+description: Use when a feature, bug fix, or architectural decision needs a design document before code is written. Triggers for new LLDs, bug reports, RFCs, HLD updates, and Mermaid diagrams.
+---
+
+# Design Documentation Skill
+
+## Overview
+
+Every code change must be preceded by documentation. This skill creates LLDs for features/bugs and maintains HLDs for system-wide architecture.
+
+**Iron Law: No code without a design doc first.**
+
+## Decision Tree
+
+```
+What are you building?
+  → New feature        → Feature LLD    → templates/feature-lld.md
+  → Bug fix            → Bug report     → templates/bug-report.md
+  → Big decision       → RFC            → templates/rfc.md
+  → System-wide doc    → HLD update     → docs/design/*.md
+  → Need a diagram     → Mermaid guide  → references/mermaid/<type>.md
+```
+
+## Step 1: Get Doc Number
+
+```bash
+bash .claude/skills/design-docs/scripts/next_doc_number.sh features   # → 003
+bash .claude/skills/design-docs/scripts/next_doc_number.sh bugs       # → BUG-001
+bash .claude/skills/design-docs/scripts/next_doc_number.sh rfcs       # → RFC-001
+```
+
+## Step 2: Load Template
+
+Read ONLY the template you need:
+
+| Work type | Template | Output path |
+|---|---|---|
+| Feature | `templates/feature-lld.md` | `docs/features/NNN-name.md` |
+| Bug fix | `templates/bug-report.md` | `docs/bugs/BUG-NNN-name.md` |
+| RFC | `templates/rfc.md` | `docs/rfcs/RFC-NNN-name.md` |
+| System doc | `templates/system-design.md` or `api-design.md` or `database-design.md` | `docs/design/*.md` |
+
+Fill ALL sections. No placeholders. No TODOs.
+
+## Step 3: Add Mermaid Diagram (MANDATORY)
+
+Every doc needs at least one diagram. Load ONLY the guide you need:
+
+| Diagram type | When | Load |
+|---|---|---|
+| Sequence | API flows, service interactions | `references/mermaid/sequence-diagrams.md` |
+| Activity/Flowchart | Workflows, business logic | `references/mermaid/activity-diagrams.md` |
+| Architecture | System components, C4 | `references/mermaid/architecture-diagrams.md` |
+| Deployment | Infrastructure, Docker, cloud | `references/mermaid/deployment-diagrams.md` |
+| Symbols | Unicode catalog | `references/mermaid/unicode-symbols.md` |
+
+**Diagram validation workflow:** See `references/resilient-workflow.md`
+
+**If diagram fails to render:** See `references/troubleshooting.md` (28 error fixes)
+
+**Diagram style rules:**
+1. Unicode symbols always (🔐 🌐 ⚙️ 💾 📬)
+2. High-contrast colors (accessible)
+3. Descriptive labels ("Auth Service (JWT)" not "Service A")
+
+## Step 4: HLD Sync Check
+
+After any LLD, check if HLD needs updating:
+
+1. Read `references/hld-sync-protocol.md`
+2. Identify affected HLD files in `docs/design/`
+3. Update affected sections + add changelog entry at bottom
+
+## Step 5: Commit Docs Before Code
+
+```bash
+git add docs/
+git commit -m "docs: add LLD for <feature-name>"
+```
+
+## Minimum Diagram Requirements
+
+| Doc Type | Minimum |
+|---|---|
+| Feature LLD | 1 sequence or activity diagram |
+| Bug report | 1 diagram showing bug's data flow |
+| RFC | 2+ diagrams: current state + proposed state |
+| HLD | 3+ diagrams: architecture, data flow, deployment |
+
+## Reference Index (load on demand — do NOT preload all)
+
+| File | Load when |
+|---|---|
+| `references/doc-standards.md` | Unsure what good LLD/HLD looks like |
+| `references/hld-sync-protocol.md` | After writing any LLD |
+| `references/resilient-workflow.md` | Generating or validating diagrams |
+| `references/troubleshooting.md` | Diagram fails to render |
+| `references/mermaid/activity-diagrams.md` | Need workflow/process diagram |
+| `references/mermaid/sequence-diagrams.md` | Need API/data flow diagram |
+| `references/mermaid/architecture-diagrams.md` | Need component diagram |
+| `references/mermaid/deployment-diagrams.md` | Need infrastructure diagram |
+| `references/mermaid/unicode-symbols.md` | Need symbol reference |
+
+## Scripts
+
+| Script | Purpose | Usage |
+|---|---|---|
+| `scripts/next_doc_number.sh` | Auto-increment doc number | `bash scripts/next_doc_number.sh features` |
+| `scripts/extract_mermaid.py` | Extract/validate diagrams | `python scripts/extract_mermaid.py doc.md --validate` |
+| `scripts/resilient_diagram.py` | Generate + validate + save diagram | `python scripts/resilient_diagram.py --code "..." --title "flow"` |
+| `scripts/mermaid_to_image.py` | Convert .mmd to PNG/SVG | `python scripts/mermaid_to_image.py diagram.mmd output.png` |
