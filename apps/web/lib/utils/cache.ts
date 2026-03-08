@@ -1,12 +1,44 @@
 import { getAppStorage } from './storage';
 
 /**
- * Helper to standardise cache keys with environment prefix
+ * The prefix used for all app-owned cache keys in storage.
+ * Used by eviction logic to identify and clean only app-owned entries.
+ */
+export const APP_CACHE_PREFIX = process.env.NODE_ENV === 'development' ? 'dev:' : 'prod:';
+
+/**
+ * Helper to standardise cache keys with environment prefix.
  * Development keys won't collide with Production keys if running on same domain.
  */
 export function getCacheKey(key: string): string {
-  const isDev = process.env.NODE_ENV === 'development';
-  return isDev ? `dev:${key}` : `prod:${key}`;
+  return `${APP_CACHE_PREFIX}${key}`;
+}
+
+/**
+ * BUG-010 + FE-1 fix: Evict only app-owned cache keys by prefix.
+ * Safe to call on quota exceeded — does NOT touch keys from other origins/apps.
+ *
+ * @param storage The storage instance to evict from
+ */
+function evictAppCacheByPrefix(storage: Storage): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < storage.length; i++) {
+    const k = storage.key(i);
+    if (k && k.startsWith(APP_CACHE_PREFIX)) {
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach((k) => storage.removeItem(k));
+}
+
+/**
+ * Intentionally clear ALL app-owned cache entries.
+ * Use this for logout/destructive actions. Does NOT clear non-app keys.
+ */
+export function clearAppCache(): void {
+  const storage = getAppStorage();
+  if (!storage) return;
+  evictAppCacheByPrefix(storage);
 }
 
 /**
@@ -72,9 +104,10 @@ export function setCachedData<T>(key: string, data: T): void {
   } catch (error) {
     console.warn(`Failed to set cache for key ${fullKey}`, error);
 
-    // If quota exceeded, we might want to clear old entries
+    // BUG-010 fix: On quota exceeded, evict only app-owned keys.
+    // storage.clear() would wipe ALL same-origin storage including session data.
     if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      storage.clear(); // Extreme approach, could be refined to LRU eviction
+      evictAppCacheByPrefix(storage);
     }
   }
 }

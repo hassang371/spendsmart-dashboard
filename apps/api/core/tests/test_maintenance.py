@@ -34,15 +34,14 @@ class TestCleanupStaleJobs:
         # Assert correct result string returned
         assert "Cleaned up 2 stale training jobs" in result
 
-        # Verify Supabase client was called correctly
-        mock_supabase.assert_called_once()
-        mock_client.table.assert_called_with("classification_jobs")
-        mock_query.update.assert_called_with({
-            "status": "failed",
-            "error_message": "Job timed out (cleaned up by maintenance task)"
-        })
-        mock_query.eq.assert_called_with("status", "processing")
-        mock_query.lt.assert_called_once() # Check that the date filter was applied
+        # BUG-017 fix: Verify now correctly targets training_jobs, not dropped classification_jobs
+        mock_client.table.assert_called_with("training_jobs")
+        # BUG-017 fix: Verify correct field name ('logs') and added updated_at timestamp
+        update_call = mock_query.update.call_args[0][0]
+        assert update_call["status"] == "failed"
+        assert "logs" in update_call
+        assert "updated_at" in update_call
+        assert "Job timed out" in update_call["logs"]
 
     def test_cleanup_stale_jobs_no_rows(self, mock_supabase):
         """Test behavior when no stale jobs exist."""

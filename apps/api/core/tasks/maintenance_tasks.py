@@ -8,7 +8,8 @@ logger = structlog.get_logger(__name__)
 
 def get_service_client() -> Client:
     """Provides a Supabase client using the service role key to bypass RLS."""
-    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    # BUG-017 fix: config defines SUPABASE_SERVICE_KEY, not SUPABASE_SERVICE_ROLE_KEY
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 @shared_task(name="cleanup_stale_jobs")
 def cleanup_stale_jobs() -> str:
@@ -27,12 +28,13 @@ def cleanup_stale_jobs() -> str:
         threshold_time = datetime.now(timezone.utc) - timedelta(hours=2)
         threshold_iso = threshold_time.isoformat()
         
-        # Find and update stuck jobs
+        # BUG-017 fix: Align to training_jobs (classification_jobs was dropped in migration)
         response = (
-            supabase.table("classification_jobs")
+            supabase.table("training_jobs")
             .update({
                 "status": "failed",
-                "error_message": "Job timed out (cleaned up by maintenance task)"
+                "logs": "Job timed out (cleaned up by maintenance task)",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             })
             .eq("status", "processing")
             .lt("updated_at", threshold_iso)

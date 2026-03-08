@@ -152,13 +152,22 @@ def main():
 
                 except Exception as e:
                     logger.error(f"Job {job_id} failed: {e}")
-                    supabase.table("training_jobs").update(
-                        {
-                            "status": "failed",
-                            "logs": str(e),
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                    ).eq("id", job_id).execute()
+                    # BUG-018 fix: Wrap failure status write in nested try/except.
+                    # If this update itself fails, we log it rather than allowing
+                    # the job to remain stuck in 'processing' (zombie job).
+                    try:
+                        supabase.table("training_jobs").update(
+                            {
+                                "status": "failed",
+                                "logs": str(e),
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                            }
+                        ).eq("id", job_id).execute()
+                    except Exception as status_err:
+                        logger.error(
+                            f"Job {job_id}: failed to write failure status: {status_err}. "
+                            f"Job may remain stuck in 'processing' — manual intervention needed."
+                        )
 
                 continue
 
