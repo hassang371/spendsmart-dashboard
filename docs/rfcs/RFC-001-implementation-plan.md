@@ -242,3 +242,19 @@ Expected: ~210 lines total always-loaded.
 ```bash
 git status
 ```
+
+---
+
+### Addendum: Unplanned Changes (discovered during implementation)
+
+The following changes were made during implementation that were not in the original plan:
+
+| Change | Reason |
+|---|---|
+| Fixed `.gitignore` — removed `.claude/`, anchored `references/` and `misc/` to root | `.claude/` was gitignored, blocking all skill/rule tracking. `references/` was matching subdirectories inside `.claude/skills/` |
+| Created `.claude/settings.json` | Needed to document plugin inventory and flag `fullstack-dev-skills` as disabled |
+| Added `.claude/settings.local.json` to `.gitignore` | Local-only plugin overrides should not be committed |
+
+---
+
+> **Final status:** Implemented (2026-03-08). All 8 tasks completed in commit `cd63a8e`.

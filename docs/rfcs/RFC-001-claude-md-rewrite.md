@@ -1,6 +1,6 @@
 # RFC-001: CLAUDE.md Rewrite + Design-Docs Skill Update
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Date:** 2026-03-07
 > **DRI:** Hassan
 

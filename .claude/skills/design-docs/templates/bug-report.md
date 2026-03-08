@@ -3,7 +3,7 @@
 > **Doc ID:** BUG-NNN-description
 > **Date:** YYYY-MM-DD
 > **Severity:** Critical | High | Medium | Low
-> **Status:** Investigating | Root Cause Found | Fix Applied | Verified
+> **Status:** Investigating | Root Cause Found | In Progress | Fix Applied | Verified
 
 ## Observed Behavior
 

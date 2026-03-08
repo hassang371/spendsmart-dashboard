@@ -2,7 +2,7 @@
 
 > **Date:** YYYY-MM-DD
 > **DRI:** [Name — Directly Responsible Individual]
-> **Status:** Draft | In Review | Approved | Rejected | Superseded
+> **Status:** Draft | Proposed | Approved | In Progress | Implemented | Verified | Rejected | Superseded
 > **OKR Alignment:** [Which objective does this serve?]
 
 ## Problem Statement

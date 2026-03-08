@@ -3,7 +3,7 @@
 > **Doc ID:** NNN-feature-name
 > **Date:** YYYY-MM-DD
 > **DRI:** [Name]
-> **Status:** Draft | In Review | Approved | Implemented
+> **Status:** Draft | Proposed | Approved | In Progress | Implemented | Verified
 
 ## Problem Statement
 

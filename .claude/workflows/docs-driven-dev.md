@@ -99,14 +99,19 @@ Exit criteria: user approves the documentation.
 - Run all tests, read actual output
 - Never claim done without evidence
 - If FAIL → back to Step 4
+- If PASS → update the design doc status to `Verified`:
+  ```
+  docs: update <doc-id> status to Verified
+  ```
 
 ---
 
 ## Step 6: Final Commit
 
-1. Re-check HLD sync: did implementation deviate from the design doc?
-2. Update affected `docs/design/*.md` + add changelog entries
-3. Final commit: `chore: update HLD and finalize <feature-name>`
+1. Update design doc status to `Implemented` (if not already `Verified`)
+2. Re-check HLD sync: did implementation deviate from the design doc?
+3. Update affected `docs/design/*.md` + add changelog entries
+4. Final commit: `chore: update HLD and finalize <feature-name>`
 
 ---
 
