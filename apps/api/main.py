@@ -62,19 +62,26 @@ class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > self._max_bytes:
-            return JSONResponse(
-                status_code=413,
-                content={
-                    "type": "about:blank",
-                    "title": "Content Too Large",
-                    "status": 413,
-                    "detail": (
-                        f"Request body exceeds maximum allowed size of "
-                        f"{self._max_bytes // (1024 * 1024)} MB."
-                    ),
-                },
-            )
+        
+        if content_length:
+            try:
+                length_val = int(content_length)
+                if length_val > self._max_bytes:
+                    raise ValueError("Too large")
+            except ValueError:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "type": "about:blank",
+                        "title": "Content Too Large / Invalid",
+                        "status": 413,
+                        "detail": (
+                            f"Request body exceeds maximum allowed size of "
+                            f"{self._max_bytes // (1024 * 1024)} MB or size is invalid."
+                        ),
+                    },
+                )
+                
         return await call_next(request)
 
 

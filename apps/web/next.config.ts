@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
     // Strict CSP for authenticated app routes
     const appCsp = `
       default-src 'self';
-      script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com;
+      script-src 'self' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com;
       style-src 'self' 'unsafe-inline';
       img-src 'self' blob: data: https://lh3.googleusercontent.com https://nbtowufbthavewruaicc.supabase.co https://avatars.githubusercontent.com https://cdn.prod.website-files.com https://sui-dev.b-cdn.net;
       font-src 'self' data:;

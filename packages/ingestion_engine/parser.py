@@ -565,16 +565,29 @@ class BankStatementParser:
             for variant in variants:
                 reverse_map[variant] = standard
 
-        # Normalize column names
+        # Normalize column names with collision handling
         new_columns = {}
-        for col in df.columns:
+        seen_normalized = set()
+        
+        for col_idx, col in enumerate(df.columns):
             col_lower = str(col).lower().strip()
+            
+            # 1. Determine base normalized name
             if col_lower in reverse_map:
-                new_columns[col] = reverse_map[col_lower]
+                normalized = reverse_map[col_lower]
             else:
-                new_columns[col] = col_lower
+                normalized = col_lower
+                
+            # 2. Handle collisions
+            if normalized in seen_normalized:
+                normalized = f"{normalized}_{col_idx}"
+                
+            seen_normalized.add(normalized)
+            new_columns[col] = normalized
 
-        df = df.rename(columns=new_columns)
+        # df.rename with a dict replacing duplicate index values is unsafe if duplicate original columns existed.
+        # But replacing the array directly works around Pandas duplicate bugs.
+        df.columns = [new_columns[c] for c in df.columns]
 
         return df
 

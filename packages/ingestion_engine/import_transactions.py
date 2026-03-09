@@ -221,18 +221,24 @@ def parse_file(
             if col not in df.columns:
                 df[col] = "" if col != "amount" else 0.0
 
-    elif filename_lower.endswith(".json"):
-        raw = _json.loads(file_content.decode("utf-8"))
+    def _decode_bytes(b: bytes) -> str:
+        try:
+            return b.decode("utf-8")
+        except UnicodeDecodeError:
+            return b.decode("windows-1252", errors="replace")
+
+    if filename_lower.endswith(".json"):
+        raw = _json.loads(_decode_bytes(file_content))
         rows = raw if isinstance(raw, list) else raw.get("transactions", [])
         df = pd.DataFrame(rows)
         df = _normalize_dataframe(df)  # Apply shared normalization
     elif filename_lower.endswith(".tsv"):
-        text_stream = io.StringIO(file_content.decode("utf-8"))
+        text_stream = io.StringIO(_decode_bytes(file_content))
         df = pd.read_csv(text_stream, sep="\t")
         df = _normalize_dataframe(df)  # Apply shared normalization
     else:
         # Default: treat as CSV
-        text_stream = io.StringIO(file_content.decode("utf-8"))
+        text_stream = io.StringIO(_decode_bytes(file_content))
         df = parse_csv_content(text_stream)
 
     # Generate / clean merchant for ALL file types (including xlsx)

@@ -100,7 +100,7 @@ async def get_user_token(authorization: str = Header(default="")) -> str:
         payload = _decode_jwt_payload(token)
         exp = payload.get("exp")
         CLOCK_SKEW_SECONDS = 30  # Tolerate up to 30s of clock drift
-        if exp is not None and time.time() > (exp + CLOCK_SKEW_SECONDS):
+        if exp is not None and time.time() > (int(exp) + CLOCK_SKEW_SECONDS):
             logger.warning("jwt_expired", exp=exp)
             raise HTTPException(
                 status_code=401,
@@ -122,22 +122,39 @@ class CurrentUser:
 
 
 async def get_current_user(token: str = Depends(get_user_token)) -> CurrentUser:
-    """Extract user identity from JWT payload — no network call.
-
-    The JWT was already validated (structure + expiry) by get_user_token.
-    Supabase enforces full cryptographic verification when the token is
-    used in any query via RLS.
+    """Extract user identity from JWT via Supabase Auth.
+    
+    This ensures the token is cryptographically verified against Supabase
+    before trusting the 'sub' and 'email' claims, preventing forged tokens
+    on endpoints that don't pass through RLS.
     """
+    from apps.api.core.config import settings
+    from supabase import create_client
+
     try:
-        payload = _decode_jwt_payload(token)
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
-        return CurrentUser(id=user_id, email=payload.get("email"))
+        # Create a client instance with the anon key and set the session token
+        client = create_client(
+            settings.SUPABASE_URL, 
+            settings.SUPABASE_ANON_KEY
+        )
+        
+        # Call the Supabase auth API to verify the token signature
+        user_response = client.auth.get_user(token)
+        
+        if not user_response or not user_response.user:
+            raise ValueError("Token rejected by auth server")
+            
+        user = user_response.user
+        return CurrentUser(id=user.id, email=user.email)
+
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        logger.warning("auth_verification_failed", error=str(e))
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid or expired authentication token"
+        )
 
 
 async def get_current_user_id(user: CurrentUser = Depends(get_current_user)) -> str:

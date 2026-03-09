@@ -34,7 +34,7 @@ jobs:
 
   deploy-staging:
     name: Deploy to Staging
-    needs: [wait-for-ci]
+    needs: [check-ci-success]
     runs-on: ubuntu-latest
     environment:
       name: staging

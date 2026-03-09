@@ -12,6 +12,7 @@ from apps.api.core.pagination import (
     decode_cursor,
     encode_cursor,
 )
+from fastapi import HTTPException
 
 
 def list_user_transactions(
@@ -45,7 +46,10 @@ def list_user_transactions(
     # True keyset pagination: rows where (transaction_date < cursor_date) OR
     # (transaction_date = cursor_date AND id < cursor_id).
     if pagination.cursor:
-        cursor_date, cursor_id = decode_cursor(pagination.cursor)
+        try:
+            cursor_date, cursor_id = decode_cursor(pagination.cursor)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid pagination cursor format.")
         query = query.or_(
             f"transaction_date.lt.{cursor_date},"
             f"and(transaction_date.eq.{cursor_date},id.lt.{cursor_id})"

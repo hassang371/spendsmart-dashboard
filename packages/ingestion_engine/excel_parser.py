@@ -1,5 +1,4 @@
 import pandas as pd
-import msoffcrypto
 import io
 import logging
 
@@ -26,6 +25,7 @@ def parse_excel_transaction_file(
     if _is_ole2(file_content):
         # File is in OLE2 format — either a legacy .xls or an encrypted .xlsx
         try:
+            import msoffcrypto
             with io.BytesIO(file_content) as f:
                 office_file = msoffcrypto.OfficeFile(f)
                 if office_file.is_encrypted():

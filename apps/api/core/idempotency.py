@@ -11,10 +11,12 @@ import os
 from typing import Any, Callable
 
 import redis.asyncio as redis
-from fastapi import Header, HTTPException, Request, Response
+from fastapi import Depends, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import structlog
+
+from apps.api.core.auth import get_current_user
 
 logger = structlog.get_logger()
 
@@ -35,6 +37,7 @@ async def get_idempotency_key(
         alias="Idempotency-Key",
         description="Optional idempotent key to prevent duplicate mutations.",
     ),
+    current_user = Depends(get_current_user)
 ) -> str | None:
     """Dependency to extract and validate the idempotency key.
 
@@ -43,7 +46,7 @@ async def get_idempotency_key(
     if not idempotency_key:
         return None
 
-    user_id = getattr(request.state, "user_id", "anonymous")
+    user_id = current_user.id
     
     # Hash the raw payload body if available to bind the key strictly to the content
     # For many routes taking JSON bodies, we can hash the body bytes.
