@@ -7,15 +7,11 @@ Before any feature, bug fix, architectural decision, or ambiguous request:
 
 **Skip brainstorming ONLY if:**
 - The request is a pure question with no code change implied, OR
-- The task is trivially scoped (rename a variable, fix a typo)
+- The change is trivially scoped: you know exactly what to change, it's a single file/function, and the approach is obvious (rename a variable, fix a typo, update a string)
 
-**When in doubt → brainstorm.**
+**When in doubt → brainstorm.** Small bug fixes that aren't obviously scoped still need brainstorming.
 
 Brainstorming IS Step 1 of docs-driven-dev. They are the same thing — not two separate steps.
-
-## Master Workflow
-
-For ANY code change: Read `.claude/workflows/docs-driven-dev.md` and follow it.
 
 ## Skill Table
 
@@ -53,13 +49,13 @@ For ANY code change: Read `.claude/workflows/docs-driven-dev.md` and follow it.
 
 **Progressive disclosure rule:** Do NOT preload all references. SKILL.md is the router — it tells you which file to read and when. Loading everything upfront wastes context.
 
-## Anti-Drift Protocol (check every 3 turns)
+## Anti-Drift Protocol
 
-1. Have I loaded docs-driven-dev for this code change? If not, read it now.
-2. Have I brainstormed before writing code? If not, stop and invoke `superpowers:brainstorming`.
-3. Have I written the test first? If not, delete the code and write the test.
-4. Am I about to claim completion? STOP — run `superpowers:verification-before-completion` first.
-5. Am I preloading ALL skill references without SKILL.md directing me? If yes, stop.
+Check these at the two moments that matter — **before writing any code** and **before claiming done**:
+
+- Before writing code: Have I brainstormed? Have I read docs-driven-dev? Have I written a failing test first?
+- Before claiming done: Have I run `superpowers:verification-before-completion` and read the actual output?
+- Always: Am I preloading ALL skill references without SKILL.md directing me? If yes, stop.
 
 **Red flags — you are drifting if:**
 - Wrote code without a failing test

@@ -2,6 +2,7 @@
 
 > **Doc ID:** 001-docs-driven-dev-workflow
 > **Date:** 2026-03-06
+> **Type:** Feature LLD
 > **Last Updated:** 2026-03-08
 > **Status:** Implemented
 > **DRI:** Hassan
