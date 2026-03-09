@@ -49,6 +49,7 @@ class TestRFC7807ErrorFormat:
     def test_not_found_returns_rfc7807(self, client):
         response = client.get("/test/not-found")
         assert response.status_code == 404
+        assert response.headers["content-type"] == "application/problem+json"
         body = response.json()
         assert body["type"] == "about:blank"
         assert body["title"] == "Not Found"
@@ -59,6 +60,7 @@ class TestRFC7807ErrorFormat:
     def test_validation_error_returns_rfc7807(self, client):
         response = client.get("/test/validation")
         assert response.status_code == 422
+        assert response.headers["content-type"] == "application/problem+json"
         body = response.json()
         assert body["title"] == "Unprocessable Entity"
         assert body["detail"] == "Invalid amount"
@@ -66,12 +68,14 @@ class TestRFC7807ErrorFormat:
     def test_auth_error_returns_rfc7807(self, client):
         response = client.get("/test/auth")
         assert response.status_code == 401
+        assert response.headers["content-type"] == "application/problem+json"
         body = response.json()
         assert body["title"] == "Unauthorized"
 
     def test_unhandled_error_returns_rfc7807(self, client):
         response = client.get("/test/unhandled")
         assert response.status_code == 500
+        assert response.headers["content-type"] == "application/problem+json"
         body = response.json()
         assert body["title"] == "Internal Server Error"
         assert body["detail"] == "An unexpected error occurred"
