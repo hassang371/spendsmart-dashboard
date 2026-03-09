@@ -68,6 +68,8 @@ async def forecast_predict(
         # BUG-07 fix: use parse_file instead of parse_csv_content
         df = parse_file(contents, file.filename)
     except Exception:
+        # Rollback the idempotency marker so user isn't locked out of retrying
+        client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
         raise HTTPException(status_code=400, detail="Failed to parse CSV")
 
     if "transaction_date" in df.columns and "date" not in df.columns:
@@ -77,6 +79,7 @@ async def forecast_predict(
         loader = TransactionLoader(df)
         daily_df = loader.aggregate_daily()
     except Exception:
+        client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
         raise HTTPException(status_code=400, detail="Failed to aggregate transactions")
 
     # Statistical forecast

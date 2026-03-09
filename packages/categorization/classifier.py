@@ -137,7 +137,26 @@ class TransactionClassifier:
 
         return results
 
-    def predict(self, text: str) -> dict:
+    def _adapter_classify(self, embeddings: torch.Tensor, adapter: LinearAdapter) -> list[dict]:
+        """Classify embeddings using a user-specific trained adapter."""
+        adapter.eval()
+        with torch.no_grad():
+            logits = adapter(embeddings)
+            probs = F.softmax(logits, dim=1)
+
+        results = []
+        for i in range(probs.shape[0]):
+            best_idx = probs[i].argmax().item()
+            best_prob = probs[i][best_idx].item()
+            best_category = self._category_names[best_idx]
+
+            results.append({
+                "category": best_category,
+                "confidence": round(best_prob, 4),
+            })
+        return results
+
+    def predict(self, text: str, adapter: Optional[LinearAdapter] = None) -> dict:
         """Classify a single transaction description.
 
         Args:
@@ -146,10 +165,10 @@ class TransactionClassifier:
         Returns:
             {"category": str, "confidence": float}
         """
-        results = self.predict_batch([text])
+        results = self.predict_batch([text], adapter=adapter)
         return results[0]
 
-    def predict_batch(self, texts: list[str]) -> list[dict]:
+    def predict_batch(self, texts: list[str], adapter: Optional[LinearAdapter] = None) -> list[dict]:
         """Classify a batch of transaction descriptions.
 
         Pipeline:
@@ -205,7 +224,10 @@ class TransactionClassifier:
                 embeddings = self._model.encode(
                     remaining_texts, convert_to_tensor=True
                 )
-                cosine_results = self._cosine_classify(embeddings)
+                if adapter is not None:
+                    cosine_results = self._adapter_classify(embeddings, adapter)
+                else:
+                    cosine_results = self._cosine_classify(embeddings)
 
             for idx, cosine_result in zip(remaining_indices, cosine_results):
                 results[idx] = cosine_result

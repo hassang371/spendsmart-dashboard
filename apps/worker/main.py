@@ -15,18 +15,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
+# Load environment variables from root .env only
 load_dotenv()
-load_dotenv(
-    "apps/web/.env.local"
-)  # Explicitly try loading from web metadata if root fails
 
-URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+# Support both standard SUPABASE_URL and Next.js public convention as fallback
+URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
 # Use Service Role Key for background worker to bypass RLS
 KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 if not URL:
-    logger.error("NEXT_PUBLIC_SUPABASE_URL invalid")
+    logger.error("SUPABASE_URL not set (also checked NEXT_PUBLIC_SUPABASE_URL)")
 
 if not KEY:
     logger.warning(

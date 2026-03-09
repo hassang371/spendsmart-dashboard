@@ -253,7 +253,12 @@ async def batch_update_transactions(
 
     for (category, amount), ids in groups.items():
         try:
-            payload: dict = {"category": category}
+            payload: dict = {
+                "category": category,
+                "is_manual": True,
+                "suggested_category": None,
+                "confidence_score": None,
+            }
             if amount is not None:
                 payload["amount"] = amount
 

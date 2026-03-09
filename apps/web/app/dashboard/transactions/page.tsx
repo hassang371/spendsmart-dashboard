@@ -1461,7 +1461,7 @@ export default function TransactionsPage() {
                   const amount = Number(tx.amount || 0);
                   const isCredit = amount >= 0;
                   const confidencePct =
-                    tx.confidence_score != null ? Math.round(tx.confidence_score * 100) : null;
+                    tx.confidence_score !== null && tx.confidence_score !== undefined ? Math.round(tx.confidence_score * 100) : null;
                   const isEditing = reviewEditId === tx.id;
                   const isSaving = savingReviewId === tx.id;
 

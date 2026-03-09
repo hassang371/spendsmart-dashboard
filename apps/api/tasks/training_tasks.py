@@ -94,7 +94,7 @@ def train_adapter_task(
             "status": "completed",
             "job_id": job_id,
             "user_id": user_id,
-            "model_path": model_path,
+            "model_path": version_record.storage_path,
         }
 
     except Exception as exc:

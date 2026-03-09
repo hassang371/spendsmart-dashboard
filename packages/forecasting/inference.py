@@ -238,7 +238,8 @@ def predict_with_tft(
     q_map = {0.1: "p10", 0.5: "p50", 0.9: "p90"}
     q_indices = {q: i for i, q in enumerate(quantiles) if q in q_map}
 
-    for i in range(horizon):
+    actual_length = min(horizon, len(preds))
+    for i in range(actual_length):
         date = future_dates[i]
         row_preds = preds[i]
 

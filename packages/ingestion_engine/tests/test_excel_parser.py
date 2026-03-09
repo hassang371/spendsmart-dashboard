@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+import sys
 from unittest.mock import MagicMock, patch
 from ..excel_parser import parse_excel_transaction_file, _OLE2_MAGIC
 
@@ -46,9 +47,10 @@ def mock_excel_data():
     return df
 
 
-@patch("packages.ingestion_engine.excel_parser.msoffcrypto")
+@patch.dict("sys.modules", {"msoffcrypto": MagicMock()})
 @patch("packages.ingestion_engine.excel_parser.pd.read_excel")
-def test_parse_encrypted_excel(mock_read_excel, mock_msoffcrypto, mock_excel_data):
+def test_parse_encrypted_excel(mock_read_excel, mock_excel_data):
+    mock_msoffcrypto = sys.modules["msoffcrypto"]
     # Prepare sliced dataframe for the second call (header=16)
     # The actual data is in row 17 (index 17 in raw, which is index 0 in sliced if header is 16)
 
@@ -99,9 +101,10 @@ def test_parse_encrypted_excel(mock_read_excel, mock_msoffcrypto, mock_excel_dat
     assert df.iloc[1]["description"] == "SALARY"
 
 
-@patch("packages.ingestion_engine.excel_parser.msoffcrypto")
-def test_encrypted_file_without_password_raises(mock_msoffcrypto):
+@patch.dict("sys.modules", {"msoffcrypto": MagicMock()})
+def test_encrypted_file_without_password_raises():
     """OLE2 file without password should immediately raise 'password-protected' error."""
+    mock_msoffcrypto = sys.modules["msoffcrypto"]
     mock_file = MagicMock()
     mock_file.is_encrypted.return_value = True
     mock_msoffcrypto.OfficeFile.return_value = mock_file
