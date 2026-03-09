@@ -37,7 +37,7 @@ def list_user_transactions(
 
     query = (
         client.table("transactions")
-        .select("*")
+        .select("*", count="exact" if pagination.include_total else None)
         .eq("user_id", user_id)
     )
 
@@ -74,4 +74,16 @@ def list_user_transactions(
         last = items[-1]
         next_cursor = encode_cursor(last["transaction_date"], last["id"])
 
-    return CursorPage(items=items, next_cursor=next_cursor, has_more=has_more)
+    total_count = getattr(result, "count", None)
+    if not isinstance(total_count, int):
+        total_count = None
+        
+    truncated = (total_count > pagination.limit) if total_count is not None else None
+
+    return CursorPage(
+        items=items,
+        next_cursor=next_cursor,
+        has_more=has_more,
+        total_count=total_count,
+        truncated=truncated,
+    )

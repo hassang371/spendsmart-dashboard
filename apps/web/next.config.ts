@@ -27,7 +27,9 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
-    const cspHeader = `
+
+    // Strict CSP for authenticated app routes
+    const appCsp = `
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com;
       style-src 'self' 'unsafe-inline';
@@ -44,46 +46,61 @@ const nextConfig: NextConfig = {
       .replace(/\s{2,}/g, ' ')
       .trim();
 
-    const headers = [
-      {
-        key: 'Content-Security-Policy',
-        value: cspHeader,
-      },
-      {
-        key: 'X-Content-Type-Options',
-        value: 'nosniff',
-      },
-      {
-        key: 'X-Frame-Options',
-        value: 'DENY',
-      },
-      {
-        key: 'X-XSS-Protection',
-        value: '1; mode=block',
-      },
-      {
-        key: 'Referrer-Policy',
-        value: 'strict-origin-when-cross-origin',
-      },
+    // Permissive CSP for the landing page (needs Webflow, GSAP, Slater, HubSpot CDNs)
+    const landingCsp = `
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline'
+        https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com
+        https://d3e54v103j8qbb.cloudfront.net
+        https://cdn.jsdelivr.net
+        https://assets.greensock.com
+        https://unpkg.com
+        https://cdn.prod.website-files.com
+        https://assets.slater.app
+        https://js.hsforms.net;
+      style-src 'self' 'unsafe-inline' https://cdn.prod.website-files.com;
+      img-src 'self' blob: data: https://lh3.googleusercontent.com https://nbtowufbthavewruaicc.supabase.co https://avatars.githubusercontent.com https://cdn.prod.website-files.com https://sui-dev.b-cdn.net;
+      font-src 'self' data: https://cdn.prod.website-files.com;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+      connect-src 'self' http://localhost:8000 https://scale-api.vercel.app https://nbtowufbthavewruaicc.supabase.co https://*.sentry.io https://cdn.prod.website-files.com;
+      worker-src 'self' blob:;
+      upgrade-insecure-requests;
+    `
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    const securityHeaders = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'X-XSS-Protection', value: '1; mode=block' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     ];
 
-    if (isProd) {
-      headers.push({
-        key: 'Strict-Transport-Security',
-        value: 'max-age=31536000; includeSubDomains; preload',
-      });
-    } else {
-      // Clear HSTS cache for localhost in development
-      headers.push({
-        key: 'Strict-Transport-Security',
-        value: 'max-age=0',
-      });
-    }
+    const hsts = isProd
+      ? { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' }
+      : { key: 'Strict-Transport-Security', value: 'max-age=0' };
 
     return [
+      // Landing page: permissive CSP for third-party Webflow/GSAP/Slater scripts
       {
-        source: '/(.*)',
-        headers,
+        source: '/',
+        headers: [
+          { key: 'Content-Security-Policy', value: landingCsp },
+          ...securityHeaders,
+          hsts,
+        ],
+      },
+      // All other routes: strict CSP
+      {
+        source: '/((?!$).*)',
+        headers: [
+          { key: 'Content-Security-Policy', value: appCsp },
+          ...securityHeaders,
+          hsts,
+        ],
       },
     ];
   },

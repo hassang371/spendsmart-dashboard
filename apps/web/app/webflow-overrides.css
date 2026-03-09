@@ -1,5 +1,36 @@
 /* Override CSS that hides elements before JavaScript loads */
 
+/* Custom cursor must be fixed-position so it doesn't push page content down */
+.cursor {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* Nav must be fixed so it doesn't consume vertical space in document flow */
+.nav-w {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 998 !important;
+}
+
+/* Hero background is a full-bleed backdrop — must be absolute, not static */
+.content-container {
+  position: relative !important;
+}
+.home-hero-background {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+}
+
 /* Show navigation immediately (don't wait for JS animation) */
 #navContainer {
   transform: translate(0px, 0%) !important;

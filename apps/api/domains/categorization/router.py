@@ -27,6 +27,7 @@ from apps.api.domains.categorization.service import (
     classify_single,
     get_classifier,
 )
+from apps.api.core.idempotency import get_idempotency_key, with_idempotency
 
 router = APIRouter(prefix="/categorization", tags=["categorization"])
 
@@ -53,25 +54,29 @@ async def classify_transaction(
 async def classify_batch(
     request: BatchClassifyRequest,
     client: Client = Depends(get_user_client),
+    idempotency_key: str | None = Depends(get_idempotency_key),
 ):
     """Classify multiple transactions in a single batch."""
-    if not request.descriptions:
-        raise HTTPException(status_code=400, detail="No descriptions provided")
-
-    try:
-        results = classify_batch_in_process(request.descriptions)
-        predictions = [
-            ClassifyResponse(
-                category=r["category"],
-                confidence=r["confidence"],
-                model_used="minilm-cosine-v2",
-            )
-            for r in results
-        ]
-        return BatchClassifyResponse(predictions=predictions)
-    except Exception as e:
-        logger.error("batch_classify_failed", error=str(e), count=len(request.descriptions))
-        raise HTTPException(status_code=500, detail="Batch classification failed")
+    async def _execute():
+        if not request.descriptions:
+            raise HTTPException(status_code=400, detail="No descriptions provided")
+    
+        try:
+            results = classify_batch_in_process(request.descriptions)
+            predictions = [
+                ClassifyResponse(
+                    category=r["category"],
+                    confidence=r["confidence"],
+                    model_used="minilm-cosine-v2",
+                )
+                for r in results
+            ]
+            return BatchClassifyResponse(predictions=predictions)
+        except Exception as e:
+            logger.error("batch_classify_failed", error=str(e), count=len(request.descriptions))
+            raise HTTPException(status_code=500, detail="Batch classification failed")
+            
+    return await with_idempotency(idempotency_key, _execute)
 
 
 @router.post("/feedback")
