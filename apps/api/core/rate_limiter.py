@@ -4,7 +4,8 @@ Fixes BUG-05: Replaces the old in-memory defaultdict(deque) rate limiter
 with a Redis-backed sliding window using sorted sets.
 
 - Per-user rate limiting keyed by user_id
-- Fail-open: if Redis is unavailable, requests are allowed (with a warning)
+- Fail-closed in production: if Redis is unavailable mid-request, requests are rejected
+- Fail-open in development: if Redis is unavailable mid-request, requests are allowed
 - Returns 429 Too Many Requests with Retry-After header when limit exceeded
 """
 
@@ -89,8 +90,12 @@ class RateLimiter:
             return True, remaining, None
 
         except Exception as e:
-            # Fail-open: allow request if Redis is unavailable
             logger.warning("rate_limit_redis_error", error=str(e), user_id=user_id)
+            import os
+            if os.getenv("ENVIRONMENT", "development") == "production":
+                # Fail-closed in production: reject when Redis is unavailable
+                return False, 0, self.window_seconds
+            # Fail-open in development: allow request to avoid blocking local dev
             return True, -1, None
 
 

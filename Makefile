@@ -35,7 +35,6 @@ stop:
 	fi
 	@lsof -ti:8000 2>/dev/null | xargs kill -9 2>/dev/null || true
 	@lsof -ti:3000 2>/dev/null | xargs kill -9 2>/dev/null || true
-	@$(MAKE) -s clean-logs
 	@echo "Stopped."
 
 clean-logs:
@@ -46,10 +45,18 @@ logs:
 	@tail -f .backend.log .frontend.log .worker.log 2>/dev/null || tail -f .backend.log .frontend.log
 
 test:
-	@.venv/bin/python -m pytest apps/api/ packages/ -q --tb=short
+	@.venv/bin/python -m pytest apps/ packages/ -q --tb=short
 
 test-fe:
 	@cd apps/web && npm test -- --passWithNoTests
 
+check:
+	@echo "Running all checks..."
+	@cd apps/web && npm run lint
+	@cd apps/web && npx tsc --noEmit
+	@.venv/bin/python -m pytest apps/ packages/ -q --tb=short
+	@echo "All checks passed."
+
 install:
 	@.venv/bin/pip install -r requirements.txt
+	@cd apps/web && npm install

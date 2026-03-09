@@ -22,8 +22,9 @@ On your FIRST turn, BEFORE anything else:
 ```bash
 make dev                               # Start frontend :3000 + backend :8000
 make stop                              # Kill servers
-make test                              # pytest apps/ + packages/
+make test                              # pytest apps/ + packages/ (api, worker, packages)
 make test-fe                           # vitest apps/web/
+make check                             # lint + tsc + pytest (full DoD check)
 make logs                              # Tail logs
 
 cd apps/web && npm run lint            # ESLint
