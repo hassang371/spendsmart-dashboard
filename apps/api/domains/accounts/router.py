@@ -111,6 +111,7 @@ class BatchUpdateRequest(BaseModel):
 async def list_transactions(
     limit: int = Query(default=50, ge=1, le=500, description="Items per page"),
     cursor: str = Query(default=None, description="Opaque pagination cursor"),
+    include_total: bool = Query(default=False, description="Include total count in response"),
     date_from: str = Query(default=None, description="Filter: start date (ISO 8601)"),
     date_to: str = Query(default=None, description="Filter: end date (ISO 8601)"),
     amount_min: float = Query(default=None, description="Filter: minimum amount"),
@@ -127,7 +128,9 @@ async def list_transactions(
     Pass `next_cursor` from a previous response as the `cursor` query param
     to fetch the next page.
     """
-    pagination = PaginationParams(limit=limit, cursor=cursor)
+    pagination = PaginationParams(
+        limit=limit, cursor=cursor, include_total=include_total
+    )
     filters = TransactionFilter(
         date_from=date_from,
         date_to=date_to,
@@ -259,6 +262,7 @@ async def batch_update_transactions(
                 .update(payload)
                 .eq("user_id", user_id)
                 .in_("id", ids)
+                .neq("category", category)
                 .execute()
             )
             if result.data:

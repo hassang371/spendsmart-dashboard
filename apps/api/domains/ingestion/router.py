@@ -18,6 +18,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from supabase import Client
+from apps.api.core.idempotency import get_idempotency_key, with_idempotency
 
 from apps.api.core.auth import get_current_user_id, get_user_client
 from packages.ingestion_engine.import_transactions import parse_file
@@ -317,6 +318,7 @@ async def import_file(
     password: str = Form(None),
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
+    idempotency_key: str | None = Depends(get_idempotency_key),
 ):
     """v3 Import: insert-first, classify-later.
 
@@ -327,218 +329,220 @@ async def import_file(
     5. Enqueue background classification
     6. Return immediately — categories appear via refreshAfterImport()
     """
-    timings: dict[str, float] = {}
-    t_start = time.perf_counter()
+    async def _execute():
+        timings: dict[str, float] = {}
+        t_start = time.perf_counter()
 
-    # Rate limit
-    limiter = getattr(request.app.state, "import_rate_limiter", None)
-    if limiter:
-        await limiter(request)
+        # Rate limit
+        limiter = getattr(request.app.state, "import_rate_limiter", None)
+        if limiter:
+            await limiter(request)
 
-    # Validate file type
-    allowed_extensions = (".csv", ".tsv", ".xls", ".xlsx", ".xlsm", ".json", ".txt", ".pdf")
-    filename = file.filename or ""
-    if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type. Accepted: {', '.join(allowed_extensions)}",
-        )
+        # Validate file type
+        allowed_extensions = (".csv", ".tsv", ".xls", ".xlsx", ".xlsm", ".json", ".txt", ".pdf")
+        filename = file.filename or ""
+        if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type. Accepted: {', '.join(allowed_extensions)}",
+            )
 
-    # Read file
-    contents = await file.read()
-    if len(contents) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)",
-        )
+        # Read file
+        contents = await file.read()
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)",
+            )
 
-    # --- File-hash dedup (instant rejection for re-uploads) ---
-    file_hash = hashlib.sha256(contents).hexdigest()
-    try:
-        existing_file = client.table("uploaded_files").select("id").eq(
-            "user_id", user_id
-        ).eq("file_hash", file_hash).execute()
-        if existing_file.data:
-            logger.info("file_already_imported", user_id=user_id, filename=filename)
+        # --- File-hash dedup (instant rejection for re-uploads) ---
+        file_hash = hashlib.sha256(contents).hexdigest()
+        try:
+            existing_file = client.table("uploaded_files").select("id").eq(
+                "user_id", user_id
+            ).eq("file_hash", file_hash).execute()
+            if existing_file.data:
+                logger.info("file_already_imported", user_id=user_id, filename=filename)
+                return {
+                    "inserted": 0,
+                    "skipped_duplicates": 0,
+                    "total_parsed": 0,
+                    "filename": filename,
+                    "message": "This file was already imported",
+                }
+        except Exception as e:
+            logger.warning("file_hash_check_failed", error=str(e))
+
+        # --- Stage 1: Parse file ---
+        t0 = time.perf_counter()
+        try:
+            df = await asyncio.to_thread(parse_file, contents, file.filename, password)
+
+            if "date" in df.columns:
+                df = df.dropna(subset=["date"])
+                df = df[df["date"].astype(str).str.strip().ne("")]
+                df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce").dt.strftime("%Y-%m-%d")
+
+            df = df.replace([np.nan, np.inf, -np.inf], None)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            err_lower = str(e).lower()
+            if "password" in err_lower or "encrypted" in err_lower or "decryption" in err_lower:
+                raise HTTPException(
+                    status_code=400,
+                    detail="File is password-protected. Please provide the password.",
+                )
+            logger.error("import_parse_failed", error=str(e), filename=filename, exc_info=True)
+            raise HTTPException(status_code=400, detail=f"Failed to parse file: {e}")
+
+        timings["parse_ms"] = round((time.perf_counter() - t0) * 1000)
+
+        if df.empty:
             return {
                 "inserted": 0,
                 "skipped_duplicates": 0,
                 "total_parsed": 0,
                 "filename": filename,
-                "message": "This file was already imported",
             }
-    except Exception as e:
-        logger.warning("file_hash_check_failed", error=str(e))
 
-    # --- Stage 1: Parse file ---
-    t0 = time.perf_counter()
-    try:
-        df = await asyncio.to_thread(parse_file, contents, file.filename, password)
+        # --- Stage 2: Build rows + fingerprints ---
+        t1 = time.perf_counter()
+        insert_rows: list[dict] = []
+        fps_to_desc: dict[str, str] = {}
 
-        if "date" in df.columns:
-            df = df.dropna(subset=["date"])
-            df = df[df["date"].astype(str).str.strip().ne("")]
-            df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce").dt.strftime("%Y-%m-%d")
-
-        df = df.replace([np.nan, np.inf, -np.inf], None)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        err_lower = str(e).lower()
-        if "password" in err_lower or "encrypted" in err_lower or "decryption" in err_lower:
-            raise HTTPException(
-                status_code=400,
-                detail="File is password-protected. Please provide the password.",
+        for _, row in df.iterrows():
+            tx = row.to_dict()
+            fp = generate_fingerprint(
+                date=str(tx.get("date", "")),
+                amount=float(tx.get("amount", 0) or 0),
+                merchant=str(tx.get("merchant", "") or ""),
+                description=str(tx.get("description", "") or ""),
+                payment_method=str(tx.get("method", "") or ""),
+                reference=str(tx.get("ref", "") or ""),
             )
-        logger.error("import_parse_failed", error=str(e), filename=filename, exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Failed to parse file: {e}")
 
-    timings["parse_ms"] = round((time.perf_counter() - t0) * 1000)
+            tx_row = _build_transaction_row(tx, user_id, fp)
+            insert_rows.append(tx_row)
 
-    if df.empty:
-        return {
-            "inserted": 0,
-            "skipped_duplicates": 0,
-            "total_parsed": 0,
-            "filename": filename,
-        }
+            desc = str(tx.get("description", "") or "")
+            if desc.strip():
+                fps_to_desc[fp] = desc
 
-    # --- Stage 2: Build rows + fingerprints ---
-    t1 = time.perf_counter()
-    insert_rows: list[dict] = []
-    fps_to_desc: dict[str, str] = {}
+        timings["build_ms"] = round((time.perf_counter() - t1) * 1000)
 
-    for _, row in df.iterrows():
-        tx = row.to_dict()
-        fp = generate_fingerprint(
-            date=str(tx.get("date", "")),
-            amount=float(tx.get("amount", 0) or 0),
-            merchant=str(tx.get("merchant", "") or ""),
-            description=str(tx.get("description", "") or ""),
-            payment_method=str(tx.get("method", "") or ""),
-            reference=str(tx.get("ref", "") or ""),
-        )
+        # --- Stage 3: Insert via RPC (ON CONFLICT handles dedup) ---
+        # For large files (>PRIORITY_THRESHOLD rows): priority insert — sort by date desc,
+        # insert latest 100 rows synchronously so user sees data immediately (~1s),
+        # then insert remaining rows in background alongside classification.
+        t2 = time.perf_counter()
+        total_inserted = 0
+        total_skipped = 0
 
-        tx_row = _build_transaction_row(tx, user_id, fp)
-        insert_rows.append(tx_row)
+        is_large_file = len(insert_rows) > PRIORITY_THRESHOLD
 
-        desc = str(tx.get("description", "") or "")
-        if desc.strip():
-            fps_to_desc[fp] = desc
+        if is_large_file:
+            # Sort by transaction_date descending to surface newest rows first
+            try:
+                insert_rows.sort(key=lambda r: r.get("transaction_date", ""), reverse=True)
+            except Exception:
+                pass
 
-    timings["build_ms"] = round((time.perf_counter() - t1) * 1000)
+            priority_rows = insert_rows[:100]
+            remaining_rows = insert_rows[100:]
 
-    # --- Stage 3: Insert via RPC (ON CONFLICT handles dedup) ---
-    # For large files (>PRIORITY_THRESHOLD rows): priority insert — sort by date desc,
-    # insert latest 100 rows synchronously so user sees data immediately (~1s),
-    # then insert remaining rows in background alongside classification.
-    t2 = time.perf_counter()
-    total_inserted = 0
-    total_skipped = 0
+            # Synchronous insert: latest 100 rows only
+            try:
+                for i in range(0, len(priority_rows), MAX_RPC_BATCH):
+                    chunk = priority_rows[i:i + MAX_RPC_BATCH]
+                    ins, skip = _rpc_insert_batch(client, user_id, chunk)
+                    total_inserted += ins
+                    total_skipped += skip
+            except Exception as e:
+                logger.error("priority_insert_failed", error=str(e), exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Failed to insert transactions: {e}")
 
-    is_large_file = len(insert_rows) > PRIORITY_THRESHOLD
+            timings["priority_insert_ms"] = round((time.perf_counter() - t2) * 1000)
+            logger.info(
+                "priority_insert_complete",
+                priority=len(priority_rows),
+                remaining=len(remaining_rows),
+                **timings,
+            )
+        else:
+            # Normal file: insert everything synchronously
+            remaining_rows = []
+            try:
+                for i in range(0, len(insert_rows), MAX_RPC_BATCH):
+                    chunk = insert_rows[i:i + MAX_RPC_BATCH]
+                    ins, skip = _rpc_insert_batch(client, user_id, chunk)
+                    total_inserted += ins
+                    total_skipped += skip
+            except Exception as e:
+                logger.error("rpc_insert_failed", error=str(e), exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Failed to insert transactions: {e}")
 
-    if is_large_file:
-        # Sort by transaction_date descending to surface newest rows first
+        timings["insert_ms"] = round((time.perf_counter() - t2) * 1000)
+        timings["total_ms"] = round((time.perf_counter() - t_start) * 1000)
+
+
+        # --- Record uploaded file ---
         try:
-            insert_rows.sort(key=lambda r: r.get("transaction_date", ""), reverse=True)
-        except Exception:
-            pass
-
-        priority_rows = insert_rows[:100]
-        remaining_rows = insert_rows[100:]
-
-        # Synchronous insert: latest 100 rows only
-        try:
-            for i in range(0, len(priority_rows), MAX_RPC_BATCH):
-                chunk = priority_rows[i:i + MAX_RPC_BATCH]
-                ins, skip = _rpc_insert_batch(client, user_id, chunk)
-                total_inserted += ins
-                total_skipped += skip
+            client.table("uploaded_files").insert({
+                "user_id": user_id,
+                "file_hash": file_hash,
+                "filename": filename,
+                "upload_type": "import",
+            }).execute()
         except Exception as e:
-            logger.error("priority_insert_failed", error=str(e), exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to insert transactions: {e}")
+            logger.warning("uploaded_file_tracking_failed", error=str(e))
 
-        timings["priority_insert_ms"] = round((time.perf_counter() - t2) * 1000)
+        # --- Create import job for monitoring ---
+        job_id: str | None = None
+        try:
+            job_res = client.table("import_jobs").insert({
+                "user_id": user_id,
+                "status": "classifying",
+                "filename": filename,
+                "total_parsed": len(insert_rows),
+                "inserted": total_inserted,
+                "skipped_duplicates": total_skipped,
+                "timings": timings,
+            }).execute()
+            if job_res.data:
+                job_id = job_res.data[0].get("id")
+        except Exception as e:
+            logger.warning("import_job_tracking_failed", error=str(e))
+
+        # --- Enqueue background tasks ---
+        token = request.headers.get("Authorization", "")[7:].strip()
+
+        # For large files: insert remaining rows in background first
+        if is_large_file and remaining_rows:
+            background_tasks.add_task(
+                _insert_remaining_rows, user_id, remaining_rows, token, job_id
+            )
+
+        # Classify and update categories in background
+        if fps_to_desc:
+            background_tasks.add_task(
+                _classify_and_update_transactions, user_id, fps_to_desc, token, job_id
+            )
+
         logger.info(
-            "priority_insert_complete",
-            priority=len(priority_rows),
-            remaining=len(remaining_rows),
+            "import_complete",
+            inserted=total_inserted,
+            skipped_duplicates=total_skipped,
+            total=len(insert_rows),
+            filename=filename,
             **timings,
         )
-    else:
-        # Normal file: insert everything synchronously
-        remaining_rows = []
-        try:
-            for i in range(0, len(insert_rows), MAX_RPC_BATCH):
-                chunk = insert_rows[i:i + MAX_RPC_BATCH]
-                ins, skip = _rpc_insert_batch(client, user_id, chunk)
-                total_inserted += ins
-                total_skipped += skip
-        except Exception as e:
-            logger.error("rpc_insert_failed", error=str(e), exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to insert transactions: {e}")
 
-    timings["insert_ms"] = round((time.perf_counter() - t2) * 1000)
-    timings["total_ms"] = round((time.perf_counter() - t_start) * 1000)
-
-
-    # --- Record uploaded file ---
-    try:
-        client.table("uploaded_files").insert({
-            "user_id": user_id,
-            "file_hash": file_hash,
-            "filename": filename,
-            "upload_type": "import",
-        }).execute()
-    except Exception as e:
-        logger.warning("uploaded_file_tracking_failed", error=str(e))
-
-    # --- Create import job for monitoring ---
-    job_id: str | None = None
-    try:
-        job_res = client.table("import_jobs").insert({
-            "user_id": user_id,
-            "status": "classifying",
-            "filename": filename,
-            "total_parsed": len(insert_rows),
+        return {
             "inserted": total_inserted,
             "skipped_duplicates": total_skipped,
-            "timings": timings,
-        }).execute()
-        if job_res.data:
-            job_id = job_res.data[0].get("id")
-    except Exception as e:
-        logger.warning("import_job_tracking_failed", error=str(e))
-
-    # --- Enqueue background tasks ---
-    token = request.headers.get("Authorization", "")[7:].strip()
-
-    # For large files: insert remaining rows in background first
-    if is_large_file and remaining_rows:
-        background_tasks.add_task(
-            _insert_remaining_rows, user_id, remaining_rows, token, job_id
-        )
-
-    # Classify and update categories in background
-    if fps_to_desc:
-        background_tasks.add_task(
-            _classify_and_update_transactions, user_id, fps_to_desc, token, job_id
-        )
-
-    logger.info(
-        "import_complete",
-        inserted=total_inserted,
-        skipped_duplicates=total_skipped,
-        total=len(insert_rows),
-        filename=filename,
-        **timings,
-    )
-
-    return {
-        "inserted": total_inserted,
-        "skipped_duplicates": total_skipped,
-        "total_parsed": len(insert_rows),
-        "filename": filename,
-    }
+            "total_parsed": len(insert_rows),
+            "filename": filename,
+        }
+    return await with_idempotency(idempotency_key, _execute)

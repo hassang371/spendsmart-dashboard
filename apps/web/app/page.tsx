@@ -49,7 +49,8 @@ export default function Home() {
           console.log('[SCALE] Triggering Webflow.destroy() and Webflow.ready()');
           (window as any).Webflow.destroy();
           (window as any).Webflow.ready();
-          (window as any).Webflow.require('ix2').init();
+          const ix2 = (window as any).Webflow.require('ix2');
+          if (ix2) ix2.init();
           console.log('[SCALE] Webflow initialized');
         } else {
           console.warn('[SCALE] Webflow object not found on window');
@@ -306,6 +307,11 @@ export default function Home() {
         crossOrigin="anonymous"
         onLoad={() => {
           console.log('[SCALE] Webflow site script loaded - Core libs ready');
+          setCoreLibsReady(true);
+        }}
+        onError={(e) => {
+          console.error('[SCALE] Webflow site script failed to load:', e);
+          console.warn('[SCALE] Setting coreLibsReady=true despite Webflow script error');
           setCoreLibsReady(true);
         }}
       />

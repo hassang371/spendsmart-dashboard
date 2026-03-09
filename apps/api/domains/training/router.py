@@ -10,6 +10,7 @@ import pandas as pd
 import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from supabase import Client
+from apps.api.core.idempotency import get_idempotency_key, with_idempotency
 from typing import Optional
 
 from apps.api.core.auth import get_current_user_id, get_user_client
@@ -69,98 +70,102 @@ async def upload_training_data(
     password: Optional[str] = Form(None),
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
+    idempotency_key: str | None = Depends(get_idempotency_key),
 ):
     """Upload transaction file, ingest into DB, and trigger adapter training."""
-    contents = await file.read()
-    file_hash = hashlib.sha256(contents).hexdigest()
+    async def _execute():
+        contents = await file.read()
+        file_hash = hashlib.sha256(contents).hexdigest()
 
-    # Check duplicates
-    try:
-        existing = (
-            client.table("uploaded_files")
-            .select("id")
-            .eq("user_id", user_id)
-            .eq("file_hash", file_hash)
-            .execute()
-        )
-        if existing.data:
-            raise HTTPException(
-                status_code=400,
-                detail="This file has already been uploaded for training.",
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning("duplicate_check_error", error=str(e))
-
-    # Parse
-    try:
-        if not contents:
-            raise HTTPException(status_code=400, detail="Empty file.")
-        df = parse_file(contents, file.filename, password=password)
-        if df.empty:
-            raise HTTPException(status_code=400, detail="No valid transactions found.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("parse_failed", error=str(e))
-        raise HTTPException(status_code=400, detail="Failed to parse file")
-
-    # Register upload
-    try:
-        client.table("uploaded_files").insert({
-            "user_id": user_id,
-            "file_hash": file_hash,
-            "filename": file.filename,
-            "upload_type": "training",
-        }).execute()
-    except Exception as e:
-        if "duplicate key" in str(e) or "23505" in str(e):
-            raise HTTPException(status_code=400, detail="File already uploaded.")
-        raise HTTPException(status_code=500, detail="Failed to register upload")
-
-    # Insert transactions
-    transactions_to_insert = [
-        prepare_transaction_payload(row, user_id)
-        for _, row in df.iterrows()
-    ]
-
-    try:
-        client.table("transactions").upsert(
-            transactions_to_insert,
-            on_conflict="user_id, fingerprint",
-            ignore_duplicates=True,
-        ).execute()
-    except Exception as e:
-        logger.error("db_insert_failed", error=str(e))
+        # Check duplicates
         try:
-            client.table("uploaded_files").delete().eq(
-                "user_id", user_id
-            ).eq("file_hash", file_hash).execute()
-        except Exception:
-            logger.warning("rollback_failed")
-        raise HTTPException(status_code=500, detail="Database error")
+            existing = (
+                client.table("uploaded_files")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("file_hash", file_hash)
+                .execute()
+            )
+            if existing.data:
+                raise HTTPException(
+                    status_code=400,
+                    detail="This file has already been uploaded for training.",
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning("duplicate_check_error", error=str(e))
 
-    # Enqueue training
-    try:
-        job_data = {
-            "user_id": user_id,
-            "status": "pending",
-            "logs": "Job created via API upload.",
+        # Parse
+        try:
+            if not contents:
+                raise HTTPException(status_code=400, detail="Empty file.")
+            df = parse_file(contents, file.filename, password=password)
+            if df.empty:
+                raise HTTPException(status_code=400, detail="No valid transactions found.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("parse_failed", error=str(e))
+            raise HTTPException(status_code=400, detail="Failed to parse file")
+
+        # Register upload
+        try:
+            client.table("uploaded_files").insert({
+                "user_id": user_id,
+                "file_hash": file_hash,
+                "filename": file.filename,
+                "upload_type": "training",
+            }).execute()
+        except Exception as e:
+            if "duplicate key" in str(e) or "23505" in str(e):
+                raise HTTPException(status_code=400, detail="File already uploaded.")
+            raise HTTPException(status_code=500, detail="Failed to register upload")
+
+        # Insert transactions
+        transactions_to_insert = [
+            prepare_transaction_payload(row, user_id)
+            for _, row in df.iterrows()
+        ]
+
+        try:
+            client.table("transactions").upsert(
+                transactions_to_insert,
+                on_conflict="user_id, fingerprint",
+                ignore_duplicates=True,
+            ).execute()
+        except Exception as e:
+            logger.error("db_insert_failed", error=str(e))
+            try:
+                client.table("uploaded_files").delete().eq(
+                    "user_id", user_id
+                ).eq("file_hash", file_hash).execute()
+            except Exception:
+                logger.warning("rollback_failed")
+            raise HTTPException(status_code=500, detail="Database error")
+
+        # Enqueue training
+        try:
+            job_data = {
+                "user_id": user_id,
+                "status": "pending",
+                "logs": "Job created via API upload.",
+            }
+            job_res = client.table("training_jobs").insert(job_data).execute()
+            job_id = job_res.data[0]["id"]
+        except Exception as e:
+            logger.error("job_enqueue_failed", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to enqueue training job")
+
+        return {
+            "status": "success",
+            "message": f"Processed {len(transactions_to_insert)} transactions and queued training.",
+            "job_id": job_id,
+            "transaction_count": len(transactions_to_insert),
         }
-        job_res = client.table("training_jobs").insert(job_data).execute()
-        job_id = job_res.data[0]["id"]
-    except Exception as e:
-        logger.error("job_enqueue_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to enqueue training job")
 
-    return {
-        "status": "success",
-        "message": f"Processed {len(transactions_to_insert)} transactions and queued training.",
-        "job_id": job_id,
-        "transaction_count": len(transactions_to_insert),
-    }
 
+    return await with_idempotency(idempotency_key, _execute)
 
 @router.get("/status/{job_id}")
 async def get_training_status(
@@ -219,65 +224,82 @@ async def train_adapter_async(
     learning_rate: float = 1e-3,
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
+    idempotency_key: str | None = Depends(get_idempotency_key),
 ):
     """Start async adapter training job. Returns immediately with job_id.
 
     v2: Trains the user's Linear Adapter from categorized transactions.
     The frozen MiniLM base model is never retrained.
     """
-    try:
-        # Fetch user's manually categorized transactions
-        res = (
-            client.table("transactions")
-            .select("description, category")
-            .eq("user_id", user_id)
-            .eq("is_manual", True)
-            .limit(10000)
-            .execute()
-        )
-
-        if not res.data or len(res.data) < 5:
-            raise HTTPException(
-                status_code=400,
-                detail="Need at least 5 manually categorized transactions for adapter training.",
+    async def _execute():
+        try:
+            # Fetch user's manually categorized transactions
+            res = (
+                client.table("transactions")
+                .select("description, category, transaction_date")
+                .eq("user_id", user_id)
+                .eq("is_manual", True)
+                .limit(10000)
+                .execute()
             )
 
-        texts = [tx["description"] for tx in res.data]
-        categories = [tx["category"] for tx in res.data]
+            if not res.data or len(res.data) < 5:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Need at least 5 manually categorized transactions for adapter training.",
+                )
 
-        job_data = {
-            "user_id": user_id,
-            "status": "pending",
-            "logs": f"Queued adapter training with {len(res.data)} samples...",
-        }
-        job_res = client.table("training_jobs").insert(job_data).execute()
-        job_id = job_res.data[0]["id"]
+            texts = [tx["description"] for tx in res.data]
+            categories = [tx["category"] for tx in res.data]
 
-        task = train_adapter_task.delay(
-            texts=texts,
-            categories=categories,
-            user_id=user_id,
-            job_id=job_id,
-            epochs=epochs,
-            learning_rate=learning_rate,
-        )
+            import hashlib
+            import json
+            dates = [tx["transaction_date"] for tx in res.data if tx.get("transaction_date")]
+            date_start = min(dates) if dates else None
+            date_end = max(dates) if dates else None
+            
+            raw_to_hash = [{"d": tx.get("description", ""), "c": tx.get("category", "")} for tx in res.data]
+            fp_str = json.dumps(raw_to_hash, sort_keys=True)
+            data_fingerprint = hashlib.sha256(fp_str.encode()).hexdigest()
 
-        client.table("training_jobs").update({
-            "celery_task_id": task.id,
-            "status": "queued",
-        }).eq("id", job_id).execute()
+            job_data = {
+                "user_id": user_id,
+                "status": "pending",
+                "logs": f"Queued adapter training with {len(res.data)} samples...",
+                "source_row_count": len(res.data),
+                "date_range_start": date_start,
+                "date_range_end": date_end,
+                "data_fingerprint": data_fingerprint,
+            }
+            job_res = client.table("training_jobs").insert(job_data).execute()
+            job_id = job_res.data[0]["id"]
 
-        return {
-            "status": "queued",
-            "message": f"Adapter training job queued with {len(res.data)} samples",
-            "job_id": job_id,
-            "task_id": task.id,
-            "epochs": epochs,
-            "samples": len(res.data),
-        }
+            task = train_adapter_task.delay(
+                texts=texts,
+                categories=categories,
+                user_id=user_id,
+                job_id=job_id,
+                epochs=epochs,
+                learning_rate=learning_rate,
+            )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("train_queue_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to queue training job")
+            client.table("training_jobs").update({
+                "celery_task_id": task.id,
+                "status": "queued",
+            }).eq("id", job_id).execute()
+
+            return {
+                "status": "queued",
+                "message": f"Adapter training job queued with {len(res.data)} samples",
+                "job_id": job_id,
+                "task_id": task.id,
+                "epochs": epochs,
+                "samples": len(res.data),
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("train_queue_failed", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to queue training job")
+    return await with_idempotency(idempotency_key, _execute)

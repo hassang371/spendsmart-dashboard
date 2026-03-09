@@ -29,6 +29,12 @@ class CursorPage(BaseModel, Generic[T]):
     has_more: bool = Field(
         description="Whether there are more items after this page"
     )
+    total_count: Optional[int] = Field(
+        default=None, description="Total number of items matching the query"
+    )
+    truncated: Optional[bool] = Field(
+        default=None, description="Whether the total count exceeds the pagination limit"
+    )
 
 
 class PaginationParams:
@@ -44,9 +50,11 @@ class PaginationParams:
         self,
         limit: int = 50,
         cursor: Optional[str] = None,
+        include_total: bool = False,
     ):
         self.limit = max(1, min(limit, 500))  # Clamp to [1, 500]
         self.cursor = cursor
+        self.include_total = include_total
 
 
 def encode_cursor(created_at: str, item_id: str) -> str:

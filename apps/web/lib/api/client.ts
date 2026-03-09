@@ -142,12 +142,15 @@ export interface TransactionListParams {
   category?: string;
   merchant?: string;
   type?: string;
+  include_total?: boolean;
 }
 
 export interface TransactionListResponse {
   items: Transaction[];
   next_cursor: string | null;
   has_more: boolean;
+  total_count?: number;
+  truncated?: boolean;
 }
 
 export interface TransactionCountsResponse {

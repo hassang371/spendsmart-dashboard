@@ -71,19 +71,23 @@ def train_adapter_task(
             lr=learning_rate,
         )
 
-        # Save adapter checkpoint
-        import torch
-        checkpoint_dir = os.getenv("MODEL_CHECKPOINT_DIR", "/app/checkpoints")
-        user_dir = f"{checkpoint_dir}/{user_id}"
-        os.makedirs(user_dir, exist_ok=True)
-        model_path = f"{user_dir}/adapter.pt"
-        torch.save(adapter.state_dict(), model_path)
+        # Save adapter checkpoint to Supabase Storage
+        from packages.categorization.model_registry import save_version
+        from apps.api.core.auth import get_service_client
+        client = get_service_client()
+        
+        version_record = save_version(
+            client=client,
+            user_id=user_id,
+            adapter_state_dict=adapter.state_dict(),
+            metrics={"epochs": epochs, "learning_rate": learning_rate, "samples": len(texts)},
+        )
 
         logger.info(f"Adapter training job {job_id} completed successfully")
         _update_job_status(
             job_id,
             status="completed",
-            checkpoint_path=model_path,
+            checkpoint_path=version_record.storage_path,
         )
 
         return {

@@ -375,6 +375,7 @@ class BankStatementParser:
         bank_type: Optional[str] = None,
         password: Optional[str] = None,
         progress_callback: Optional[Callable] = None,
+        zero_threshold: float = 0.005,
     ):
         """
         Initialize parser.
@@ -385,12 +386,14 @@ class BankStatementParser:
             bank_type: Bank type override (hdfc, icici, sbi, axis, generic)
             password: Password for encrypted files
             progress_callback: Callback function(percent) for progress updates
+            zero_threshold: Threshold below which an amount is considered zero (default 0.005)
         """
         self.file_path = file_path
         self.file_content = file_content
         self.bank_type = bank_type
         self.password = password
         self.progress_callback = progress_callback
+        self.zero_threshold = zero_threshold
         self.detector = BankFormatDetector()
         self.extractor = TransactionExtractor()
         self.merchant_extractor = MerchantExtractor()
@@ -858,7 +861,7 @@ class BankStatementParser:
 
                 # Calculate amount
                 amount = self._calculate_amount(row)
-                if amount == 0:
+                if abs(amount) <= self.zero_threshold:
                     continue
 
                 # Get description

@@ -21,6 +21,8 @@ export default function AnalyticsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState<boolean>(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -36,12 +38,18 @@ export default function AnalyticsPage() {
           return;
         }
 
-        const cacheKey = `analytics-cache:${user.id}`;
-        const cachedData = getCachedData<Transaction[]>(cacheKey, ANALYTICS_CACHE_TTL_MS);
+        const cacheKey = `analytics-cache-v2:${user.id}`;
+        const cachedData = getCachedData<{
+          items: Transaction[];
+          truncated?: boolean;
+          totalCount?: number | null;
+        }>(cacheKey, ANALYTICS_CACHE_TTL_MS);
 
         if (cachedData) {
           if (mounted) {
-            setTransactions(cachedData);
+            setTransactions(cachedData.items);
+            setTruncated(!!cachedData.truncated);
+            setTotalCount(cachedData.totalCount ?? null);
             setLoading(false);
           }
           return;
@@ -64,12 +72,20 @@ export default function AnalyticsPage() {
         const response = await accountsApi.getTransactions(session.access_token, {
           limit: 500,
           date_from: twelveMonthsAgo.toISOString().split('T')[0],
+          include_total: true,
         });
 
         if (!mounted) return;
 
         setTransactions(response.items);
-        setCachedData(cacheKey, response.items);
+        setTruncated(!!response.truncated);
+        setTotalCount(response.total_count ?? null);
+        
+        setCachedData(cacheKey, {
+          items: response.items,
+          truncated: response.truncated,
+          totalCount: response.total_count,
+        });
       } catch (err: unknown) {
         if (!mounted) return;
         const message = err instanceof Error ? err.message : 'Failed to load analytics data.';
@@ -150,6 +166,14 @@ export default function AnalyticsPage() {
           Deep dive into your spending habits.
         </p>
       </motion.div>
+
+      {truncated && (
+        <motion.div variants={itemVariants} className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-amber-600 dark:text-amber-400">
+          <p className="text-sm font-medium">
+            Showing 500 of {totalCount} transactions — export for full data
+          </p>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <motion.div variants={itemVariants} className="lg:col-span-4 lg:row-span-1 min-h-0">

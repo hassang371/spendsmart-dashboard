@@ -28,10 +28,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from apps.api.core.config import settings
 from apps.api.core.errors import register_error_handlers
-from apps.api.core.logging import setup_logging
+from apps.api.core.logging_config import setup_logging, structlog_middleware
 from apps.api.core.rate_limiter import RateLimiter, rate_limit_dependency
 from apps.api.core.security_headers import SecurityHeadersMiddleware
-from apps.api.core.middleware import RequestIDMiddleware, RequestLoggingMiddleware
 
 # Domain routers (new)
 from apps.api.domains.ingestion.router import router as ingestion_router
@@ -103,10 +102,7 @@ def _init_sentry() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan — startup/shutdown hooks."""
-    setup_logging(
-        log_level=settings.log_level,
-        json_output=(os.getenv("ENVIRONMENT", "development") == "production"),
-    )
+    setup_logging(is_dev=(os.getenv("ENVIRONMENT", "development") != "production"))
     _init_sentry()
     logger.info("app_starting", version="0.5.0")
 
@@ -191,17 +187,15 @@ app = FastAPI(
     },
 )
 
-# Register RFC 7807 error handlers (ARCH-02 fix)
+# Register RFC 9457 error handlers
 register_error_handlers(app)
 
 # Middleware is applied in reverse registration order (last added = outermost).
-# Order: RequestLogging → RequestID → SecurityHeaders → ContentSizeLimit → CORS → app
+# Order: Structlog → SecurityHeaders → ContentSizeLimit → CORS → app
 
-# M5: Structured request logging (outermost — wraps entire request lifecycle)
-app.add_middleware(RequestLoggingMiddleware)
-
-# M5: Request ID generation/propagation
-app.add_middleware(RequestIDMiddleware)
+# M5: Structured request logging & Request ID generation/propagation
+from starlette.middleware.base import BaseHTTPMiddleware
+app.add_middleware(BaseHTTPMiddleware, dispatch=structlog_middleware)
 
 # M3: Security headers (X-Frame-Options, X-Content-Type-Options, CSP, etc.)
 is_production = settings.ENVIRONMENT == "production"
