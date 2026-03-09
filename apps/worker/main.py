@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+from apps.worker.job_states import JobStatus, transition, InvalidTransitionError
+
 # Imports
 
 # Configure logging
@@ -97,6 +99,89 @@ def train_model(job_id: str, user_id: str):
     return summary
 
 
+def process_next_job(supabase: Client) -> bool:
+    """Polls for a single pending job and processes it. Returns True if a job was found, False otherwise."""
+    try:
+        # Training Jobs (Forecasting / Active Learning)
+        response = (
+            supabase.table("training_jobs")
+            .select("*")
+            .eq("status", JobStatus.PENDING)
+            .limit(1)
+            .execute()
+        )
+
+        if response.data:
+            job = response.data[0]
+            job_id = job["id"]
+            user_id = job["user_id"]
+
+            logger.info(f"Claiming training job {job_id}")
+            now_iso = datetime.now(timezone.utc).isoformat()
+
+            if job["status"] == JobStatus.COMPLETED.value:
+                logger.info(f"Job {job_id} already completed. Skipping.")
+                return True
+
+            try:
+                transition(job["status"], JobStatus.PROCESSING.value)
+            except InvalidTransitionError as e:
+                logger.warning(f"Job {job_id} bad transition: {e}")
+                return True
+
+            # Mark processing
+            claim_response = (
+                supabase.table("training_jobs")
+                .update({"status": JobStatus.PROCESSING, "updated_at": now_iso})
+                .eq("id", job_id)
+                .eq("status", JobStatus.PENDING)
+                .execute()
+            )
+
+            if not claim_response.data:
+                logger.info(f"Job {job_id} was already claimed by another worker.")
+                return True
+
+            try:
+                logs = train_model(job_id, user_id)
+
+                supabase.table("training_jobs").update(
+                    {
+                        "status": JobStatus.COMPLETED,
+                        "logs": logs,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                ).eq("id", job_id).execute()
+
+                logger.info(f"Job {job_id} completed successfully.")
+
+            except Exception as e:
+                logger.error(f"Job {job_id} failed: {e}")
+                # BUG-018 fix: Wrap failure status write in nested try/except.
+                try:
+                    transition(JobStatus.PROCESSING.value, JobStatus.FAILED.value)
+                    supabase.table("training_jobs").update(
+                        {
+                            "status": JobStatus.FAILED,
+                            "logs": str(e),
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    ).eq("id", job_id).execute()
+                except Exception as status_err:
+                    logger.error(
+                        f"Job {job_id}: failed to write failure status: {status_err}. "
+                        f"Job may remain stuck in 'processing' — manual intervention needed."
+                    )
+
+            return True
+
+        return False
+
+    except Exception as e:
+        logger.error(f"Worker loop error: {e}")
+        return False
+
+
 def main():
     if not URL or not KEY:
         logger.error("Missing configuration. Exiting.")
@@ -106,76 +191,8 @@ def main():
     logger.info("Worker started. Polling for jobs...")
 
     while True:
-        try:
-            # Training Jobs (Forecasting / Active Learning)
-            response = (
-                supabase.table("training_jobs")
-                .select("*")
-                .eq("status", "pending")
-                .limit(1)
-                .execute()
-            )
-
-            if response.data:
-                job = response.data[0]
-                job_id = job["id"]
-                user_id = job["user_id"]
-
-                logger.info(f"Claiming training job {job_id}")
-                now_iso = datetime.now(timezone.utc).isoformat()
-
-                # Mark processing
-                claim_response = (
-                    supabase.table("training_jobs")
-                    .update({"status": "processing", "updated_at": now_iso})
-                    .eq("id", job_id)
-                    .eq("status", "pending")
-                    .execute()
-                )
-
-                if not claim_response.data:
-                    logger.info(f"Job {job_id} was already claimed by another worker.")
-                    continue
-
-                try:
-                    logs = train_model(job_id, user_id)
-
-                    supabase.table("training_jobs").update(
-                        {
-                            "status": "completed",
-                            "logs": logs,
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                    ).eq("id", job_id).execute()
-
-                    logger.info(f"Job {job_id} completed successfully.")
-
-                except Exception as e:
-                    logger.error(f"Job {job_id} failed: {e}")
-                    # BUG-018 fix: Wrap failure status write in nested try/except.
-                    # If this update itself fails, we log it rather than allowing
-                    # the job to remain stuck in 'processing' (zombie job).
-                    try:
-                        supabase.table("training_jobs").update(
-                            {
-                                "status": "failed",
-                                "logs": str(e),
-                                "updated_at": datetime.now(timezone.utc).isoformat(),
-                            }
-                        ).eq("id", job_id).execute()
-                    except Exception as status_err:
-                        logger.error(
-                            f"Job {job_id}: failed to write failure status: {status_err}. "
-                            f"Job may remain stuck in 'processing' — manual intervention needed."
-                        )
-
-                continue
-
-            # 3. No jobs
-            time.sleep(5)
-
-        except Exception as e:
-            logger.error(f"Worker loop error: {e}")
+        had_job = process_next_job(supabase)
+        if not had_job:
             time.sleep(5)
 
 
