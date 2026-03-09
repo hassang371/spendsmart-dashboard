@@ -125,7 +125,10 @@ async def lifespan(app: FastAPI):
 
     # Eagerly initialize the MiniLM classifier in background thread
     # so the first import doesn't wait for model loading.
+    # /ready returns 503 until this completes.
     import asyncio
+
+    app.state.classifier_ready = False
 
     async def _warmup_classifier():
         try:
@@ -134,6 +137,8 @@ async def lifespan(app: FastAPI):
             logger.info("classifier_warmed_up")
         except Exception as e:
             logger.warning("classifier_warmup_failed", error=str(e))
+        finally:
+            app.state.classifier_ready = True
 
     asyncio.create_task(_warmup_classifier())
 
@@ -230,8 +235,13 @@ async def root_health_check():
     return {"status": "ok"}
 
 @app.get("/ready", tags=["health"])
-async def root_ready_check():
-    """Readiness probe."""
+async def root_ready_check(request: Request):
+    """Readiness probe — returns 503 until classifier warmup completes."""
+    if not getattr(request.app.state, "classifier_ready", False):
+        return JSONResponse(
+            status_code=503,
+            content={"status": "warming_up"},
+        )
     return {"status": "ready"}
 
 # --- Legacy routers (kept during migration) ---

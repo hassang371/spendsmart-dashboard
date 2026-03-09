@@ -49,6 +49,8 @@ class TestHealthEndpoints:
 
     def test_ready_readiness_returns_200(self):
         client = TestClient(app)
+        # Mock the async warmup being complete to test the 200 path
+        app.state.classifier_ready = True
         response = client.get("/ready")
         assert response.status_code == 200
         assert response.json()["status"] == "ready"
