@@ -12,11 +12,15 @@ classes. All errors return a consistent JSON format:
     }
 
 Fixes ARCH-02: replaces ad-hoc error handling across routers.
+Upgraded to RFC 9457 Problem Details schema in API-1.
 """
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from apps.api.core.problem_detail import problem_response, PROBLEM_TYPES
+from apps.api.core.logging_config import get_request_id_from_state
 
 
 class AppError(Exception):
@@ -58,28 +62,6 @@ class RateLimitError(AppError):
         self.retry_after = retry_after
 
 
-def _build_problem_detail(
-    status: int,
-    title: str,
-    detail: str,
-    error_type: str = "about:blank",
-    instance: str = "",
-    request_id: str = "",
-) -> dict:
-    """Build RFC 7807 Problem Details response body."""
-    body = {
-        "type": error_type,
-        "title": title,
-        "status": status,
-        "detail": detail,
-    }
-    if instance:
-        body["instance"] = instance
-    if request_id:
-        body["request_id"] = request_id
-    return body
-
-
 # HTTP status code to title mapping
 _STATUS_TITLES = {
     400: "Bad Request",
@@ -101,39 +83,31 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
         title = _STATUS_TITLES.get(exc.status_code, "Error")
-        request_id = getattr(request.state, "request_id", "")
-        body = _build_problem_detail(
-            status=exc.status_code,
+        return problem_response(
+            status_code=exc.status_code,
             title=title,
             detail=exc.detail,
-            error_type=exc.error_type,
+            type=exc.error_type,
             instance=str(request.url.path),
-            request_id=request_id,
         )
-        return JSONResponse(status_code=exc.status_code, content=body)
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         title = _STATUS_TITLES.get(exc.status_code, "Error")
         detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
-        request_id = getattr(request.state, "request_id", "")
-        body = _build_problem_detail(
-            status=exc.status_code,
+        return problem_response(
+            status_code=exc.status_code,
             title=title,
             detail=detail,
             instance=str(request.url.path),
-            request_id=request_id,
         )
-        return JSONResponse(status_code=exc.status_code, content=body)
 
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-        request_id = getattr(request.state, "request_id", "")
-        body = _build_problem_detail(
-            status=500,
+        return problem_response(
+            status_code=500,
             title="Internal Server Error",
             detail="An unexpected error occurred",
+            type=PROBLEM_TYPES.get("internal_error", "about:blank"),
             instance=str(request.url.path),
-            request_id=request_id,
         )
-        return JSONResponse(status_code=500, content=body)
