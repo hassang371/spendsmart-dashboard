@@ -7,11 +7,8 @@ Prioritize correctness, simplicity, and verification over speed.
 
 On your FIRST turn, BEFORE anything else:
 
-1. Check auto memory (`~/.claude/projects/.../memory/MEMORY.md`) for prior decisions.
-2. Run `TaskList` to see in-progress tasks from prior sessions.
-3. Evaluate the request:
-   - Does it change code or involve building something? → Read `.claude/workflows/docs-driven-dev.md`
-   - Pure question or trivial task (typo, rename)? → Answer directly
+1. Run `TaskList` to see in-progress tasks from prior sessions.
+2. Evaluate the request — if it involves a code change, `superpowers.md` (always loaded) routes you to the right workflow. Pure questions and trivial tasks (typo, rename) can be answered directly.
 
 ## Tech Stack
 
@@ -53,8 +50,8 @@ docs/
   rfcs/         # RFCs (auto-numbered)
   archive/      # Old/superseded docs
 .claude/
-  rules/        # Modular rules (auto-loaded by Claude Code)
-  workflows/    # On-demand workflow files
+  rules/        # Modular rules (auto-loaded by Claude Code; path-scoped rules in rules/frontend/, rules/backend/)
+  workflows/    # On-demand reference files — read explicitly via Read tool, NOT auto-loaded
   skills/       # Custom project skills (design-docs)
 ```
 

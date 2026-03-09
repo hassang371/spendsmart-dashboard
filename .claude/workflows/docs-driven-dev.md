@@ -69,7 +69,7 @@ Exit criteria: user approves the documentation.
 **Invoke:** `superpowers:writing-plans` via Skill tool
 
 - Reference the LLD doc from Step 2
-- Plans saved in the same `docs/` subdir as the LLD (or alongside it)
+- Plan = `TaskCreate` entries (one per task) — do NOT create `implementation_plan.md` or any plan file
 - Exit criteria: user approves the plan
 
 ---
@@ -96,10 +96,18 @@ Exit criteria: user approves the documentation.
 
 **Invoke:** `superpowers:verification-before-completion`
 
-- Run all tests, read actual output
-- Never claim done without evidence
-- If FAIL → back to Step 4
-- If PASS → update the design doc status to `Verified`:
+**Definition of Done — ALL must pass before claiming complete:**
+
+| Check | Command |
+|---|---|
+| Backend tests | `.venv/bin/python -m pytest apps/ packages/ -v` |
+| Frontend tests | `cd apps/web && npm run test` |
+| TypeScript | `npx tsc --noEmit` |
+| Lint | `cd apps/web && npm run lint` |
+
+- Run each command and read the actual output — do not assume
+- If ANY fail → back to Step 4
+- If ALL pass → update the design doc status to `Verified`:
   ```
   docs: update <doc-id> status to Verified
   ```

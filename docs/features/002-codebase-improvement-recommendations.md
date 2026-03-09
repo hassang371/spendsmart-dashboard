@@ -2,6 +2,7 @@
 
 > **Doc ID:** 002-codebase-improvement-recommendations
 > **Date:** 2026-03-08
+> **Type:** Feature LLD
 > **Status:** Proposed
 > **DRI:** Hassan
 > **Related Docs:** `docs/bugs/BUG-001-consolidated-code-review.md`
