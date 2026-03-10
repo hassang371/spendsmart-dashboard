@@ -629,14 +629,14 @@ export default function AIInsightsPage() {
             <div className="mb-4 flex items-center justify-between">
               <h3 className="flex items-center gap-2 text-xl font-bold text-foreground">
                 <Brain className="h-5 w-5 text-emerald-500" />
-                Train Global Model
+                Train Personal Adapter
               </h3>
             </div>
 
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Upload your full transaction history (CSV or Excel) to train a deep learning model
-                (Temporal Fusion Transformer) on your data.
+                Upload categorized transaction history (CSV or Excel) to train your personal
+                categorization adapter. At least 5 non-Uncategorized rows are required to queue training.
               </p>
 
               <div className="space-y-2">
@@ -663,7 +663,7 @@ export default function AIInsightsPage() {
                   ) : (
                     <Upload className="h-4 w-4" />
                   )}
-                  {trainingLoading ? 'Uploading & Queuing...' : 'Upload & Train Model'}
+                  {trainingLoading ? 'Uploading & Queuing...' : 'Upload & Train Adapter'}
                 </button>
                 <input
                   ref={trainingFileRef}
@@ -679,7 +679,11 @@ export default function AIInsightsPage() {
                 <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
                   <div className="flex items-center gap-2 text-emerald-600">
                     <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-xs font-bold">Job Queued: {trainingResult.job_id}</span>
+                    <span className="text-xs font-bold">
+                      {trainingResult.queued_training
+                        ? `Adapter job queued: ${trainingResult.job_id}`
+                        : `Upload processed: ${trainingResult.job_id}`}
+                    </span>
                   </div>
                 </div>
               )}

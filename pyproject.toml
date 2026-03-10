@@ -7,11 +7,8 @@ description = "SCALE — AI-Powered Financial Intelligence"
 pythonpath = ["."]
 addopts = ["--import-mode=importlib"]
 testpaths = [
-    "apps/api/tests",
-    "apps/worker/tests",
-    "packages/categorization/tests",
-    "packages/forecasting/tests",
-    "packages/ingestion_engine/tests",
+    "apps",
+    "packages",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

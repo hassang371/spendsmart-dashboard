@@ -58,6 +58,10 @@ export interface HealthResponse {
 
 export interface TrainingUploadResponse {
   job_id: string;
+  status?: string;
+  message?: string;
+  transaction_count?: number;
+  queued_training?: boolean;
 }
 
 export interface TrainingJob {

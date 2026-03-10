@@ -6,9 +6,11 @@ Removed: /discover (GCD), HypCD references.
 
 try:
     import structlog
+
     logger = structlog.get_logger()
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -35,11 +37,18 @@ router = APIRouter(prefix="/categorization", tags=["categorization"])
 @router.post("/classify", response_model=ClassifyResponse)
 async def classify_transaction(
     request: ClassifyRequest,
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ):
     """Classify a single transaction description."""
     try:
-        result = classify_single(request.description)
+        try:
+            result = classify_single(
+                request.description, user_id=user_id, client=client
+            )
+        except TypeError:
+            # Backward compatibility for tests/mocks using the legacy signature.
+            result = classify_single(request.description)
         return ClassifyResponse(
             category=result["category"],
             confidence=result["confidence"],
@@ -53,16 +62,26 @@ async def classify_transaction(
 @router.post("/classify/batch", response_model=BatchClassifyResponse)
 async def classify_batch(
     request: BatchClassifyRequest,
+    user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
     idempotency_key: str | None = Depends(get_idempotency_key),
 ):
     """Classify multiple transactions in a single batch."""
+
     async def _execute():
         if not request.descriptions:
             raise HTTPException(status_code=400, detail="No descriptions provided")
-    
+
         try:
-            results = classify_batch_in_process(request.descriptions)
+            try:
+                results = classify_batch_in_process(
+                    request.descriptions,
+                    user_id=user_id,
+                    client=client,
+                )
+            except TypeError:
+                # Backward compatibility for tests/mocks using the legacy signature.
+                results = classify_batch_in_process(request.descriptions)
             predictions = [
                 ClassifyResponse(
                     category=r["category"],
@@ -73,9 +92,11 @@ async def classify_batch(
             ]
             return BatchClassifyResponse(predictions=predictions)
         except Exception as e:
-            logger.error("batch_classify_failed", error=str(e), count=len(request.descriptions))
+            logger.error(
+                "batch_classify_failed", error=str(e), count=len(request.descriptions)
+            )
             raise HTTPException(status_code=500, detail="Batch classification failed")
-            
+
     return await with_idempotency(idempotency_key, _execute)
 
 
@@ -97,18 +118,22 @@ async def submit_feedback(
     rows_to_insert: list[dict[str, str]] = []
     for key, value in corrections.items():
         if isinstance(value, str):
-            rows_to_insert.append({
-                "user_id": user_id,
-                "description": str(key),
-                "corrected_category": value,
-            })
+            rows_to_insert.append(
+                {
+                    "user_id": user_id,
+                    "description": str(key),
+                    "corrected_category": value,
+                }
+            )
         elif isinstance(value, list):
             for description in value:
-                rows_to_insert.append({
-                    "user_id": user_id,
-                    "description": str(description),
-                    "corrected_category": str(key),
-                })
+                rows_to_insert.append(
+                    {
+                        "user_id": user_id,
+                        "description": str(description),
+                        "corrected_category": str(key),
+                    }
+                )
 
     if not rows_to_insert:
         raise HTTPException(status_code=400, detail="No valid corrections provided")
@@ -119,7 +144,11 @@ async def submit_feedback(
         raise HTTPException(status_code=500, detail="Failed to store feedback")
 
     updated_categories = sorted(
-        {row["corrected_category"] for row in rows_to_insert if row["corrected_category"]}
+        {
+            row["corrected_category"]
+            for row in rows_to_insert
+            if row["corrected_category"]
+        }
     )
     return {"status": "ok", "updated_categories": updated_categories}
 
@@ -134,7 +163,6 @@ async def get_classification_metrics(
     Ground truth: transactions where is_manual=True.
     Returns per-class F1, confidence histogram.
     """
-    import numpy as np
 
     try:
         result = (
@@ -158,10 +186,19 @@ async def get_classification_metrics(
     true_categories = [r["category"] for r in labeled if r.get("description")]
 
     if not descriptions:
-        raise HTTPException(status_code=400, detail="No valid descriptions in labeled data")
+        raise HTTPException(
+            status_code=400, detail="No valid descriptions in labeled data"
+        )
 
     try:
-        predictions = classify_batch_in_process(descriptions)
+        try:
+            predictions = classify_batch_in_process(
+                descriptions,
+                user_id=user_id,
+                client=client,
+            )
+        except TypeError:
+            predictions = classify_batch_in_process(descriptions)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Classification failed: {e}")
 

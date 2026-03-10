@@ -24,6 +24,7 @@ describe('API Client', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        headers: new Map([['content-type', 'application/json']]),
         text: () => Promise.resolve(JSON.stringify({ detail: 'Not found' })),
         json: () => Promise.resolve({ detail: 'Not found' }),
       });
@@ -36,6 +37,7 @@ describe('API Client', () => {
     it('should return health status', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             status: 'healthy',
@@ -60,6 +62,7 @@ describe('API Client', () => {
         ok: false,
         status: 503,
         statusText: 'Service Unavailable',
+        headers: new Map([['content-type', 'text/plain']]),
         text: () => Promise.resolve('Service down'),
         json: () => Promise.reject(new Error('not json')),
       });
@@ -74,6 +77,7 @@ describe('API Client', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             transactions: [{ date: '2024-01-01', amount: 100 }],
@@ -103,6 +107,7 @@ describe('API Client', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             predictions: [{ day_offset: 1, predicted_spend: 100 }],
@@ -131,6 +136,7 @@ describe('API Client', () => {
     it('should get safe to spend amount', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             safe_amount: 5000,
@@ -162,6 +168,7 @@ describe('API Client', () => {
     it('should classify descriptions in batch', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             'Starbucks Coffee': 'Food & Drink',
@@ -192,6 +199,7 @@ describe('API Client', () => {
     it('should submit category corrections', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             status: 'success',
@@ -222,6 +230,7 @@ describe('API Client', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             status: 'success',
@@ -250,6 +259,7 @@ describe('API Client', () => {
     it('should get latest training job', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: new Map([['content-type', 'application/json']]),
         json: () =>
           Promise.resolve({
             id: 'job-123',
@@ -273,6 +283,7 @@ describe('API Client', () => {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
+        headers: new Map([['content-type', 'application/json']]),
         text: () => Promise.resolve(JSON.stringify({ detail: 'Invalid request format' })),
         json: () => Promise.resolve({ detail: 'Invalid request format' }),
       });
@@ -285,6 +296,7 @@ describe('API Client', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
+        headers: new Map([['content-type', 'text/plain']]),
         text: () => Promise.resolve('Plain text error'),
         json: () => Promise.reject(new Error('not json')),
       });

@@ -21,7 +21,9 @@ load_dotenv()
 # Support both standard SUPABASE_URL and Next.js public convention as fallback
 URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
 # Use Service Role Key for background worker to bypass RLS
-KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
+    "SUPABASE_SERVICE_KEY"
+)
 
 if not URL:
     logger.error("SUPABASE_URL not set (also checked NEXT_PUBLIC_SUPABASE_URL)")
@@ -100,17 +102,31 @@ def train_model(job_id: str, user_id: str):
 def process_next_job(supabase: Client) -> bool:
     """Polls for a single pending job and processes it. Returns True if a job was found, False otherwise."""
     try:
-        # Training Jobs (Forecasting / Active Learning)
+        # Training jobs for the forecasting worker only.
+        # Adapter-training jobs are queued via Celery and carry
+        # source_row_count/celery_task_id metadata.
         response = (
             supabase.table("training_jobs")
             .select("*")
             .eq("status", JobStatus.PENDING)
-            .limit(1)
+            .limit(20)
             .execute()
         )
 
         if response.data:
-            job = response.data[0]
+            candidates = [
+                job
+                for job in response.data
+                if (
+                    job.get("job_type") == "forecasting"
+                    or str(job.get("logs") or "").startswith("forecasting:")
+                )
+                and not job.get("celery_task_id")
+            ]
+            if not candidates:
+                return False
+
+            job = candidates[0]
             job_id = job["id"]
             user_id = job["user_id"]
 
@@ -170,6 +186,26 @@ def process_next_job(supabase: Client) -> bool:
                         f"Job {job_id}: failed to write failure status: {status_err}. "
                         f"Job may remain stuck in 'processing' — manual intervention needed."
                     )
+                    for attempt in range(1, 4):
+                        try:
+                            time.sleep(0.5 * attempt)
+                            supabase.table("training_jobs").update(
+                                {
+                                    "status": JobStatus.FAILED,
+                                    "logs": str(e),
+                                    "updated_at": datetime.now(
+                                        timezone.utc
+                                    ).isoformat(),
+                                }
+                            ).eq("id", job_id).execute()
+                            logger.info(
+                                f"Job {job_id}: failure status write recovered on retry {attempt}."
+                            )
+                            break
+                        except Exception as retry_err:
+                            logger.error(
+                                f"Job {job_id}: failure status retry {attempt} failed: {retry_err}"
+                            )
 
             return True
 

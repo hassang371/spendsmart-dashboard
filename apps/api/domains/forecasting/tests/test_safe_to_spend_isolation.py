@@ -4,7 +4,8 @@ Each test verifies that the `user_id` filter is applied to the transactions
 query so that cross-tenant leakage cannot occur even if RLS has a gap.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+import asyncio
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -38,8 +39,7 @@ def _make_rows(user_ids: list[str]) -> list[dict]:
     ]
 
 
-@pytest.mark.asyncio
-async def test_safe_to_spend_applies_user_id_filter(mock_client):
+def test_safe_to_spend_applies_user_id_filter(mock_client):
     """BUG-002: The query MUST call .eq('user_id', user_id) before fetching rows."""
     client, query = mock_client
     user_id = "user-abc-123"
@@ -60,7 +60,7 @@ async def test_safe_to_spend_applies_user_id_filter(mock_client):
         from apps.api.domains.forecasting.router import safe_to_spend
 
         # Call the function directly (bypassing FastAPI DI)
-        result = await safe_to_spend(user_id=user_id, client=client)
+        asyncio.run(safe_to_spend(user_id=user_id, client=client))
 
     # The .eq() chain must have been called with user_id
     eq_calls = [str(c) for c in query.eq.call_args_list]
@@ -71,8 +71,7 @@ async def test_safe_to_spend_applies_user_id_filter(mock_client):
     )
 
 
-@pytest.mark.asyncio
-async def test_safe_to_spend_no_other_user_rows_returned(mock_client):
+def test_safe_to_spend_no_other_user_rows_returned(mock_client):
     """BUG-002: Cross-tenant rows must never appear in safe-to-spend result."""
     client, query = mock_client
     user_id = "user-tenant-A"
@@ -94,7 +93,7 @@ async def test_safe_to_spend_no_other_user_rows_returned(mock_client):
     ):
         from apps.api.domains.forecasting.router import safe_to_spend
 
-        result = await safe_to_spend(user_id=user_id, client=client)
+        result = asyncio.run(safe_to_spend(user_id=user_id, client=client))
 
     # Result must be a dict with expected keys (not a cross-tenant data dump)
     assert "safe_amount" in result
@@ -102,9 +101,10 @@ async def test_safe_to_spend_no_other_user_rows_returned(mock_client):
 
     # Verify .eq was called with the correct user_id (not other_user_id)
     all_eq_args = [call.args for call in query.eq.call_args_list]
-    assert ("user_id", user_id) in all_eq_args, (
-        f"Expected eq('user_id', '{user_id}') in query chain. Got: {all_eq_args}"
-    )
-    assert ("user_id", other_user_id) not in all_eq_args, (
-        "Cross-tenant user_id must not appear in query filter"
-    )
+    assert (
+        ("user_id", user_id) in all_eq_args
+    ), f"Expected eq('user_id', '{user_id}') in query chain. Got: {all_eq_args}"
+    assert (
+        "user_id",
+        other_user_id,
+    ) not in all_eq_args, "Cross-tenant user_id must not appear in query filter"

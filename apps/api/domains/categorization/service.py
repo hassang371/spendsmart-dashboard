@@ -4,7 +4,12 @@ Provides a module-level TransactionClassifier singleton and
 helper functions for batch/single classification.
 """
 
-from packages.categorization.classifier import TransactionClassifier
+from typing import Optional
+
+from supabase import Client
+
+from packages.categorization.classifier import LinearAdapter, TransactionClassifier
+from packages.categorization.model_registry import load_latest
 
 _classifier: TransactionClassifier | None = None
 
@@ -17,7 +22,26 @@ def get_classifier() -> TransactionClassifier:
     return _classifier
 
 
-def classify_batch_in_process(descriptions: list[str]) -> list[dict]:
+def _load_user_adapter(
+    clf: TransactionClassifier, client: Client, user_id: str
+) -> Optional[LinearAdapter]:
+    state_dict = load_latest(client, user_id)
+    if not state_dict:
+        return None
+
+    adapter = LinearAdapter(
+        input_dim=clf.embedding_dim,
+        num_classes=len(clf._category_names),
+    )
+    adapter.load_state_dict(state_dict)
+    return adapter
+
+
+def classify_batch_in_process(
+    descriptions: list[str],
+    user_id: str | None = None,
+    client: Client | None = None,
+) -> list[dict]:
     """Classify a batch of transaction descriptions.
 
     Args:
@@ -27,10 +51,17 @@ def classify_batch_in_process(descriptions: list[str]) -> list[dict]:
         List of {"category": str, "confidence": float} dicts.
     """
     clf = get_classifier()
-    return clf.predict_batch(descriptions)
+    adapter = None
+    if user_id and client:
+        adapter = _load_user_adapter(clf, client, user_id)
+    return clf.predict_batch(descriptions, adapter=adapter)
 
 
-def classify_single(description: str) -> dict:
+def classify_single(
+    description: str,
+    user_id: str | None = None,
+    client: Client | None = None,
+) -> dict:
     """Classify a single transaction description.
 
     Args:
@@ -40,4 +71,7 @@ def classify_single(description: str) -> dict:
         {"category": str, "confidence": float}
     """
     clf = get_classifier()
-    return clf.predict(description)
+    adapter = None
+    if user_id and client:
+        adapter = _load_user_adapter(clf, client, user_id)
+    return clf.predict(description, adapter=adapter)

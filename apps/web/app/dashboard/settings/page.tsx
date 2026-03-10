@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase/client';
-import { getCacheKey } from '../../../lib/utils/cache';
+import { removeCachedData } from '../../../lib/utils/cache';
 import { useTheme } from 'next-themes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -68,6 +68,23 @@ export default function SettingsPage() {
 
   // Toast States
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const clearAppCacheFull = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const k = window.localStorage.key(i);
+          if (k && (k.startsWith('dev:') || k.startsWith('prod:'))) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+      }
+    } catch(err) {
+      console.warn(err);
+    }
+  }
 
   useEffect(() => {
     if (toast) {
@@ -271,8 +288,6 @@ export default function SettingsPage() {
         .eq('user_id', user.id);
       if (deleteError) throw deleteError;
 
-      // BUG-024 fix: Use getCacheKey() so keys match what getCachedData() wrote
-      // and clearAppCache() can find them when evicting by prefix.
       const cacheKeys = [
         'overview-cache',
         'transactions-cache',
@@ -281,7 +296,7 @@ export default function SettingsPage() {
         'safe-to-spend-cache',
         'training-job-cache',
       ];
-      cacheKeys.forEach((key) => localStorage.removeItem(getCacheKey(`${key}:${user.id}`)));
+      cacheKeys.forEach((key) => removeCachedData(`${key}:${user.id}`));
 
       setToast({
         type: 'success',

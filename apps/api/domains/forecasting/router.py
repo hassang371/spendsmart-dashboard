@@ -6,7 +6,6 @@ preserve metadata columns.
 """
 
 import hashlib
-import io
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -47,14 +46,22 @@ async def forecast_predict(
     contents = await file.read()
     file_hash = hashlib.sha256(contents).hexdigest()
 
-    # Duplicate-file check BEFORE parsing (fail fast)
+    # Parse first so a parse failure never burns a duplicate marker.
     try:
-        client.table("uploaded_files").insert({
-            "user_id": user_id,
-            "file_hash": file_hash,
-            "filename": file.filename,
-            "upload_type": "forecast",
-        }).execute()
+        df = parse_file(contents, file.filename)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Failed to parse CSV")
+
+    # Register upload marker after parse succeeds.
+    try:
+        client.table("uploaded_files").insert(
+            {
+                "user_id": user_id,
+                "file_hash": file_hash,
+                "filename": file.filename,
+                "upload_type": "forecast",
+            }
+        ).execute()
     except Exception as e:
         if "duplicate key" in str(e) or "23505" in str(e):
             raise HTTPException(
@@ -63,15 +70,6 @@ async def forecast_predict(
             )
         raise HTTPException(status_code=500, detail="Failed to register upload")
 
-    # Parse only after successful registration
-    try:
-        # BUG-07 fix: use parse_file instead of parse_csv_content
-        df = parse_file(contents, file.filename)
-    except Exception:
-        # Rollback the idempotency marker so user isn't locked out of retrying
-        client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
-        raise HTTPException(status_code=400, detail="Failed to parse CSV")
-
     if "transaction_date" in df.columns and "date" not in df.columns:
         df = df.rename(columns={"transaction_date": "date"})
 
@@ -79,7 +77,9 @@ async def forecast_predict(
         loader = TransactionLoader(df)
         daily_df = loader.aggregate_daily()
     except Exception:
-        client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
+        client.table("uploaded_files").delete().eq("user_id", user_id).eq(
+            "file_hash", file_hash
+        ).execute()
         raise HTTPException(status_code=400, detail="Failed to aggregate transactions")
 
     # Statistical forecast
@@ -89,7 +89,9 @@ async def forecast_predict(
         float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
     )
     avg_daily_income = (
-        float(recent["daily_income"].mean()) if "daily_income" in recent.columns else 0.0
+        float(recent["daily_income"].mean())
+        if "daily_income" in recent.columns
+        else 0.0
     )
 
     predictions = [
@@ -121,7 +123,9 @@ async def safe_to_spend(
     lookback_days = 90
 
     try:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        ).isoformat()
         response = (
             client.table("transactions")
             .select("transaction_date, amount, status")
@@ -167,7 +171,9 @@ async def safe_to_spend(
     model_note = f"Based on {days_of_data} days of transaction history."
 
     avg_daily_income = (
-        float(recent["daily_income"].mean()) if "daily_income" in recent.columns else 0.0
+        float(recent["daily_income"].mean())
+        if "daily_income" in recent.columns
+        else 0.0
     )
     avg_daily_spend = (
         float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
@@ -183,15 +189,15 @@ async def safe_to_spend(
             pred_data = predict_with_tft(tft_model, df, horizon=horizon)
             if "forecast" in pred_data:
                 forecast = pred_data["forecast"]
-                total_predicted_spend_p90 = sum(
-                    day.get("p90", 0) for day in forecast
-                )
+                total_predicted_spend_p90 = sum(day.get("p90", 0) for day in forecast)
                 total_predicted_income = avg_daily_income * horizon
                 tft_net = total_predicted_income - total_predicted_spend_p90
                 safe_amount = round(max(0.0, tft_net), 2)
                 projected_overspend = round(max(0.0, -tft_net), 2)
                 model_name = "tft_v1"
-                model_note = "AI prediction (TFT) for spending, statistical avg for income."
+                model_note = (
+                    "AI prediction (TFT) for spending, statistical avg for income."
+                )
                 forecast_breakdown = forecast
     except Exception as e:
         logger.warning("tft_inference_failed", error=str(e))

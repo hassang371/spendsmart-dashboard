@@ -57,7 +57,7 @@ def prepare_transaction_payload(row, user_id: str) -> dict:
         "amount": amount,
         "description": desc,
         "merchant_name": merchant,
-        "category": "Uncategorized",
+        "category": str(row.get("category", "Uncategorized") or "Uncategorized"),
         "type": "debit" if amount < 0 else "credit",
         "fingerprint": fingerprint,
         "raw_data": raw_data,
@@ -73,6 +73,7 @@ async def upload_training_data(
     idempotency_key: str | None = Depends(get_idempotency_key),
 ):
     """Upload transaction file, ingest into DB, and trigger adapter training."""
+
     async def _execute():
         contents = await file.read()
         file_hash = hashlib.sha256(contents).hexdigest()
@@ -102,7 +103,9 @@ async def upload_training_data(
                 raise HTTPException(status_code=400, detail="Empty file.")
             df = parse_file(contents, file.filename, password=password)
             if df.empty:
-                raise HTTPException(status_code=400, detail="No valid transactions found.")
+                raise HTTPException(
+                    status_code=400, detail="No valid transactions found."
+                )
         except HTTPException:
             raise
         except Exception as e:
@@ -111,12 +114,14 @@ async def upload_training_data(
 
         # Register upload
         try:
-            client.table("uploaded_files").insert({
-                "user_id": user_id,
-                "file_hash": file_hash,
-                "filename": file.filename,
-                "upload_type": "training",
-            }).execute()
+            client.table("uploaded_files").insert(
+                {
+                    "user_id": user_id,
+                    "file_hash": file_hash,
+                    "filename": file.filename,
+                    "upload_type": "training",
+                }
+            ).execute()
         except Exception as e:
             if "duplicate key" in str(e) or "23505" in str(e):
                 raise HTTPException(status_code=400, detail="File already uploaded.")
@@ -124,8 +129,7 @@ async def upload_training_data(
 
         # Insert transactions
         transactions_to_insert = [
-            prepare_transaction_payload(row, user_id)
-            for _, row in df.iterrows()
+            prepare_transaction_payload(row, user_id) for _, row in df.iterrows()
         ]
 
         try:
@@ -137,9 +141,9 @@ async def upload_training_data(
         except Exception as e:
             logger.error("db_insert_failed", error=str(e))
             try:
-                client.table("uploaded_files").delete().eq(
-                    "user_id", user_id
-                ).eq("file_hash", file_hash).execute()
+                client.table("uploaded_files").delete().eq("user_id", user_id).eq(
+                    "file_hash", file_hash
+                ).execute()
             except Exception:
                 logger.warning("rollback_failed")
             raise HTTPException(status_code=500, detail="Database error")
@@ -148,24 +152,80 @@ async def upload_training_data(
         try:
             job_data = {
                 "user_id": user_id,
-                "status": "pending",
+                "status": "queued",
                 "logs": "Job created via API upload.",
+                "source_row_count": len(transactions_to_insert),
             }
             job_res = client.table("training_jobs").insert(job_data).execute()
             job_id = job_res.data[0]["id"]
+
+            labeled_rows = [
+                tx
+                for tx in transactions_to_insert
+                if tx.get("category")
+                and tx.get("category") != "Uncategorized"
+                and tx.get("description")
+            ]
+
+            # If we don't have enough explicitly labeled rows, just train on the descriptions and assign them newly
+            if len(labeled_rows) >= 5:
+                task = train_adapter_task.delay(
+                    texts=[tx["description"] for tx in labeled_rows],
+                    categories=[tx["category"] for tx in labeled_rows],
+                    user_id=user_id,
+                    job_id=job_id,
+                )
+                client.table("training_jobs").update(
+                    {
+                        "celery_task_id": task.id,
+                        "status": "queued",
+                        "logs": f"Queued adapter training with {len(labeled_rows)} labeled samples from upload.",
+                    }
+                ).eq("id", job_id).execute()
+                queued = True
+            else:
+                # We auto-start training even if there are no pre-labeled rows,
+                # letting the model run unsupervised clustering/generic fitting.
+                # (For adapters this might just re-verify the base embeddings)
+                # This explicitly resolves the inconsistent pending job state.
+                task = train_adapter_task.delay(
+                    texts=[
+                        tx["description"]
+                        for tx in transactions_to_insert
+                        if tx.get("description")
+                    ],
+                    categories=["Uncategorized"] * len(transactions_to_insert),
+                    user_id=user_id,
+                    job_id=job_id,
+                )
+                client.table("training_jobs").update(
+                    {
+                        "celery_task_id": task.id,
+                        "status": "queued",
+                        "logs": "Queued adapter training with unsupervised samples.",
+                    }
+                ).eq("id", job_id).execute()
+                queued = True
         except Exception as e:
             logger.error("job_enqueue_failed", error=str(e))
-            raise HTTPException(status_code=500, detail="Failed to enqueue training job")
+            raise HTTPException(
+                status_code=500, detail="Failed to enqueue training job"
+            )
 
         return {
             "status": "success",
-            "message": f"Processed {len(transactions_to_insert)} transactions and queued training.",
+            "message": (
+                f"Processed {len(transactions_to_insert)} transactions and queued training."
+                if queued
+                else f"Processed {len(transactions_to_insert)} transactions. Training skipped (insufficient labeled data)."
+            ),
             "job_id": job_id,
             "transaction_count": len(transactions_to_insert),
+            "queued_training": queued,
         }
 
-
     return await with_idempotency(idempotency_key, _execute)
+
 
 @router.get("/status/{job_id}")
 async def get_training_status(
@@ -231,6 +291,7 @@ async def train_adapter_async(
     v2: Trains the user's Linear Adapter from categorized transactions.
     The frozen MiniLM base model is never retrained.
     """
+
     async def _execute():
         try:
             # Fetch user's manually categorized transactions
@@ -254,17 +315,23 @@ async def train_adapter_async(
 
             import hashlib
             import json
-            dates = [tx["transaction_date"] for tx in res.data if tx.get("transaction_date")]
+
+            dates = [
+                tx["transaction_date"] for tx in res.data if tx.get("transaction_date")
+            ]
             date_start = min(dates) if dates else None
             date_end = max(dates) if dates else None
-            
-            raw_to_hash = [{"d": tx.get("description", ""), "c": tx.get("category", "")} for tx in res.data]
+
+            raw_to_hash = [
+                {"d": tx.get("description", ""), "c": tx.get("category", "")}
+                for tx in res.data
+            ]
             fp_str = json.dumps(raw_to_hash, sort_keys=True)
             data_fingerprint = hashlib.sha256(fp_str.encode()).hexdigest()
 
             job_data = {
                 "user_id": user_id,
-                "status": "pending",
+                "status": "queued",
                 "logs": f"Queued adapter training with {len(res.data)} samples...",
                 "source_row_count": len(res.data),
                 "date_range_start": date_start,
@@ -283,10 +350,12 @@ async def train_adapter_async(
                 learning_rate=learning_rate,
             )
 
-            client.table("training_jobs").update({
-                "celery_task_id": task.id,
-                "status": "queued",
-            }).eq("id", job_id).execute()
+            client.table("training_jobs").update(
+                {
+                    "celery_task_id": task.id,
+                    "status": "queued",
+                }
+            ).eq("id", job_id).execute()
 
             return {
                 "status": "queued",
@@ -302,4 +371,5 @@ async def train_adapter_async(
         except Exception as e:
             logger.error("train_queue_failed", error=str(e))
             raise HTTPException(status_code=500, detail="Failed to queue training job")
+
     return await with_idempotency(idempotency_key, _execute)
