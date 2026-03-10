@@ -80,14 +80,33 @@ export default function OverviewPage() {
           return;
         }
 
-        // Fetch last-30-days transactions for overview charts (scoped to reduce payload)
+        // Fetch last-30-days transactions for overview charts with cursor pagination
+        // to avoid silent truncation at a fixed page size.
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const response = await accountsApi.getTransactions(session.access_token, {
-          limit: 500,
-          date_from: thirtyDaysAgo.toISOString().split('T')[0],
-        });
-        const allItems: Transaction[] = response.items;
+
+        const allItems: Transaction[] = [];
+        let cursor: string | undefined;
+        let hasMore = true;
+        let pages = 0;
+        const MAX_PAGES = 20;
+
+        while (hasMore && pages < MAX_PAGES) {
+          const response = await accountsApi.getTransactions(session.access_token, {
+            limit: 500,
+            cursor,
+            date_from: thirtyDaysAgo.toISOString().split('T')[0],
+          });
+
+          allItems.push(...response.items);
+          hasMore = response.has_more;
+          cursor = response.next_cursor ?? undefined;
+          pages += 1;
+        }
+
+        if (hasMore) {
+          console.warn('Overview transactions are truncated after pagination safety cap.');
+        }
 
         setData(allItems);
         setCachedData(cacheKey, allItems);

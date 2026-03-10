@@ -62,26 +62,35 @@ class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         content_length = request.headers.get("content-length")
-        
+
         if content_length:
             try:
                 length_val = int(content_length)
-                if length_val > self._max_bytes:
-                    raise ValueError("Too large")
             except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "type": "about:blank",
+                        "title": "Invalid Content-Length",
+                        "status": 400,
+                        "detail": ("Content-Length header must be a valid integer."),
+                    },
+                )
+
+            if length_val > self._max_bytes:
                 return JSONResponse(
                     status_code=413,
                     content={
                         "type": "about:blank",
-                        "title": "Content Too Large / Invalid",
+                        "title": "Content Too Large",
                         "status": 413,
                         "detail": (
                             f"Request body exceeds maximum allowed size of "
-                            f"{self._max_bytes // (1024 * 1024)} MB or size is invalid."
+                            f"{self._max_bytes // (1024 * 1024)} MB."
                         ),
                     },
                 )
-                
+
         return await call_next(request)
 
 
@@ -115,6 +124,7 @@ async def lifespan(app: FastAPI):
 
     # Initialize Redis-backed rate limiter for the /ingest/import endpoint
     import redis as _redis
+
     try:
         _redis_client = _redis.from_url(
             os.getenv("REDIS_URL", "redis://localhost:6379/0"),
@@ -140,6 +150,7 @@ async def lifespan(app: FastAPI):
     async def _warmup_classifier():
         try:
             from apps.api.domains.categorization.service import get_classifier
+
             await asyncio.to_thread(get_classifier)
             logger.info("classifier_warmed_up")
         except Exception as e:
@@ -206,7 +217,6 @@ register_error_handlers(app)
 # Order: Structlog → SecurityHeaders → ContentSizeLimit → CORS → app
 
 # M5: Structured request logging & Request ID generation/propagation
-from starlette.middleware.base import BaseHTTPMiddleware
 app.add_middleware(BaseHTTPMiddleware, dispatch=structlog_middleware)
 
 # M3: Security headers (X-Frame-Options, X-Content-Type-Options, CSP, etc.)
@@ -236,10 +246,12 @@ app.include_router(training_router, prefix="/api/v1")
 app.include_router(anomaly_router, prefix="/api/v1")
 app.include_router(accounts_router, prefix="/api/v1")
 
+
 @app.get("/health", tags=["health"])
 async def root_health_check():
     """Liveness probe."""
     return {"status": "ok"}
+
 
 @app.get("/ready", tags=["health"])
 async def root_ready_check(request: Request):
@@ -250,6 +262,7 @@ async def root_ready_check(request: Request):
             content={"status": "warming_up"},
         )
     return {"status": "ready"}
+
 
 # --- Legacy routers (kept during migration) ---
 app.include_router(health.router, prefix="/api/v1")

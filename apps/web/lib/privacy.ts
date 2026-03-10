@@ -54,7 +54,7 @@ export function anonymizeTransaction(
     amount: tx.amount,
     date: tx.transaction_date, // Keep date for time-series analysis
     category: tx.category,
-    merchant: merchant,
+    merchant,
     description: description || undefined,
   };
 }

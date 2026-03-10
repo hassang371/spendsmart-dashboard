@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { anonymizeTransaction, anonymizeDataset, Transaction } from './privacy';
+import { anonymizeTransaction, anonymizeDataset } from './privacy';
+import type { Transaction } from './privacy';
 
 describe('Privacy Utilities', () => {
   const mockTransaction: Transaction = {

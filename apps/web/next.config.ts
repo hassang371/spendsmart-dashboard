@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
     const appCsp = `
       default-src 'self';
       script-src 'self' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com;
-      style-src 'self' 'unsafe-inline';
+      style-src 'self';
       img-src 'self' blob: data: https://lh3.googleusercontent.com https://nbtowufbthavewruaicc.supabase.co https://avatars.githubusercontent.com https://cdn.prod.website-files.com https://sui-dev.b-cdn.net;
       font-src 'self' data:;
       object-src 'none';
@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
     // Permissive CSP for the landing page (needs Webflow, GSAP, Slater, HubSpot CDNs)
     const landingCsp = `
       default-src 'self';
-      script-src 'self' 'unsafe-eval' 'unsafe-inline'
+      script-src 'self'
         https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com
         https://d3e54v103j8qbb.cloudfront.net
         https://cdn.jsdelivr.net

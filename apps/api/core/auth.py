@@ -43,7 +43,9 @@ def _get_supabase_anon_key() -> str:
     if settings and settings.SUPABASE_ANON_KEY:
         return settings.SUPABASE_ANON_KEY
     # Fallback to direct env lookup
-    key = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    key = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get(
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    )
     if not key:
         raise RuntimeError("SUPABASE_ANON_KEY is not configured")
     return key
@@ -100,12 +102,26 @@ async def get_user_token(authorization: str = Header(default="")) -> str:
         payload = _decode_jwt_payload(token)
         exp = payload.get("exp")
         CLOCK_SKEW_SECONDS = 30  # Tolerate up to 30s of clock drift
-        if exp is not None and time.time() > (int(exp) + CLOCK_SKEW_SECONDS):
-            logger.warning("jwt_expired", exp=exp)
-            raise HTTPException(
-                status_code=401,
-                detail="Token has expired. Please sign in again.",
-            )
+        if exp is not None:
+            try:
+                if isinstance(exp, (int, float)):
+                    exp_ts = int(exp)
+                elif isinstance(exp, str):
+                    exp_ts = int(exp)
+                else:
+                    raise ValueError("malformed exp claim type")
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid token: malformed exp claim",
+                )
+
+            if time.time() > (exp_ts + CLOCK_SKEW_SECONDS):
+                logger.warning("jwt_expired", exp=exp)
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token has expired. Please sign in again.",
+                )
     except HTTPException:
         raise
     except ValueError:
@@ -123,7 +139,7 @@ class CurrentUser:
 
 async def get_current_user(token: str = Depends(get_user_token)) -> CurrentUser:
     """Extract user identity from JWT via Supabase Auth.
-    
+
     This ensures the token is cryptographically verified against Supabase
     before trusting the 'sub' and 'email' claims, preventing forged tokens
     on endpoints that don't pass through RLS.
@@ -133,17 +149,14 @@ async def get_current_user(token: str = Depends(get_user_token)) -> CurrentUser:
 
     try:
         # Create a client instance with the anon key and set the session token
-        client = create_client(
-            settings.SUPABASE_URL, 
-            settings.SUPABASE_ANON_KEY
-        )
-        
+        client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+
         # Call the Supabase auth API to verify the token signature
         user_response = client.auth.get_user(token)
-        
+
         if not user_response or not user_response.user:
             raise ValueError("Token rejected by auth server")
-            
+
         user = user_response.user
         return CurrentUser(id=user.id, email=user.email)
 
@@ -152,8 +165,7 @@ async def get_current_user(token: str = Depends(get_user_token)) -> CurrentUser:
     except Exception as e:
         logger.warning("auth_verification_failed", error=str(e))
         raise HTTPException(
-            status_code=401, 
-            detail="Invalid or expired authentication token"
+            status_code=401, detail="Invalid or expired authentication token"
         )
 
 

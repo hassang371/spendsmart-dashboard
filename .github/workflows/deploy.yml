@@ -42,6 +42,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # TODO: Configure deployment target.
       # Option A — SSH + Docker Compose on a VPS:
@@ -78,6 +80,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # TODO: Mirror staging deployment steps here, pointing at production secrets.
       - name: Deploy to Production

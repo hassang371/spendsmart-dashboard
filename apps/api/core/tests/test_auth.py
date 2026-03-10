@@ -21,15 +21,18 @@ from apps.api.core.auth import get_user_token, _decode_jwt_payload
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_jwt(payload: dict) -> str:
     """Build a minimal JWT (unsigned) for testing."""
-    header = base64.urlsafe_b64encode(
-        json.dumps({"alg": "HS256", "typ": "JWT"}).encode()
-    ).rstrip(b"=").decode()
+    header = (
+        base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+        .rstrip(b"=")
+        .decode()
+    )
 
-    payload_b64 = base64.urlsafe_b64encode(
-        json.dumps(payload).encode()
-    ).rstrip(b"=").decode()
+    payload_b64 = (
+        base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+    )
 
     # Fake signature — auth.py does NOT verify signatures
     sig = base64.urlsafe_b64encode(b"fakesig").rstrip(b"=").decode()
@@ -49,6 +52,7 @@ def _expired_token() -> str:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def auth_app():
@@ -70,6 +74,7 @@ def client(auth_app):
 # ---------------------------------------------------------------------------
 # Unit: _decode_jwt_payload
 # ---------------------------------------------------------------------------
+
 
 class TestDecodeJwtPayload:
     def test_decodes_valid_payload(self):
@@ -96,6 +101,7 @@ class TestDecodeJwtPayload:
 # ---------------------------------------------------------------------------
 # Integration: get_user_token dependency
 # ---------------------------------------------------------------------------
+
 
 class TestGetUserToken:
     def test_missing_authorization_header_returns_401(self, client):
@@ -136,3 +142,21 @@ class TestGetUserToken:
         # The pre-flight should NOT raise a 401 for malformed payloads.
         # (The endpoint itself might fail at the Supabase layer, but that's outside this test.)
         assert response.status_code == 200  # auth.py passes it through
+
+    def test_malformed_exp_claim_dict_returns_401(self, client):
+        """If `exp` is structurally valid JSON but not a number/string, it shouldn't crash."""
+        token = _make_jwt({"sub": "user-123", "exp": {"unknown": "format"}})
+        response = client.get(
+            "/protected", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 401
+        assert "malformed exp claim" in response.json()["detail"].lower()
+
+    def test_malformed_exp_claim_list_returns_401(self, client):
+        """If `exp` is structurally valid JSON but it is a list, it shouldn't crash."""
+        token = _make_jwt({"sub": "user-123", "exp": [1, 2, 3]})
+        response = client.get(
+            "/protected", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 401
+        assert "malformed exp claim" in response.json()["detail"].lower()
