@@ -13,11 +13,11 @@ PRODUCTION NOTES:
   benefit from more sophisticated fact extraction.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional
-from enum import Enum
 import json
 import re
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, List, Optional
 
 
 class ProbeType(Enum):
@@ -277,9 +277,7 @@ class ProbeGenerator:
         for pattern in decision_patterns:
             matches = re.findall(pattern, self.history, re.IGNORECASE)
             for match in matches:
-                decisions.append(
-                    {"decision": match.strip(), "context": pattern.split("\\s+")[0]}
-                )
+                decisions.append({"decision": match.strip(), "context": pattern.split("\\s+")[0]})
 
         return decisions[:5]  # Limit to 5 decisions
 
@@ -291,9 +289,7 @@ class CompressionEvaluator:
         self.model = model
         self.results: List[EvaluationResult] = []
 
-    def evaluate(
-        self, probe: Probe, response: str, compressed_context: str
-    ) -> EvaluationResult:
+    def evaluate(self, probe: Probe, response: str, compressed_context: str) -> EvaluationResult:
         """
         Evaluate a single probe response.
 
@@ -311,9 +307,7 @@ class CompressionEvaluator:
         # Evaluate each criterion
         criterion_results = []
         for criterion in criteria:
-            result = self._evaluate_criterion(
-                criterion, probe, response, compressed_context
-            )
+            result = self._evaluate_criterion(criterion, probe, response, compressed_context)
             criterion_results.append(result)
 
         # Calculate dimension scores
@@ -356,9 +350,7 @@ class CompressionEvaluator:
 
         return criteria
 
-    def _evaluate_criterion(
-        self, criterion: Dict, probe: Probe, response: str, context: str
-    ) -> CriterionResult:
+    def _evaluate_criterion(self, criterion: Dict, probe: Probe, response: str, context: str) -> CriterionResult:
         """
         Evaluate a single criterion using LLM judge.
 
@@ -380,13 +372,9 @@ class CompressionEvaluator:
         score = self._heuristic_score(criterion, response, probe.ground_truth)
         reasoning = f"Evaluated {criterion['id']} based on response content."
 
-        return CriterionResult(
-            criterion_id=criterion["id"], score=score, reasoning=reasoning
-        )
+        return CriterionResult(criterion_id=criterion["id"], score=score, reasoning=reasoning)
 
-    def _heuristic_score(
-        self, criterion: Dict, response: str, ground_truth: Optional[str]
-    ) -> float:
+    def _heuristic_score(self, criterion: Dict, response: str, ground_truth: Optional[str]) -> float:
         """
         Heuristic scoring for demonstration.
 
@@ -409,33 +397,23 @@ class CompressionEvaluator:
 
         return min(5.0, max(0.0, score))
 
-    def _calculate_dimension_scores(
-        self, criterion_results: List[CriterionResult]
-    ) -> Dict[str, float]:
+    def _calculate_dimension_scores(self, criterion_results: List[CriterionResult]) -> Dict[str, float]:
         """Calculate dimension scores from criterion results."""
         dimension_scores = {}
 
         for dimension, criteria in RUBRIC_CRITERIA.items():
             criterion_ids = [c["id"] for c in criteria]
-            relevant_results = [
-                r for r in criterion_results if r.criterion_id in criterion_ids
-            ]
+            relevant_results = [r for r in criterion_results if r.criterion_id in criterion_ids]
 
             if relevant_results:
                 # Weighted average
                 total_weight = sum(
-                    c["weight"]
-                    for c in criteria
-                    if c["id"] in [r.criterion_id for r in relevant_results]
+                    c["weight"] for c in criteria if c["id"] in [r.criterion_id for r in relevant_results]
                 )
                 weighted_sum = sum(
-                    r.score
-                    * next(c["weight"] for c in criteria if c["id"] == r.criterion_id)
-                    for r in relevant_results
+                    r.score * next(c["weight"] for c in criteria if c["id"] == r.criterion_id) for r in relevant_results
                 )
-                dimension_scores[dimension] = (
-                    weighted_sum / total_weight if total_weight > 0 else 0.0
-                )
+                dimension_scores[dimension] = weighted_sum / total_weight if total_weight > 0 else 0.0
 
         return dimension_scores
 
@@ -455,10 +433,7 @@ class CompressionEvaluator:
                 dimension_totals[dim] = dimension_totals.get(dim, 0) + score
                 dimension_counts[dim] = dimension_counts.get(dim, 0) + 1
 
-        avg_dimensions = {
-            dim: dimension_totals[dim] / dimension_counts[dim]
-            for dim in dimension_totals
-        }
+        avg_dimensions = {dim: dimension_totals[dim] / dimension_counts[dim] for dim in dimension_totals}
 
         return {
             "total_evaluations": len(self.results),
@@ -531,13 +506,9 @@ class StructuredSummarizer:
         }
 
         # Extract file modifications
-        mod_pattern = (
-            r"(?:modified|changed|updated|fixed)\s+([^\s]+\.[a-z]+)[:\s]*(.+?)(?:\n|$)"
-        )
+        mod_pattern = r"(?:modified|changed|updated|fixed)\s+([^\s]+\.[a-z]+)[:\s]*(.+?)(?:\n|$)"
         for match in re.finditer(mod_pattern, content, re.IGNORECASE):
-            extracted["files_modified"].append(
-                {"path": match.group(1), "change": match.group(2).strip()[:100]}
-            )
+            extracted["files_modified"].append({"path": match.group(1), "change": match.group(2).strip()[:100]})
 
         # Extract file reads
         read_pattern = r"(?:read|examined|opened|checked)\s+([^\s]+\.[a-z]+)"
@@ -583,15 +554,10 @@ class StructuredSummarizer:
     def _format_summary(self) -> str:
         """Format sections into summary string."""
         files_modified_str = (
-            "\n".join(
-                f"- {f['path']}: {f['change']}" for f in self.sections["files_modified"]
-            )
-            or "None"
+            "\n".join(f"- {f['path']}: {f['change']}" for f in self.sections["files_modified"]) or "None"
         )
 
-        files_read_str = (
-            "\n".join(f"- {f}" for f in self.sections["files_read"]) or "None"
-        )
+        files_read_str = "\n".join(f"- {f}" for f in self.sections["files_read"]) or "None"
 
         decisions_str = (
             "\n".join(
@@ -601,12 +567,7 @@ class StructuredSummarizer:
             or "None"
         )
 
-        next_steps_str = (
-            "\n".join(
-                f"{i+1}. {s}" for i, s in enumerate(self.sections["next_steps"][-5:])
-            )
-            or "None"
-        )
+        next_steps_str = "\n".join(f"{i+1}. {s}" for i, s in enumerate(self.sections["next_steps"][-5:])) or "None"
 
         return self.TEMPLATE.format(
             intent=self.sections["intent"] or "Not specified",
@@ -621,9 +582,7 @@ class StructuredSummarizer:
 # Usage Example
 
 
-def evaluate_compression_quality(
-    original_history: str, compressed_context: str, model_response_fn
-) -> Dict:
+def evaluate_compression_quality(original_history: str, compressed_context: str, model_response_fn) -> Dict:
     """
     Evaluate compression quality for a conversation.
 
@@ -656,9 +615,7 @@ def evaluate_compression_quality(
     summary["recommendations"] = []
 
     if summary.get("weakest_dimension") == "artifact_trail":
-        summary["recommendations"].append(
-            "Consider implementing separate artifact tracking outside compression"
-        )
+        summary["recommendations"].append("Consider implementing separate artifact tracking outside compression")
 
     if summary["average_score"] < 3.5:
         summary["recommendations"].append(

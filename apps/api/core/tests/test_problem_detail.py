@@ -1,10 +1,10 @@
-import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.core.problem_detail import ProblemDetail, problem_response
 
 app = FastAPI()
+
 
 @app.get("/error/dict")
 def route_dict_error():
@@ -13,8 +13,9 @@ def route_dict_error():
         title="Bad Request",
         detail="Missing parameters",
         type="https://example.com/errors/bad-request",
-        instance="/error/dict"
+        instance="/error/dict",
     )
+
 
 @app.get("/error/pydantic")
 def route_pydantic_error():
@@ -24,7 +25,7 @@ def route_pydantic_error():
         status=422,
         detail="Data validation failed",
         instance="/error/pydantic",
-        errors=[{"field": "email", "msg": "invalid format"}]
+        errors=[{"field": "email", "msg": "invalid format"}],
     )
     return problem_response(
         status_code=pd.status,
@@ -32,16 +33,18 @@ def route_pydantic_error():
         detail=pd.detail,
         type=pd.type,
         instance=pd.instance,
-        errors=pd.errors
+        errors=pd.errors,
     )
 
+
 client = TestClient(app)
+
 
 def test_problem_response_dict():
     response = client.get("/error/dict")
     assert response.status_code == 400
     assert response.headers["content-type"] == "application/problem+json"
-    
+
     data = response.json()
     assert data["type"] == "https://example.com/errors/bad-request"
     assert data["title"] == "Bad Request"
@@ -49,11 +52,12 @@ def test_problem_response_dict():
     assert data["detail"] == "Missing parameters"
     assert data["instance"] == "/error/dict"
 
+
 def test_problem_response_pydantic_schema():
     response = client.get("/error/pydantic")
     assert response.status_code == 422
     assert response.headers["content-type"] == "application/problem+json"
-    
+
     data = response.json()
     assert data["type"] == "https://example.com/errors/invalid"
     assert data["title"] == "Invalid Entity"

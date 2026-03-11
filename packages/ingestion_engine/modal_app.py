@@ -1,10 +1,10 @@
 from io import StringIO
-from typing import List, Dict, Any
-from packages.ingestion_engine.import_transactions import (
-    parse_csv_content,
-    generate_fingerprint,
-)
+from typing import Any, Dict, List
 
+from packages.ingestion_engine.import_transactions import (
+    generate_fingerprint,
+    parse_csv_content,
+)
 from packages.ingestion_engine.merchant_extractor import MerchantExtractor
 
 
@@ -51,9 +51,7 @@ def process_file_logic(file_bytes: bytes) -> List[Dict[str, Any]]:
         }
 
         # Generate ID
-        record["fingerprint"] = generate_fingerprint(
-            record["date"], record["amount"], cleaned_merchant or raw_desc
-        )
+        record["fingerprint"] = generate_fingerprint(record["date"], record["amount"], cleaned_merchant or raw_desc)
 
         results.append(record)
 

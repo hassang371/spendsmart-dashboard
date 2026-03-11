@@ -244,6 +244,7 @@ erDiagram
 ### 5.2 Database Schema
 
 **Table: features**
+
 ```sql
 CREATE TABLE features (
     id VARCHAR(36) PRIMARY KEY,
@@ -267,6 +268,7 @@ CREATE TABLE features (
 Create a new feature instance.
 
 **Request:**
+
 ```json
 {
   "name": "Feature Name",
@@ -277,6 +279,7 @@ Create a new feature instance.
 ```
 
 **Response (201):**
+
 ```json
 {
   "id": "feat_123",

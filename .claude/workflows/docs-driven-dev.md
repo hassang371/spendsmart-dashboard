@@ -55,6 +55,7 @@ Based on work type:
 Must include at least one Mermaid diagram. HLD sync check required after every LLD.
 
 **Commit docs before any code:**
+
 ```bash
 git add docs/
 git commit -m "docs: add LLD for <name>"
@@ -108,6 +109,7 @@ Exit criteria: user approves the documentation.
 - Run each command and read the actual output — do not assume
 - If ANY fail → back to Step 4
 - If ALL pass → update the design doc status to `Verified`:
+
   ```
   docs: update <doc-id> status to Verified
   ```

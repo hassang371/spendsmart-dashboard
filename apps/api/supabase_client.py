@@ -3,13 +3,13 @@
 Creates per-request Supabase clients using the caller's JWT
 so that Row-Level Security is enforced on every query.
 """
+
 import os
-from supabase import create_client, Client
+
+from supabase import Client, create_client
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get(
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-)
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 
 def get_supabase_client(access_token: str | None = None) -> Client:

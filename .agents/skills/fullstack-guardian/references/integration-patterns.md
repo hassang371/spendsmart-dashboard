@@ -3,6 +3,7 @@
 ## Type Safety Across Stack
 
 ### Shared Type Definitions
+
 ```typescript
 // packages/shared/types.ts
 export interface User {
@@ -35,6 +36,7 @@ export interface ApiResponse<T> {
 ```
 
 ### Shared Validation (Zod)
+
 ```typescript
 // packages/shared/schemas.ts
 import { z } from 'zod';
@@ -52,6 +54,7 @@ export type CreateUserDto = z.infer<typeof createUserSchema>;
 ```
 
 ### API Client Generation
+
 ```typescript
 // Generated from OpenAPI spec
 import { UserApi } from '@/generated/api';
@@ -62,6 +65,7 @@ const user = await userApi.getUser({ id: '123' }); // Type-safe
 ## Architecture Decisions
 
 ### Monorepo Structure
+
 ```
 workspace/
 ├── packages/
@@ -105,6 +109,7 @@ workspace/
 ```
 
 ### BFF (Backend for Frontend)
+
 ```typescript
 // Aggregates multiple services for frontend
 @Controller('bff')
@@ -136,6 +141,7 @@ export class BFFController {
 ## Deployment Pipeline
 
 ### CI/CD Configuration (GitHub Actions)
+
 ```yaml
 # .github/workflows/ci.yml
 name: CI/CD Pipeline
@@ -193,6 +199,7 @@ jobs:
 ```
 
 ### Database Migrations
+
 ```typescript
 // TypeORM migration
 export class AddUserRoles implements MigrationInterface {
@@ -216,6 +223,7 @@ export class AddUserRoles implements MigrationInterface {
 ```
 
 ### Feature Flags
+
 ```typescript
 class FeatureFlags {
   private flags = new Map<string, boolean>();
@@ -234,6 +242,7 @@ class FeatureFlags {
 ```
 
 ### Blue-Green Deployment
+
 ```bash
 #!/bin/bash
 docker build -t myapp:new .
@@ -246,6 +255,7 @@ kubectl patch service myapp -p '{"spec":{"selector":{"env":"green"}}}'
 ## End-to-End Testing
 
 ### Playwright E2E Tests
+
 ```typescript
 import { test, expect } from '@playwright/test';
 
@@ -265,6 +275,7 @@ test('should login successfully', async ({ page }) => {
 ```
 
 ### Load Testing with k6
+
 ```javascript
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -296,6 +307,7 @@ export default function () {
 ## Environment Management
 
 ### Multi-environment Config
+
 ```typescript
 interface Environment {
   api: { baseUrl: string; timeout: number };

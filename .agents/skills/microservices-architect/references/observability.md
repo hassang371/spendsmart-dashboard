@@ -11,6 +11,7 @@ Comprehensive guide for monitoring, tracing, and debugging distributed systems.
 **Categories:**
 
 **Business Metrics:**
+
 ```
 Examples:
 - Orders per minute
@@ -45,6 +46,7 @@ order_value.observe(order.total_amount)
 ```
 
 **System Metrics:**
+
 ```
 Infrastructure:
 - CPU usage
@@ -73,6 +75,7 @@ Message Queue:
 ```
 
 **The Four Golden Signals (Google SRE):**
+
 ```
 1. Latency:
    - Time to serve requests
@@ -119,6 +122,7 @@ Message Queue:
 ```
 
 **RED Method (for services):**
+
 ```
 - Rate: Requests per second
 - Errors: Failed requests per second
@@ -128,6 +132,7 @@ Perfect for microservices dashboards
 ```
 
 **USE Method (for resources):**
+
 ```
 - Utilization: Percentage of time resource busy
 - Saturation: Queue depth or waiting threads
@@ -141,6 +146,7 @@ Perfect for infrastructure monitoring
 **Purpose:** Discrete event records with context.
 
 **Structured Logging:**
+
 ```json
 {
   "timestamp": "2025-12-14T15:30:45.123Z",
@@ -162,6 +168,7 @@ Perfect for infrastructure monitoring
 ```
 
 **Log Levels:**
+
 ```
 ERROR:
 - Application errors
@@ -192,6 +199,7 @@ Use: Deep troubleshooting (disabled in production usually)
 ```
 
 **Correlation IDs:**
+
 ```
 Request flow across services:
 
@@ -227,6 +235,7 @@ async def correlation_middleware(request, call_next):
 ```
 
 **Log Aggregation:**
+
 ```
 Services → Log Shipper → Centralized Log Storage → Visualization
 
@@ -255,6 +264,7 @@ correlationId:"corr-123"
 **Concepts:**
 
 **Trace:**
+
 ```
 Entire request journey across all services
 
@@ -272,6 +282,7 @@ Total: 200ms (some parallel execution)
 ```
 
 **Span:**
+
 ```
 Single operation within a trace
 
@@ -307,6 +318,7 @@ Span attributes:
 ```
 
 **Implementation (OpenTelemetry):**
+
 ```python
 from opentelemetry import trace
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
@@ -348,6 +360,7 @@ async def create_order(order_data):
 ```
 
 **Trace Visualization:**
+
 ```
 Jaeger UI shows:
 
@@ -365,6 +378,7 @@ Parallel operations visible
 ```
 
 **Sampling Strategies:**
+
 ```
 Problem: Tracing every request is expensive
 
@@ -418,6 +432,7 @@ class CustomSampler:
 ### Defining SLOs
 
 **SLI (Service Level Indicator):**
+
 ```
 Quantitative measure of service level
 
@@ -428,6 +443,7 @@ Examples:
 ```
 
 **SLO (Service Level Objective):**
+
 ```
 Target value for SLI
 
@@ -443,6 +459,7 @@ SLO Components:
 ```
 
 **SLA (Service Level Agreement):**
+
 ```
 Contract with consequences if SLO not met
 
@@ -454,6 +471,7 @@ SLA ≤ SLO (leave buffer for incidents)
 ```
 
 **Error Budget:**
+
 ```
 Allowed failure to meet SLO = (100% - SLO target)
 
@@ -480,6 +498,7 @@ Benefits:
 ### Implementing SLO Monitoring
 
 **Prometheus + Grafana:**
+
 ```
 # SLI: Availability
 availability_sli = (
@@ -514,6 +533,7 @@ annotations:
 ### Alert Levels
 
 **Critical (Page immediately):**
+
 ```
 Conditions:
 - Service completely down
@@ -534,6 +554,7 @@ severity: critical
 ```
 
 **Warning (Investigate soon):**
+
 ```
 Conditions:
 - Elevated error rate (5-10%)
@@ -554,6 +575,7 @@ severity: warning
 ```
 
 **Info (Awareness):**
+
 ```
 Conditions:
 - Deployment completed
@@ -570,6 +592,7 @@ Actions:
 ### Alert Best Practices
 
 **Actionable Alerts:**
+
 ```
 Bad Alert:
 "High CPU usage"
@@ -589,6 +612,7 @@ Include:
 ```
 
 **Avoid Alert Fatigue:**
+
 ```
 Problems:
 - Too many alerts
@@ -616,6 +640,7 @@ group_interval: 5m  # Batch notifications
 ### Recommended Tools
 
 **Metrics:**
+
 ```
 Collection: Prometheus
 - Pull-based metrics
@@ -633,6 +658,7 @@ Alternative: Datadog, New Relic, CloudWatch
 ```
 
 **Logs:**
+
 ```
 Aggregation: ELK Stack
 - Elasticsearch (storage & search)
@@ -648,6 +674,7 @@ Alternative: Splunk, Datadog, CloudWatch Logs
 ```
 
 **Tracing:**
+
 ```
 Backend: Jaeger or Zipkin
 - Trace storage
@@ -665,6 +692,7 @@ Alternative: Datadog APM, New Relic, Lightstep
 ```
 
 **All-in-One:**
+
 ```
 Observability platforms:
 - Datadog (metrics, logs, traces, RUM)
@@ -685,6 +713,7 @@ Cons:
 ### Implementation Checklist
 
 **For Each Service:**
+
 ```
 ✓ Structured logging with correlation IDs
 ✓ Metrics exported (Prometheus format)
@@ -699,6 +728,7 @@ Cons:
 ```
 
 **For System-Wide:**
+
 ```
 ✓ Centralized log aggregation
 ✓ Distributed tracing backend
@@ -715,6 +745,7 @@ Cons:
 ## Troubleshooting Workflow
 
 **Incident Response:**
+
 ```
 1. Detect (Alert fires)
    - Check dashboard
@@ -754,6 +785,7 @@ Cons:
 ```
 
 **Using Traces to Debug:**
+
 ```
 Scenario: API returning 500 errors
 

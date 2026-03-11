@@ -1,11 +1,18 @@
 """Tests for the forecast endpoint."""
+
 import io
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+
+from apps.api.core.auth import (
+    CurrentUser,
+    get_current_user,
+    get_current_user_id,
+    get_user_client,
+)
 from apps.api.main import app
-from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 # CSV with enough data points for the forecasting engine
 # Need at least 37 days (30 context + 7 prediction) for TFT

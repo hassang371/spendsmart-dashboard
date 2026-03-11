@@ -21,6 +21,7 @@ Run experiments in staging only. Never in production without error budget > 50%.
 | Rollback | Automatic (restart policy: unless-stopped) |
 
 **Steps:**
+
 1. Verify API healthy: `curl /api/v1/health`
 2. Kill container: `docker kill $(docker compose ps -q api)`
 3. Monitor: `watch -n 1 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health'`
@@ -45,6 +46,7 @@ Run experiments in staging only. Never in production without error budget > 50%.
 | Rollback | `docker compose start redis` |
 
 **Steps:**
+
 1. Verify all healthy: `curl /api/v1/health/ready`
 2. Stop Redis: `docker compose stop redis`
 3. Test API still serves: `curl /api/v1/health` (should return 200)
@@ -72,6 +74,7 @@ Run experiments in staging only. Never in production without error budget > 50%.
 | Rollback | `RESET statement_timeout` |
 
 **Steps:**
+
 1. Connect to Supabase SQL editor
 2. Set timeout: `ALTER DATABASE postgres SET statement_timeout = '100ms';`
 3. Run k6 load test targeting transaction listing
@@ -97,6 +100,7 @@ Run experiments in staging only. Never in production without error budget > 50%.
 | Rollback | N/A (idempotent via fingerprint dedup) |
 
 **Steps:**
+
 1. Prepare test CSV file with known transaction count
 2. Run: `k6 run --vus 50 --duration 2m import_stress_test.js`
 3. Verify: count transactions in DB matches expected (no duplicates, no losses)
@@ -121,6 +125,7 @@ Run experiments in staging only. Never in production without error budget > 50%.
 | Rollback | Restart worker, job auto-retries or marked failed |
 
 **Steps:**
+
 1. Start a training job via API
 2. Verify status = "processing"
 3. Kill worker: `docker compose kill worker`

@@ -41,9 +41,7 @@ def _call_claude(prompt: str, model: str | None, timeout: int = 300) -> str:
         timeout=timeout,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"claude -p exited {result.returncode}\nstderr: {result.stderr}"
-        )
+        raise RuntimeError(f"claude -p exited {result.returncode}\nstderr: {result.stderr}")
     return result.stdout
 
 
@@ -59,21 +57,13 @@ def improve_description(
     iteration: int | None = None,
 ) -> str:
     """Call Claude to improve the description based on eval results."""
-    failed_triggers = [
-        r for r in eval_results["results"] if r["should_trigger"] and not r["pass"]
-    ]
-    false_triggers = [
-        r for r in eval_results["results"] if not r["should_trigger"] and not r["pass"]
-    ]
+    failed_triggers = [r for r in eval_results["results"] if r["should_trigger"] and not r["pass"]]
+    false_triggers = [r for r in eval_results["results"] if not r["should_trigger"] and not r["pass"]]
 
     # Build scores summary
-    train_score = (
-        f"{eval_results['summary']['passed']}/{eval_results['summary']['total']}"
-    )
+    train_score = f"{eval_results['summary']['passed']}/{eval_results['summary']['total']}"
     if test_results:
-        test_score = (
-            f"{test_results['summary']['passed']}/{test_results['summary']['total']}"
-        )
+        test_score = f"{test_results['summary']['passed']}/{test_results['summary']['total']}"
         scores_summary = f"Train: {train_score}, Test: {test_score}"
     else:
         scores_summary = f"Train: {train_score}"
@@ -93,17 +83,13 @@ Current scores ({scores_summary}):
     if failed_triggers:
         prompt += "FAILED TO TRIGGER (should have triggered but didn't):\n"
         for r in failed_triggers:
-            prompt += (
-                f'  - "{r["query"]}" (triggered {r["triggers"]}/{r["runs"]} times)\n'
-            )
+            prompt += f'  - "{r["query"]}" (triggered {r["triggers"]}/{r["runs"]} times)\n'
         prompt += "\n"
 
     if false_triggers:
         prompt += "FALSE TRIGGERS (triggered but shouldn't have):\n"
         for r in false_triggers:
-            prompt += (
-                f'  - "{r["query"]}" (triggered {r["triggers"]}/{r["runs"]} times)\n'
-            )
+            prompt += f'  - "{r["query"]}" (triggered {r["triggers"]}/{r["runs"]} times)\n'
         prompt += "\n"
 
     if history:
@@ -111,9 +97,7 @@ Current scores ({scores_summary}):
         for h in history:
             train_s = f"{h.get('train_passed', h.get('passed', 0))}/{h.get('train_total', h.get('total', 0))}"
             test_s = (
-                f"{h.get('test_passed', '?')}/{h.get('test_total', '?')}"
-                if h.get("test_passed") is not None
-                else None
+                f"{h.get('test_passed', '?')}/{h.get('test_total', '?')}" if h.get("test_passed") is not None else None
             )
             score_str = f"train={train_s}" + (f", test={test_s}" if test_s else "")
             prompt += f"<attempt {score_str}>\n"
@@ -154,9 +138,7 @@ Please respond with only the new description text in <new_description> tags, not
     text = _call_claude(prompt, model)
 
     match = re.search(r"<new_description>(.*?)</new_description>", text, re.DOTALL)
-    description = (
-        match.group(1).strip().strip('"') if match else text.strip().strip('"')
-    )
+    description = match.group(1).strip().strip('"') if match else text.strip().strip('"')
 
     transcript: dict = {
         "iteration": iteration,
@@ -184,14 +166,8 @@ Please respond with only the new description text in <new_description> tags, not
             f"the new description in <new_description> tags."
         )
         shorten_text = _call_claude(shorten_prompt, model)
-        match = re.search(
-            r"<new_description>(.*?)</new_description>", shorten_text, re.DOTALL
-        )
-        shortened = (
-            match.group(1).strip().strip('"')
-            if match
-            else shorten_text.strip().strip('"')
-        )
+        match = re.search(r"<new_description>(.*?)</new_description>", shorten_text, re.DOTALL)
+        shortened = match.group(1).strip().strip('"') if match else shorten_text.strip().strip('"')
 
         transcript["rewrite_prompt"] = shorten_prompt
         transcript["rewrite_response"] = shorten_text
@@ -210,22 +186,16 @@ Please respond with only the new description text in <new_description> tags, not
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Improve a skill description based on eval results"
-    )
+    parser = argparse.ArgumentParser(description="Improve a skill description based on eval results")
     parser.add_argument(
         "--eval-results",
         required=True,
         help="Path to eval results JSON (from run_eval.py)",
     )
     parser.add_argument("--skill-path", required=True, help="Path to skill directory")
-    parser.add_argument(
-        "--history", default=None, help="Path to history JSON (previous attempts)"
-    )
+    parser.add_argument("--history", default=None, help="Path to history JSON (previous attempts)")
     parser.add_argument("--model", required=True, help="Model for improvement")
-    parser.add_argument(
-        "--verbose", action="store_true", help="Print thinking to stderr"
-    )
+    parser.add_argument("--verbose", action="store_true", help="Print thinking to stderr")
     args = parser.parse_args()
 
     skill_path = Path(args.skill_path)

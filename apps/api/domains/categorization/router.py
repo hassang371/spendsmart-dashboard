@@ -14,9 +14,9 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
-from supabase import Client
 
 from apps.api.core.auth import get_current_user_id, get_user_client
+from apps.api.core.idempotency import get_idempotency_key, with_idempotency
 from apps.api.domains.categorization.schemas import (
     BatchClassifyRequest,
     BatchClassifyResponse,
@@ -29,7 +29,7 @@ from apps.api.domains.categorization.service import (
     classify_single,
     get_classifier,
 )
-from apps.api.core.idempotency import get_idempotency_key, with_idempotency
+from supabase import Client
 
 router = APIRouter(prefix="/categorization", tags=["categorization"])
 
@@ -43,9 +43,7 @@ async def classify_transaction(
     """Classify a single transaction description."""
     try:
         try:
-            result = classify_single(
-                request.description, user_id=user_id, client=client
-            )
+            result = classify_single(request.description, user_id=user_id, client=client)
         except TypeError:
             # Backward compatibility for tests/mocks using the legacy signature.
             result = classify_single(request.description)
@@ -92,9 +90,7 @@ async def classify_batch(
             ]
             return BatchClassifyResponse(predictions=predictions)
         except Exception as e:
-            logger.error(
-                "batch_classify_failed", error=str(e), count=len(request.descriptions)
-            )
+            logger.error("batch_classify_failed", error=str(e), count=len(request.descriptions))
             raise HTTPException(status_code=500, detail="Batch classification failed")
 
     return await with_idempotency(idempotency_key, _execute)
@@ -143,13 +139,7 @@ async def submit_feedback(
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to store feedback")
 
-    updated_categories = sorted(
-        {
-            row["corrected_category"]
-            for row in rows_to_insert
-            if row["corrected_category"]
-        }
-    )
+    updated_categories = sorted({row["corrected_category"] for row in rows_to_insert if row["corrected_category"]})
     return {"status": "ok", "updated_categories": updated_categories}
 
 
@@ -186,9 +176,7 @@ async def get_classification_metrics(
     true_categories = [r["category"] for r in labeled if r.get("description")]
 
     if not descriptions:
-        raise HTTPException(
-            status_code=400, detail="No valid descriptions in labeled data"
-        )
+        raise HTTPException(status_code=400, detail="No valid descriptions in labeled data")
 
     try:
         try:

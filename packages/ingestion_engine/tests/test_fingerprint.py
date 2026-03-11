@@ -31,12 +31,8 @@ def test_generate_fingerprint_differentiation():
     Test that different transactions have different fingerprints.
     """
     fp1 = generate_fingerprint("2026-02-12T10:00:00Z", 150.00, "Starbucks")
-    fp2 = generate_fingerprint(
-        "2026-02-12T10:00:01Z", 150.00, "Starbucks"
-    )  # 1 second later
-    fp3 = generate_fingerprint(
-        "2026-02-12T10:00:00Z", 150.01, "Starbucks"
-    )  # 1 cent different
+    fp2 = generate_fingerprint("2026-02-12T10:00:01Z", 150.00, "Starbucks")  # 1 second later
+    fp3 = generate_fingerprint("2026-02-12T10:00:00Z", 150.01, "Starbucks")  # 1 cent different
 
     assert fp1 != fp2
     assert fp1 != fp3

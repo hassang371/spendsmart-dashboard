@@ -24,7 +24,7 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 2. Follow its structured phases: Root Cause → Pattern Analysis → Hypothesis Testing → Implementation
 3. After fix is verified, output results to `walkthrough.md` artifact
 
-## Red Flags — Return to Phase 1 If:
+## Red Flags — Return to Phase 1 If
 
 - You're proposing fixes before tracing data flow
 - You've tried 3+ fixes without success (question architecture)

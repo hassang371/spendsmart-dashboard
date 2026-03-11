@@ -42,11 +42,11 @@ kill_redis() {
     print_header "Redis Outage Simulation"
     echo "1. Pausing the Redis container to simulate network partition/crash..."
     docker compose -f "$PROJECT_ROOT/docker-compose.yml" pause redis
-    
+
     echo "2. Redis is down. Run 'k6 run tests/performance/load_test.js' within the next 30s to verify fail-open."
     echo "   Sleeping for 30 seconds..."
     sleep 30
-    
+
     echo "3. Restoring Redis container..."
     docker compose -f "$PROJECT_ROOT/docker-compose.yml" unpause redis
     echo "✅ Redis restored."
@@ -56,7 +56,7 @@ kill_api() {
     print_header "API Pod Crash Simulation"
     echo "1. Killing the API container abruptly..."
     docker compose -f "$PROJECT_ROOT/docker-compose.yml" kill api
-    
+
     echo "2. API is dead. docker-compose should automatically restart it (restart: unless-stopped)."
     echo "   Monitoring status for 15s..."
     for i in {1..15}; do
@@ -73,7 +73,7 @@ kill_api() {
 
 network_latency() {
     print_header "Network Latency Injection (200ms)"
-    
+
     API_CONTAINER=$(docker compose -f "$PROJECT_ROOT/docker-compose.yml" ps -q api)
     if [ -z "$API_CONTAINER" ]; then
         echo "Error: API container is not running."

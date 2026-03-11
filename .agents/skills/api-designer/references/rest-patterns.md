@@ -7,6 +7,7 @@ REST APIs are built around resources, not actions. Resources are the nouns of yo
 ### Resource Identification
 
 **Good Resource URIs:**
+
 ```
 GET    /users                  # Collection
 GET    /users/{id}             # Individual resource
@@ -18,6 +19,7 @@ DELETE /users/{id}             # Delete resource
 ```
 
 **Bad Resource URIs:**
+
 ```
 POST   /getUser                # Verb in URI
 POST   /createUser             # Verb in URI
@@ -48,6 +50,7 @@ GET    /user?action=delete     # Action as query param
 ### Method Usage
 
 **GET - Retrieve Resources**
+
 ```http
 GET /users/123
 Accept: application/json
@@ -62,6 +65,7 @@ Response: 200 OK
 ```
 
 **POST - Create Resources**
+
 ```http
 POST /users
 Content-Type: application/json
@@ -82,6 +86,7 @@ Location: /users/124
 ```
 
 **PUT - Replace Resource**
+
 ```http
 PUT /users/123
 Content-Type: application/json
@@ -101,6 +106,7 @@ Response: 200 OK
 ```
 
 **PATCH - Partial Update**
+
 ```http
 PATCH /users/123
 Content-Type: application/json
@@ -119,6 +125,7 @@ Response: 200 OK
 ```
 
 **DELETE - Remove Resource**
+
 ```http
 DELETE /users/123
 
@@ -297,12 +304,14 @@ Response: 412 Precondition Failed (if ETag doesn't match)
 ### Query Parameters
 
 **Filtering:**
+
 ```
 GET /users?status=active&role=admin
 GET /products?category=electronics&price_min=100&price_max=500
 ```
 
 **Sorting:**
+
 ```
 GET /users?sort=created_at
 GET /users?sort=-created_at          # Descending
@@ -310,12 +319,14 @@ GET /users?sort=name,created_at      # Multiple fields
 ```
 
 **Field Selection:**
+
 ```
 GET /users?fields=id,name,email
 GET /users?exclude=password,social_security_number
 ```
 
 **Search:**
+
 ```
 GET /users?q=john
 GET /products?search=laptop

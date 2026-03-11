@@ -1,20 +1,20 @@
 import argparse
-import sys
 import os
+import sys
+
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-from sentence_transformers import SentenceTransformer
-from supabase import create_client, Client  # Added
 from dotenv import load_dotenv  # Added
+from sentence_transformers import SentenceTransformer
+from torch.utils.data import DataLoader, TensorDataset
+
+from supabase import Client, create_client  # Added
 
 load_dotenv()  # Load env vars
 load_dotenv("apps/web/.env.local")
 
 # Global Supabase
 url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
-key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-)
+key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 
 def get_supabase() -> Client:
@@ -26,13 +26,13 @@ def get_supabase() -> Client:
 # Ensure package imports work
 sys.path.append(os.getcwd())
 
+from packages.categorization.clustering import HyperbolicKMeans
 from packages.categorization.data_loader import (
     BankStatementParser,
     InverseFrequencyMasking,
 )
-from packages.categorization.training import HypCDTrainer
-from packages.categorization.clustering import HyperbolicKMeans
 from packages.categorization.hypcd import HypCDClassifier, HyperbolicProjector
+from packages.categorization.training import HypCDTrainer
 
 # Global config
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
@@ -78,9 +78,7 @@ def train(args):
     # To be efficient, we can augment text strings, then embed.
     print("Generating positive pairs...")
     augmented_texts = [augmenter.augment(t) for t in texts]
-    pos_embeddings = bert.encode(
-        augmented_texts, convert_to_tensor=True, show_progress_bar=True
-    )
+    pos_embeddings = bert.encode(augmented_texts, convert_to_tensor=True, show_progress_bar=True)
     pos_embeddings = pos_embeddings.cpu()
 
     # Create Dataset
@@ -100,6 +98,7 @@ def train(args):
     # 5. Train
     print("Starting Training...")
     from geoopt import PoincareBall
+
     trainer = HypCDTrainer(projector=model, manifold=PoincareBall(c=1.0), lr=0.005)
     metrics = trainer.train(dataloader, epochs=args.epochs)
 
@@ -156,6 +155,7 @@ def train_db(args):
 
     print("Initializing Model...")
     from packages.categorization.backends.cloud import CloudBackend
+
     backend = CloudBackend()
     classifier = HypCDClassifier(backend=backend)
     anchors = classifier.anchors
@@ -198,6 +198,7 @@ def train_db(args):
     # Train
     print("Starting Supervised Training...")
     from geoopt import PoincareBall
+
     trainer = HypCDTrainer(projector=projector, manifold=PoincareBall(c=1.0), lr=0.005)
     # Use train_supervised (Need to implement in Trainer)
     metrics = trainer.train_supervised(dataloader, epochs=args.epochs)
@@ -321,6 +322,7 @@ def explore(args):
 
     print(f"Running Hyperbolic K-Means on {len(texts)} transactions...")
     from geoopt import PoincareBall
+
     kmeans = HyperbolicKMeans(n_clusters=args.clusters, manifold=PoincareBall(c=1.0))
     kmeans.fit(hyp_embs)
     labels, _, _ = kmeans.predict(hyp_embs)
@@ -380,12 +382,7 @@ def train_global(args):
     supabase = get_supabase()
 
     print("Fetching labeled corrections from all users...")
-    result = (
-        supabase.table("transactions")
-        .select("description,category")
-        .eq("is_manual", True)
-        .execute()
-    )
+    result = supabase.table("transactions").select("description,category").eq("is_manual", True).execute()
     records = result.data or []
 
     if not records:
@@ -402,10 +399,12 @@ def train_global(args):
 
     print("Initializing HypCDClassifier with FinBERT backbone...")
     from packages.categorization.backends.cloud import CloudBackend
+
     backend = CloudBackend()
     classifier = HypCDClassifier(backend=backend)
 
     from packages.categorization.adapter_manager import AdapterManager
+
     mgr = AdapterManager()
 
     print(f"Running supervised fine-tuning for {args.epochs} epochs...")
@@ -414,16 +413,16 @@ def train_global(args):
     output_path = args.output or "checkpoints/global/base_model.pt"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     mgr.save_global_base(classifier.state_dict())
-    print(f"Global base model saved to: checkpoints/global/base_model.pt")
+    print("Global base model saved to: checkpoints/global/base_model.pt")
 
     if args.upload:
         print("Uploading to Supabase Storage (models/global/base_model.pt)...")
         print("Upload complete (or skipped if no Supabase credentials).")
 
-    print(f"\nTraining complete.")
+    print("\nTraining complete.")
     print(f"  Labeled examples: {len(texts)}")
     print(f"  Epochs:           {args.epochs}")
-    print(f"  Checkpoint:       checkpoints/global/base_model.pt")
+    print("  Checkpoint:       checkpoints/global/base_model.pt")
     print("\nNext: restart the API to load the new checkpoint automatically.")
 
 
@@ -433,19 +432,13 @@ def main():
 
     # Train
     train_parser = subparsers.add_parser("train")
-    train_parser.add_argument(
-        "--file", type=str, required=True, help="Path to Excel statement"
-    )
-    train_parser.add_argument(
-        "--password", type=str, default=None, help="Excel password"
-    )
+    train_parser.add_argument("--file", type=str, required=True, help="Path to Excel statement")
+    train_parser.add_argument("--password", type=str, default=None, help="Excel password")
     train_parser.add_argument("--epochs", type=int, default=10, help="Training epochs")
 
     # Train DB
     db_parser = subparsers.add_parser("train-db")
-    db_parser.add_argument(
-        "--user_id", type=str, required=False, help="User ID to filter"
-    )
+    db_parser.add_argument("--user_id", type=str, required=False, help="User ID to filter")
     db_parser.add_argument("--epochs", type=int, default=5)
 
     # Classify DB

@@ -5,16 +5,16 @@ Usage:
   python -m packages.categorization.cli batch data/test.csv
   python -m packages.categorization.cli info
 """
+
 import argparse
 import csv
-import sys
 import os
+import sys
 
 sys.path.append(os.getcwd())
 
 from packages.categorization.classifier import TransactionClassifier
 from packages.categorization.cleaner import process_description
-from packages.categorization.constants import Category
 
 
 def classify_cmd(args):
@@ -44,7 +44,14 @@ def batch_cmd(args):
 
     # Find description column
     desc_col = None
-    for candidate in ["description", "Description", "desc", "narration", "Narration", "DESCRIPTION"]:
+    for candidate in [
+        "description",
+        "Description",
+        "desc",
+        "narration",
+        "Narration",
+        "DESCRIPTION",
+    ]:
         if candidate in rows[0]:
             desc_col = candidate
             break
@@ -71,13 +78,13 @@ def info_cmd(args):
     """Display classifier info."""
     classifier = TransactionClassifier()
 
-    print(f"\n📊 Classifier Info")
+    print("\n📊 Classifier Info")
     print(f"{'─' * 40}")
     print(f"  Model:      {classifier._model_name}")
     print(f"  Dim:        {classifier.embedding_dim}")
     print(f"  Threshold:  {classifier.confidence_threshold}")
     print(f"  Categories: {len(classifier._category_names)}")
-    print(f"\n  Categories:")
+    print("\n  Categories:")
     for cat in sorted(classifier._category_names):
         print(f"    - {cat}")
 

@@ -175,8 +175,8 @@ class MerchantExtractor:
         for pattern in self.noise_patterns:
             cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
         # Remove trailing digits/codes (e.g. "HD", "4K", reference numbers)
-        cleaned = re.sub(r"\b[A-Z]{1,3}\d+\b", " ", cleaned)   # e.g. "6E1234"
-        cleaned = re.sub(r"\b\d{4,}\b", " ", cleaned)           # long numbers
+        cleaned = re.sub(r"\b[A-Z]{1,3}\d+\b", " ", cleaned)  # e.g. "6E1234"
+        cleaned = re.sub(r"\b\d{4,}\b", " ", cleaned)  # long numbers
         cleaned = re.sub(r"[^a-zA-Z\s]", " ", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
 

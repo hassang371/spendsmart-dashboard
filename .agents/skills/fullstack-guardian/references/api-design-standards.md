@@ -3,6 +3,7 @@
 ## RESTful API Conventions
 
 ### URL Structure
+
 ```
 # Collection vs Resource
 GET    /api/users          # List all users
@@ -19,6 +20,7 @@ GET    /api/posts/:id/comments     # Comments on post
 ```
 
 ### HTTP Status Codes
+
 ```typescript
 // Success codes
 200 OK              // GET, PUT, PATCH successful
@@ -42,6 +44,7 @@ GET    /api/posts/:id/comments     # Comments on post
 ```
 
 ### Standardized Error Responses
+
 ```typescript
 interface ApiError {
   error: {
@@ -80,6 +83,7 @@ interface ApiError {
 ```
 
 ### Pagination
+
 ```typescript
 // Query parameters
 GET /api/users?page=1&limit=20&sort=-createdAt&filter[role]=admin
@@ -128,6 +132,7 @@ async findAll(
 ## API Versioning
 
 ### URL Path Versioning (Recommended)
+
 ```typescript
 // Version in URL path
 GET /api/v1/users
@@ -146,6 +151,7 @@ export class UsersV2Controller {}
 ```
 
 ### Header Versioning (Alternative)
+
 ```typescript
 // Request header
 GET /api/users
@@ -162,6 +168,7 @@ app.use((req, res, next) => {
 ## Rate Limiting
 
 ### Per-Endpoint Configuration
+
 ```typescript
 // Express with express-rate-limit
 import rateLimit from 'express-rate-limit';
@@ -183,6 +190,7 @@ app.use('/api/auth/', authLimiter);
 ```
 
 ### Redis-backed Rate Limiting
+
 ```typescript
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 
@@ -206,6 +214,7 @@ app.use(async (req, res, next) => {
 ## CORS Configuration
 
 ### Production-ready CORS
+
 ```typescript
 import cors from 'cors';
 
@@ -235,6 +244,7 @@ app.use(cors(corsOptions));
 ## Request/Response Validation
 
 ### Input Validation with Zod
+
 ```typescript
 import { z } from 'zod';
 
@@ -267,6 +277,7 @@ app.post('/api/users', validate(createUserSchema), createUserHandler);
 ## API Documentation
 
 ### OpenAPI/Swagger Setup
+
 ```typescript
 // NestJS with Swagger
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

@@ -85,6 +85,7 @@
 | **Monitoring** | Single app to monitor | Distributed tracing needed |
 
 ### When to Use Monolith
+
 ```
 ✓ Starting new product (validate idea first)
 ✓ Small team (< 10 developers)
@@ -95,6 +96,7 @@
 ```
 
 ### When to Use Microservices
+
 ```
 ✓ Large team (> 10 developers)
 ✓ Clear bounded contexts in domain
@@ -106,6 +108,7 @@
 ```
 
 ### Modular Monolith (Recommended Middle Ground)
+
 ```typescript
 // Structure monolith with clear boundaries
 project/
@@ -201,6 +204,7 @@ export class WebBFFController {
 | **Microservices** | Easy to share across services | Harder to share |
 
 **Hybrid approach (Recommended):**
+
 ```typescript
 // Short-lived access token (15min) + refresh token (7 days)
 interface AuthTokens {
@@ -314,6 +318,7 @@ Production:
 ## Quick Decision Trees
 
 ### "Which database should I use?"
+
 ```
 Need ACID transactions? → PostgreSQL
 NoSQL with flexible schema? → MongoDB
@@ -323,6 +328,7 @@ High read throughput? → PostgreSQL + read replicas
 ```
 
 ### "Monolith or microservices?"
+
 ```
 New product? → Modular monolith
 Team < 10 people? → Modular monolith
@@ -332,6 +338,7 @@ Limited DevOps resources? → Monolith
 ```
 
 ### "REST or GraphQL?"
+
 ```
 Simple CRUD? → REST
 Mobile app with flexible queries? → GraphQL
@@ -341,6 +348,7 @@ Team knows GraphQL? → GraphQL, otherwise REST
 ```
 
 ### "Which state management?"
+
 ```
 Simple app, few global state? → React Context
 Server state (API data)? → TanStack Query

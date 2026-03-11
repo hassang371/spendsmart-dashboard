@@ -1,7 +1,8 @@
 # packages/categorization/backends/cloud.py
-import torch
-from transformers import BertTokenizer, BertModel
 from typing import List
+
+import torch
+from transformers import BertModel, BertTokenizer
 
 from .base import BackendBase
 
@@ -53,9 +54,9 @@ class CloudBackend(BackendBase):
             Tensor of shape (batch_size, dim) with BERT [CLS] embeddings
         """
         # Tokenize
-        inputs = self.tokenizer(
-            texts, return_tensors="pt", padding=True, truncation=True, max_length=128
-        ).to(self._device)
+        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=128).to(
+            self._device
+        )
 
         # Get [CLS] embeddings
         with torch.no_grad():

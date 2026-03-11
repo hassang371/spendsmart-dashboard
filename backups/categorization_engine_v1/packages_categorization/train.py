@@ -1,21 +1,21 @@
-import os
 import json
 import logging
+import os
 from datetime import datetime, timezone
-from dotenv import load_dotenv
-from supabase import create_client, Client
+
 import torch
+from dotenv import load_dotenv
+
+from supabase import Client, create_client
+
 from .backends.cloud import CloudBackend
 from .training import HypCDTrainer
-from .hypcd import HypCDClassifier
 
 # Configuration
 load_dotenv()
 load_dotenv("apps/web/.env.local")
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
@@ -99,10 +99,7 @@ def train():
 
     # Create batches
     batch_size = 32
-    batches = [
-        all_texts[i : i + batch_size]
-        for i in range(0, len(all_texts), batch_size)
-    ]
+    batches = [all_texts[i : i + batch_size] for i in range(0, len(all_texts), batch_size)]
 
     # Train
     logger.info(f"Training on {len(all_texts)} samples...")

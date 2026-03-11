@@ -32,6 +32,7 @@ Follow this systematic approach for any Kubernetes issue:
 ### 2. Initial Triage
 
 Run cluster health check:
+
 ```bash
 python3 scripts/cluster_health.py
 ```
@@ -48,6 +49,7 @@ This provides an overview of:
 Based on triage results, focus investigation:
 
 **For Namespace-Level Issues:**
+
 ```bash
 python3 scripts/check_namespace.py <namespace>
 ```
@@ -62,6 +64,7 @@ This provides comprehensive namespace health:
 - Actionable recommendations
 
 **For Pod Issues:**
+
 ```bash
 python3 scripts/diagnose_pod.py <namespace> <pod-name>
 ```
@@ -146,6 +149,7 @@ See references/incident_response.md for detailed playbooks.
 ## Quick Reference Commands
 
 ### Cluster Overview
+
 ```bash
 kubectl cluster-info
 kubectl get nodes
@@ -154,6 +158,7 @@ kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
 ```
 
 ### Pod Diagnostics
+
 ```bash
 kubectl describe pod <pod> -n <namespace>
 kubectl logs <pod> -n <namespace>
@@ -163,6 +168,7 @@ kubectl get pod <pod> -n <namespace> -o yaml
 ```
 
 ### Node Diagnostics
+
 ```bash
 kubectl describe node <node>
 kubectl top nodes
@@ -172,6 +178,7 @@ ssh <node> "journalctl -u kubelet -n 100"
 ```
 
 ### Service & Network
+
 ```bash
 kubectl describe svc <service> -n <namespace>
 kubectl get endpoints <service> -n <namespace>
@@ -179,6 +186,7 @@ kubectl get networkpolicies --all-namespaces
 ```
 
 ### Storage
+
 ```bash
 kubectl get pvc,pv --all-namespaces
 kubectl describe pvc <pvc> -n <namespace>
@@ -186,6 +194,7 @@ kubectl get storageclass
 ```
 
 ### Resource & Configuration
+
 ```bash
 kubectl describe resourcequota -n <namespace>
 kubectl describe limitrange -n <namespace>
@@ -219,6 +228,7 @@ Namespace-level health check and diagnostics:
 - Actionable recommendations
 
 **Usage:**
+
 ```bash
 # Human-readable output
 python3 scripts/check_namespace.py <namespace>

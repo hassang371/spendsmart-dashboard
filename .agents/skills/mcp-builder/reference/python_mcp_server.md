@@ -9,6 +9,7 @@ This document provides Python-specific best practices and examples for implement
 ## Quick Reference
 
 ### Key Imports
+
 ```python
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -18,11 +19,13 @@ import httpx
 ```
 
 ### Server Initialization
+
 ```python
 mcp = FastMCP("service_mcp")
 ```
 
 ### Tool Registration Pattern
+
 ```python
 @mcp.tool(name="tool_name", annotations={...})
 async def tool_function(params: InputModel) -> str:

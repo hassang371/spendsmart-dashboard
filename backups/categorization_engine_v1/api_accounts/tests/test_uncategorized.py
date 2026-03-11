@@ -1,7 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from apps.api.main import app
+
 from apps.api.core.auth import get_user_client
+from apps.api.main import app
 
 
 class MockData:
@@ -25,20 +26,31 @@ class MockData:
 class MockTable:
     def __init__(self):
         self._data = MockData()
-    def select(self, *args): return self
-    def eq(self, *args): return self
-    def order(self, *args, **kwargs): return self
-    def limit(self, *args): return self
-    def execute(self): return self._data
+
+    def select(self, *args):
+        return self
+
+    def eq(self, *args):
+        return self
+
+    def order(self, *args, **kwargs):
+        return self
+
+    def limit(self, *args):
+        return self
+
+    def execute(self):
+        return self._data
 
 
 class MockClient:
     def __init__(self):
-        self.auth = type("auth", (), {
-            "get_user": lambda self: type("r", (), {
-                "user": type("u", (), {"id": "user-1"})()
-            })()
-        })()
+        self.auth = type(
+            "auth",
+            (),
+            {"get_user": lambda self: type("r", (), {"user": type("u", (), {"id": "user-1"})()})()},
+        )()
+
     def table(self, name):
         return MockTable()
 

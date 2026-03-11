@@ -1,7 +1,7 @@
 -- Migration: 001_active_learning
 
 -- 1. Add manual override flag to transactions
-ALTER TABLE transactions 
+ALTER TABLE transactions
 ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE;
 
 -- 2. Create classification_jobs table

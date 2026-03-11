@@ -1,6 +1,8 @@
-import pytest
+from unittest.mock import MagicMock, mock_open, patch
+
 import pandas as pd
-from unittest.mock import patch, MagicMock, mock_open
+import pytest
+
 from packages.categorization.data_loader import BankStatementParser
 
 # Mock data simulating the Excel file structure we inspected
@@ -104,9 +106,7 @@ def test_get_cleaning_diff():
     # Test the new method for inspection
     parser = BankStatementParser("dummy.xlsx", password="password")
     # Mock dataframe manually since we are not parsing real file
-    parser.df = pd.DataFrame(
-        {"Details": ["POS txn", "ATM wdl"], "Cleaned_Details": ["txn", "wdl"]}
-    )
+    parser.df = pd.DataFrame({"Details": ["POS txn", "ATM wdl"], "Cleaned_Details": ["txn", "wdl"]})
 
     # This method doesn't exist yet, so it should fail (AttributeError)
     diff = parser.get_cleaning_diff()

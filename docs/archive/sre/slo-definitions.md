@@ -21,22 +21,26 @@
 ## Error Budget Policy
 
 ### Budget > 50% remaining
+
 - Ship features normally
 - Run chaos experiments
 - Accept calculated risk for velocity
 
 ### Budget 25-50% remaining
+
 - Slow down feature releases
 - Prioritize reliability improvements
 - Review recent incidents for patterns
 
 ### Budget < 25% remaining
+
 - **FREEZE** feature releases
 - All engineering effort on reliability
 - Postmortem for budget burn causes
 - Architecture review if systemic
 
 ### Budget exhausted (0%)
+
 - Only critical bug fixes and security patches
 - Mandatory reliability sprint
 - Root cause analysis required before resuming features

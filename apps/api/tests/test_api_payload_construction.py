@@ -4,7 +4,6 @@ import pandas as pd
 # Since it doesn't exist yet, we will define the test first (TDD).
 # We expect to create a function `prepare_transaction_payload` in `apps.api.routers.training`
 # or a new utility module. For now, let's assume it's in `apps.api.routers.training`.
-
 from apps.api.domains.training.router import prepare_transaction_payload
 
 

@@ -38,6 +38,7 @@ Is this reusable across environments/projects?
 When building reusable infrastructure:
 
 1. **Scaffold new module with script:**
+
 ```bash
 python3 scripts/init_module.py my-module-name
 ```
@@ -48,12 +49,12 @@ This automatically creates:
 - Examples directory
 - README with documentation
 
-2. **Use module template structure:**
+1. **Use module template structure:**
    - See `assets/templates/MODULE_TEMPLATE.md` for complete structure
    - Required files: `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, `README.md`
    - Recommended: `examples/` directory with working examples
 
-3. **Follow module best practices:**
+2. **Follow module best practices:**
    - Single responsibility - one module, one purpose
    - Sensible defaults for optional variables
    - Complete descriptions for all variables and outputs
@@ -61,6 +62,7 @@ This automatically creates:
    - Mark sensitive values with `sensitive = true`
 
 3. **Validate module:**
+
 ```bash
 python3 scripts/validate_module.py /path/to/module
 ```
@@ -73,14 +75,15 @@ This checks for:
 - Naming conventions followed
 - Sensitive values properly marked
 
-4. **Test module:**
+1. **Test module:**
+
 ```bash
 cd examples/complete
 terraform init
 terraform plan
 ```
 
-5. **Document module:**
+1. **Document module:**
    - Use terraform-docs to auto-generate: `terraform-docs markdown . > README.md`
    - Include usage examples
    - Document all inputs and outputs
@@ -98,6 +101,7 @@ See `references/best_practices.md` "Module Design" section for:
 For environment-specific infrastructure:
 
 1. **Structure by environment:**
+
 ```
 environments/
 ├── dev/
@@ -105,7 +109,8 @@ environments/
 └── prod/
 ```
 
-2. **Use consistent file organization:**
+1. **Use consistent file organization:**
+
 ```
 environment/
 ├── main.tf           # Resource definitions
@@ -117,7 +122,8 @@ environment/
 └── versions.tf       # Version constraints
 ```
 
-3. **Reference modules:**
+1. **Reference modules:**
+
 ```hcl
 module "vpc" {
   source = "git::https://github.com/company/terraform-modules.git//vpc?ref=v1.2.0"
@@ -137,11 +143,13 @@ module "vpc" {
 - Auditing infrastructure
 
 **Inspect state and check health:**
+
 ```bash
 python3 scripts/inspect_state.py /path/to/terraform/directory
 ```
 
 **Check for drift:**
+
 ```bash
 python3 scripts/inspect_state.py /path/to/terraform/directory --check-drift
 ```
@@ -154,6 +162,7 @@ The script provides:
 - Drift detection (if requested)
 
 **Manual state operations:**
+
 ```bash
 # List all resources
 terraform state list
@@ -200,6 +209,7 @@ terraform output
 ```
 
 **With Terragrunt:**
+
 ```bash
 # Run for single module
 terragrunt plan
@@ -226,34 +236,39 @@ When encountering errors:
    - Performance problems
 
 3. **Enable debug logging if needed:**
+
 ```bash
 export TF_LOG=DEBUG
 export TF_LOG_PATH=terraform-debug.log
 terraform plan
 ```
 
-4. **Isolate the problem:**
+1. **Isolate the problem:**
+
 ```bash
 # Test specific resource
 terraform plan -target=aws_instance.web
 terraform apply -target=aws_instance.web
 ```
 
-5. **Common quick fixes:**
+1. **Common quick fixes:**
 
 **State locked:**
+
 ```bash
 # Verify no one else running, then:
 terraform force-unlock <lock-id>
 ```
 
 **Provider cache issues:**
+
 ```bash
 rm -rf .terraform
 terraform init -upgrade
 ```
 
 **Module cache issues:**
+
 ```bash
 rm -rf .terraform/modules
 terraform init
@@ -264,31 +279,37 @@ terraform init
 **Before committing:**
 
 1. **Format code:**
+
 ```bash
 terraform fmt -recursive
 ```
 
-2. **Validate syntax:**
+1. **Validate syntax:**
+
 ```bash
 terraform validate
 ```
 
-3. **Lint with tflint:**
+1. **Lint with tflint:**
+
 ```bash
 tflint --module
 ```
 
-4. **Security scan with checkov:**
+1. **Security scan with checkov:**
+
 ```bash
 checkov -d .
 ```
 
-5. **Validate modules:**
+1. **Validate modules:**
+
 ```bash
 python3 scripts/validate_module.py modules/vpc
 ```
 
-6. **Generate documentation:**
+1. **Generate documentation:**
+
 ```bash
 terraform-docs markdown modules/vpc > modules/vpc/README.md
 ```
@@ -464,6 +485,7 @@ Use these templates as starting points for your CI/CD pipelines. Customize based
 Scaffolds a new Terraform module with proper structure and template files.
 
 **Usage:**
+
 ```bash
 # Create module in current directory
 python3 scripts/init_module.py my-vpc
@@ -494,6 +516,7 @@ python3 scripts/init_module.py my-vpc --json
 Comprehensive state inspection and health check.
 
 **Usage:**
+
 ```bash
 # Basic inspection
 python3 scripts/inspect_state.py /path/to/terraform
@@ -522,6 +545,7 @@ python3 scripts/inspect_state.py /path/to/terraform --check-drift
 Validates Terraform modules against best practices.
 
 **Usage:**
+
 ```bash
 python3 scripts/validate_module.py /path/to/module
 ```

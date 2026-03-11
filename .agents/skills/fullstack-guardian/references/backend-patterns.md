@@ -3,6 +3,7 @@
 ## Microservices Architecture
 
 ### Circuit Breaker Pattern
+
 ```typescript
 class CircuitBreaker {
   private failures = 0;
@@ -29,6 +30,7 @@ class CircuitBreaker {
 ```
 
 ### Saga Pattern (Distributed Transactions)
+
 ```typescript
 class OrderSaga {
   async execute(order: Order) {
@@ -52,6 +54,7 @@ class OrderSaga {
 ## Message Queue Integration
 
 ### Producer/Consumer with DLQ
+
 ```typescript
 // RabbitMQ Consumer with Dead Letter Queue
 class MessageConsumer {
@@ -89,6 +92,7 @@ class MessageConsumer {
 ```
 
 ### Idempotency
+
 ```typescript
 class IdempotentHandler {
   async handle(messageId: string, fn: () => Promise<void>) {
@@ -104,6 +108,7 @@ class IdempotentHandler {
 ## Database Optimization
 
 ### Connection Pooling
+
 ```typescript
 import { Pool } from 'pg';
 
@@ -124,6 +129,7 @@ export async function query(sql: string, params: any[]) {
 ```
 
 ### Read Replica Strategy
+
 ```typescript
 class DatabaseRouter {
   async query(sql: string, params: any[]) {
@@ -140,6 +146,7 @@ class DatabaseRouter {
 ## Monitoring & Observability
 
 ### Prometheus Metrics
+
 ```typescript
 import { Counter, Histogram, Registry } from 'prom-client';
 
@@ -171,6 +178,7 @@ app.get('/metrics', async (req, res) => {
 ```
 
 ### Distributed Tracing
+
 ```typescript
 import { trace } from '@opentelemetry/api';
 
@@ -196,6 +204,7 @@ async function processOrder(orderId: string) {
 ## Docker & Deployment
 
 ### Multi-stage Dockerfile
+
 ```dockerfile
 FROM node:18-alpine AS builder
 WORKDIR /app
@@ -214,6 +223,7 @@ CMD ["node", "dist/main.js"]
 ```
 
 ### Graceful Shutdown
+
 ```typescript
 process.on('SIGTERM', async () => {
   console.log('Shutting down gracefully');

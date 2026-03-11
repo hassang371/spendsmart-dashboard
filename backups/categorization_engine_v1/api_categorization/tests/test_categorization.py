@@ -4,13 +4,14 @@ Verifies BUG-03 fix (single classify endpoint) and BUG-04 fix
 (in-process batch classification without Celery).
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from apps.api.domains.categorization.router import router
 from apps.api.core.auth import get_user_client
+from apps.api.domains.categorization.router import router
 
 
 @pytest.fixture
@@ -58,9 +59,12 @@ class TestClassifyEndpoint:
     """BUG-03 fix: Single /classify endpoint."""
 
     def test_classify_single_returns_200(self, client):
-        response = client.post("/api/v1/categorization/classify", json={
-            "description": "Starbucks coffee",
-        })
+        response = client.post(
+            "/api/v1/categorization/classify",
+            json={
+                "description": "Starbucks coffee",
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "category" in data
@@ -71,9 +75,12 @@ class TestClassifyEndpoint:
         """Without auth, should return 401."""
         app.dependency_overrides.clear()
         c = TestClient(app)
-        response = c.post("/api/v1/categorization/classify", json={
-            "description": "test",
-        })
+        response = c.post(
+            "/api/v1/categorization/classify",
+            json={
+                "description": "test",
+            },
+        )
         assert response.status_code == 401
 
 
@@ -82,9 +89,12 @@ class TestBatchClassify:
 
     def test_batch_classify_returns_predictions(self, client, mock_classifier):
         """Batch classify should return results for all descriptions."""
-        response = client.post("/api/v1/categorization/classify/batch", json={
-            "descriptions": ["Starbucks coffee", "Uber ride"],
-        })
+        response = client.post(
+            "/api/v1/categorization/classify/batch",
+            json={
+                "descriptions": ["Starbucks coffee", "Uber ride"],
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "predictions" in data
@@ -93,17 +103,23 @@ class TestBatchClassify:
 
     def test_batch_classify_calls_predict_batch_once(self, client, mock_classifier):
         """BUG-04: Should call predict_batch ONCE, not N separate times."""
-        client.post("/api/v1/categorization/classify/batch", json={
-            "descriptions": ["A", "B", "C"],
-        })
+        client.post(
+            "/api/v1/categorization/classify/batch",
+            json={
+                "descriptions": ["A", "B", "C"],
+            },
+        )
         # predict_batch should be called exactly once with all descriptions
         mock_classifier.predict_batch.assert_called_once()
 
     def test_batch_classify_empty_descriptions(self, client):
         """Empty descriptions list should return 400."""
-        response = client.post("/api/v1/categorization/classify/batch", json={
-            "descriptions": [],
-        })
+        response = client.post(
+            "/api/v1/categorization/classify/batch",
+            json={
+                "descriptions": [],
+            },
+        )
         assert response.status_code == 400
 
 
@@ -111,7 +127,10 @@ class TestFeedback:
     """Tests for feedback/active learning endpoint."""
 
     def test_feedback_empty_corrections(self, client):
-        response = client.post("/api/v1/categorization/feedback", json={
-            "corrections": {},
-        })
+        response = client.post(
+            "/api/v1/categorization/feedback",
+            json={
+                "corrections": {},
+            },
+        )
         assert response.status_code == 400

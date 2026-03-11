@@ -1,7 +1,12 @@
 """Tests for the v2 keyword rules engine and category constants."""
+
 import pytest
 
-from packages.categorization.constants import Category, DEFAULT_CATEGORY_KEYWORDS, LEGACY_CATEGORY_MAP
+from packages.categorization.constants import (
+    DEFAULT_CATEGORY_KEYWORDS,
+    LEGACY_CATEGORY_MAP,
+    Category,
+)
 from packages.categorization.rules import KeywordMatcher
 
 
@@ -24,9 +29,20 @@ class TestCategoryConstants:
             assert cat.value in DEFAULT_CATEGORY_KEYWORDS, f"Missing seeds for {cat.value}"
 
     def test_legacy_map_covers_old_categories(self):
-        old_cats = ["Food", "Transport", "Utilities", "Salary", "Shopping",
-                    "Entertainment", "Health", "Education", "Finance", "People",
-                    "Misc", "Uncategorized"]
+        old_cats = [
+            "Food",
+            "Transport",
+            "Utilities",
+            "Salary",
+            "Shopping",
+            "Entertainment",
+            "Health",
+            "Education",
+            "Finance",
+            "People",
+            "Misc",
+            "Uncategorized",
+        ]
         for old in old_cats:
             assert old in LEGACY_CATEGORY_MAP, f"Missing legacy mapping for {old}"
             assert LEGACY_CATEGORY_MAP[old] in [c.value for c in Category]

@@ -24,9 +24,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
     test_queries: list[dict] = []
     if history:
         for r in history[0].get("train_results", history[0].get("results", [])):
-            train_queries.append(
-                {"query": r["query"], "should_trigger": r.get("should_trigger", True)}
-            )
+            train_queries.append({"query": r["query"], "should_trigger": r.get("should_trigger", True)})
         if history[0].get("test_results"):
             for r in history[0].get("test_results", []):
                 test_queries.append(
@@ -36,9 +34,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
                     }
                 )
 
-    refresh_tag = (
-        '    <meta http-equiv="refresh" content="5">\n' if auto_refresh else ""
-    )
+    refresh_tag = '    <meta http-equiv="refresh" content="5">\n' if auto_refresh else ""
 
     html_parts = [
         """<!DOCTYPE html>
@@ -207,16 +203,12 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
     # Add column headers for train queries
     for qinfo in train_queries:
         polarity = "positive-col" if qinfo["should_trigger"] else "negative-col"
-        html_parts.append(
-            f'                <th class="{polarity}">{html.escape(qinfo["query"])}</th>\n'
-        )
+        html_parts.append(f'                <th class="{polarity}">{html.escape(qinfo["query"])}</th>\n')
 
     # Add column headers for test queries (different color)
     for qinfo in test_queries:
         polarity = "positive-col" if qinfo["should_trigger"] else "negative-col"
-        html_parts.append(
-            f'                <th class="test-col {polarity}">{html.escape(qinfo["query"])}</th>\n'
-        )
+        html_parts.append(f'                <th class="test-col {polarity}">{html.escape(qinfo["query"])}</th>\n')
 
     html_parts.append("""            </tr>
         </thead>
@@ -225,13 +217,9 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
 
     # Find best iteration for highlighting
     if test_queries:
-        best_iter = max(history, key=lambda h: h.get("test_passed") or 0).get(
-            "iteration"
-        )
+        best_iter = max(history, key=lambda h: h.get("test_passed") or 0).get("iteration")
     else:
-        best_iter = max(
-            history, key=lambda h: h.get("train_passed", h.get("passed", 0))
-        ).get("iteration")
+        best_iter = max(history, key=lambda h: h.get("train_passed", h.get("passed", 0))).get("iteration")
 
     # Add rows for each iteration
     for h in history:
@@ -331,18 +319,10 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate HTML report from run_loop output"
-    )
-    parser.add_argument(
-        "input", help="Path to JSON output from run_loop.py (or - for stdin)"
-    )
-    parser.add_argument(
-        "-o", "--output", default=None, help="Output HTML file (default: stdout)"
-    )
-    parser.add_argument(
-        "--skill-name", default="", help="Skill name to include in the report title"
-    )
+    parser = argparse.ArgumentParser(description="Generate HTML report from run_loop output")
+    parser.add_argument("input", help="Path to JSON output from run_loop.py (or - for stdin)")
+    parser.add_argument("-o", "--output", default=None, help="Output HTML file (default: stdout)")
+    parser.add_argument("--skill-name", default="", help="Skill name to include in the report title")
     args = parser.parse_args()
 
     if args.input == "-":

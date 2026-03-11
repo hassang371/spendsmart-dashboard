@@ -1,8 +1,10 @@
 """Hyperbolic clustering with Fréchet mean and hierarchy extraction."""
-import torch
-import geoopt
-from geoopt.optim import RiemannianSGD
+
 from typing import Optional
+
+import geoopt
+import torch
+from geoopt.optim import RiemannianSGD
 
 
 class HyperbolicKMeans:
@@ -12,9 +14,7 @@ class HyperbolicKMeans:
     Implements clustering in Poincaré ball for Generalized Category Discovery.
     """
 
-    def __init__(
-        self, n_clusters: int, manifold, max_iter: int = 100, tol: float = 1e-4
-    ):
+    def __init__(self, n_clusters: int, manifold, max_iter: int = 100, tol: float = 1e-4):
         """
         Initialize hyperbolic K-means.
 
@@ -94,10 +94,7 @@ class HyperbolicKMeans:
         for iteration in range(self.max_iter):
             # Assignment: nearest centroid by hyperbolic distance
             distances = torch.stack(
-                [
-                    self.manifold.dist(embeddings, c.unsqueeze(0))
-                    for c in self.centroids
-                ],
+                [self.manifold.dist(embeddings, c.unsqueeze(0)) for c in self.centroids],
                 dim=1,
             )
 

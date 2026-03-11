@@ -4,9 +4,10 @@
 Uses sentence-transformers/all-MiniLM-L6-v2 (22MB, 384-dim) for
 maximum portability across cloud, web, and mobile platforms.
 """
-import torch
+
 from typing import List
 
+import torch
 from sentence_transformers import SentenceTransformer
 
 from .base import BackendBase
@@ -49,9 +50,7 @@ class CloudBackend(BackendBase):
         Returns:
             Tensor of shape (batch_size, 384) with sentence embeddings
         """
-        embeddings = self._model.encode(
-            texts, convert_to_tensor=True, show_progress_bar=False
-        )
+        embeddings = self._model.encode(texts, convert_to_tensor=True, show_progress_bar=False)
         return embeddings.to(self._device)
 
     def embed_batch(self, texts: List[str]) -> torch.Tensor:

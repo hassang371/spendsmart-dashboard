@@ -72,6 +72,7 @@ kubectl exec -it <pod-name> -n <namespace> -- \
 ### Common Causes and Solutions
 
 **CPU Throttling:**
+
 ```yaml
 # Increase CPU limits or remove limits for bursty workloads
 resources:
@@ -82,6 +83,7 @@ resources:
 ```
 
 **Insufficient Replicas:**
+
 ```bash
 # Scale up deployment
 kubectl scale deployment <deployment-name> -n <namespace> --replicas=5
@@ -94,6 +96,7 @@ kubectl autoscale deployment <deployment-name> \
 ```
 
 **Slow Dependencies:**
+
 ```yaml
 # Implement circuit breakers and timeouts in application
 # Or use service mesh policies (Istio example):
@@ -173,6 +176,7 @@ kubectl cp <namespace>/<pod-name>:/tmp/flamegraph.html ./flamegraph.html
 ### Solutions
 
 **Vertical Scaling:**
+
 ```yaml
 resources:
   requests:
@@ -182,6 +186,7 @@ resources:
 ```
 
 **Horizontal Scaling:**
+
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -204,6 +209,7 @@ spec:
 ```
 
 **Remove CPU Limits for Bursty Workloads:**
+
 ```yaml
 # Allow bursting to available CPU
 resources:
@@ -244,6 +250,7 @@ kubectl get --raw "/apis/metrics.k8s.io/v1beta1/namespaces/<namespace>/pods/<pod
 ### Memory Profiling
 
 **Heap dump for Java:**
+
 ```bash
 # Capture heap dump
 kubectl exec <pod-name> -n <namespace> -- \
@@ -256,6 +263,7 @@ kubectl cp <namespace>/<pod-name>:/tmp/heapdump.hprof ./heapdump.hprof
 ```
 
 **Memory profiling for Go:**
+
 ```bash
 # Capture heap profile
 kubectl port-forward <pod-name> 6060:6060 -n <namespace>
@@ -268,6 +276,7 @@ go tool pprof -http=:8080 heap.prof
 ### Solutions
 
 **Increase Memory Limits:**
+
 ```yaml
 resources:
   requests:
@@ -283,6 +292,7 @@ resources:
 - Tune garbage collection
 
 **Use Memory-Optimized Node Pools:**
+
 ```yaml
 # Node affinity for memory-intensive workloads
 affinity:
@@ -345,6 +355,7 @@ kubectl delete networkpolicy <policy-name> -n <namespace>
 ### Solutions
 
 **DNS Optimization:**
+
 ```yaml
 # Use CoreDNS caching
 # Increase CoreDNS replicas
@@ -355,6 +366,7 @@ kubectl scale deployment coredns -n kube-system --replicas=5
 ```
 
 **Optimize Service Mesh:**
+
 ```yaml
 # Reduce Istio sidecar resources if over-provisioned
 sidecar.istio.io/proxyCPU: "100m"
@@ -365,6 +377,7 @@ sidecar.istio.io/inject: "false"
 ```
 
 **Use HostNetwork for Network-Intensive Pods:**
+
 ```yaml
 # Use with caution - bypasses pod networking
 spec:
@@ -373,6 +386,7 @@ spec:
 ```
 
 **Enable Bandwidth Limits (QoS):**
+
 ```yaml
 metadata:
   annotations:
@@ -414,6 +428,7 @@ kubectl describe storageclass <storage-class-name>
 ### Storage Benchmarking
 
 **Deploy fio for benchmarking:**
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -442,6 +457,7 @@ spec:
 ### Solutions
 
 **Use Higher Performance Storage Class:**
+
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -457,6 +473,7 @@ spec:
 ```
 
 **Provision IOPS (AWS EBS io2):**
+
 ```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -471,6 +488,7 @@ volumeBindingMode: WaitForFirstConsumer
 ```
 
 **Use Local NVMe for Ultra-Low Latency:**
+
 ```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -509,6 +527,7 @@ spec:
 ### Expose Prometheus Metrics
 
 **Add metrics endpoint to application:**
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -538,6 +557,7 @@ spec:
 - Cache hit rate
 
 **Example Prometheus queries:**
+
 ```promql
 # P95 latency
 histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
@@ -552,6 +572,7 @@ sum(rate(http_requests_total[5m]))
 ### Distributed Tracing
 
 **Implement OpenTelemetry:**
+
 ```yaml
 # Deploy Jaeger
 apiVersion: apps/v1

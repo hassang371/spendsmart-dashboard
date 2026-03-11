@@ -8,17 +8,29 @@ Frontend Migration: Added POST /import for full end-to-end import
 """
 
 import hashlib
-import structlog
-import numpy as np
 from collections import defaultdict
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
-from supabase import Client
+import numpy as np
+import structlog
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 
 from apps.api.core.auth import get_user_client
-from packages.ingestion_engine.import_transactions import parse_file
 from apps.api.domains.ingestion.service import generate_fingerprint
-from packages.ingestion_engine.merchant_extractor import MerchantExtractor, infer_payment_method
+from packages.ingestion_engine.import_transactions import parse_file
+from packages.ingestion_engine.merchant_extractor import (
+    MerchantExtractor,
+    infer_payment_method,
+)
+from supabase import Client
 
 _merchant_extractor = MerchantExtractor()  # module-level singleton
 
@@ -45,7 +57,7 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, dict]:
         classifications = classify_batch_in_process(descriptions)
         for desc, clf in zip(descriptions, classifications):
             result[desc] = {
-                "category":   clf.get("category", "Uncategorized"),
+                "category": clf.get("category", "Uncategorized"),
                 "confidence": float(clf.get("confidence", 0.0)),
             }
         return result
@@ -54,21 +66,96 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, dict]:
 
     # Fallback: keyword-based classification (rule matches default to confidence=1.0)
     keyword_map = [
-        ("Food",          ["swiggy", "zomato", "blinkit", "zepto", "bigbasket", "food",
-                           "restaurant", "dining", "dunzo", "dominos", "kfc", "burger"]),
-        ("Transport",     ["uber", "ola", "rapido", "metro", "irctc", "fuel", "petrol",
-                           "indigo", "makemytrip", "redbus", "fastag"]),
-        ("Shopping",      ["amazon", "flipkart", "myntra", "ajio", "meesho", "nykaa",
-                           "decathlon", "croma"]),
-        ("Utilities",     ["electric", "water", "gas", "bill", "recharge", "airtel",
-                           "jio", "vodafone", "broadband"]),
-        ("Entertainment", ["netflix", "spotify", "hotstar", "prime", "youtube",
-                           "jiocinema", "sonyliv", "subscription", "play pass"]),
-        ("Health",        ["hospital", "pharmacy", "doctor", "clinic", "1mg",
-                           "netmeds", "cultfit", "gym"]),
-        ("Education",     ["course", "tuition", "udemy", "byju", "unacademy"]),
-        ("Finance",       ["loan", "emi", "insurance", "zerodha", "groww", "cred"]),
-        ("Salary",        ["salary", "payroll", "stipend"]),
+        (
+            "Food",
+            [
+                "swiggy",
+                "zomato",
+                "blinkit",
+                "zepto",
+                "bigbasket",
+                "food",
+                "restaurant",
+                "dining",
+                "dunzo",
+                "dominos",
+                "kfc",
+                "burger",
+            ],
+        ),
+        (
+            "Transport",
+            [
+                "uber",
+                "ola",
+                "rapido",
+                "metro",
+                "irctc",
+                "fuel",
+                "petrol",
+                "indigo",
+                "makemytrip",
+                "redbus",
+                "fastag",
+            ],
+        ),
+        (
+            "Shopping",
+            [
+                "amazon",
+                "flipkart",
+                "myntra",
+                "ajio",
+                "meesho",
+                "nykaa",
+                "decathlon",
+                "croma",
+            ],
+        ),
+        (
+            "Utilities",
+            [
+                "electric",
+                "water",
+                "gas",
+                "bill",
+                "recharge",
+                "airtel",
+                "jio",
+                "vodafone",
+                "broadband",
+            ],
+        ),
+        (
+            "Entertainment",
+            [
+                "netflix",
+                "spotify",
+                "hotstar",
+                "prime",
+                "youtube",
+                "jiocinema",
+                "sonyliv",
+                "subscription",
+                "play pass",
+            ],
+        ),
+        (
+            "Health",
+            [
+                "hospital",
+                "pharmacy",
+                "doctor",
+                "clinic",
+                "1mg",
+                "netmeds",
+                "cultfit",
+                "gym",
+            ],
+        ),
+        ("Education", ["course", "tuition", "udemy", "byju", "unacademy"]),
+        ("Finance", ["loan", "emi", "insurance", "zerodha", "groww", "cred"]),
+        ("Salary", ["salary", "payroll", "stipend"]),
     ]
 
     for desc in descriptions:
@@ -79,16 +166,14 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, dict]:
                 matched = category
                 break
         result[desc] = {
-            "category":   matched,
+            "category": matched,
             "confidence": 1.0 if matched != "Uncategorized" else 0.0,
         }
 
     return result
 
 
-def _classify_and_update_transactions(
-    user_id: str, fps_to_desc: dict, token: str, job_id: str | None = None
-) -> None:
+def _classify_and_update_transactions(user_id: str, fps_to_desc: dict, token: str, job_id: str | None = None) -> None:
     """Background task: classify inserted transactions and patch their categories.
 
     Applies CONFIDENCE_THRESHOLD — confident predictions are assigned normally;
@@ -109,11 +194,11 @@ def _classify_and_update_transactions(
 
     # Separate confident vs uncertain predictions
     confident_fps: dict[str, list[str]] = defaultdict(list)  # category -> [fps]
-    uncertain_rows: list[dict] = []                          # [{fp, suggested, confidence}]
+    uncertain_rows: list[dict] = []  # [{fp, suggested, confidence}]
 
     for fp, desc in fps_to_desc.items():
         pred = category_map.get(desc, {"category": "Uncategorized", "confidence": 0.0})
-        cat  = pred["category"]
+        cat = pred["category"]
         conf = pred["confidence"]
 
         if conf >= CONFIDENCE_THRESHOLD and cat != "Uncategorized":
@@ -122,40 +207,43 @@ def _classify_and_update_transactions(
             uncertain_rows.append({"fp": fp, "suggested": cat, "confidence": conf})
 
     try:
+        from apps.api.core.auth import _get_supabase_anon_key, _get_supabase_url
         from supabase import create_client
-        from apps.api.core.auth import _get_supabase_url, _get_supabase_anon_key
+
         client = create_client(_get_supabase_url(), _get_supabase_anon_key())
         client.auth.set_session(token, "")
 
         # Mark job as running
         if job_id:
             try:
-                client.table("classification_jobs").update(
-                    {"status": "running"}
-                ).eq("id", job_id).execute()
+                client.table("classification_jobs").update({"status": "running"}).eq("id", job_id).execute()
             except Exception:
                 pass
 
         # Batch-update confident predictions
         for category, fps in confident_fps.items():
             client.table("transactions").update(
-                {"category": category, "suggested_category": None, "confidence_score": None}
+                {
+                    "category": category,
+                    "suggested_category": None,
+                    "confidence_score": None,
+                }
             ).eq("user_id", user_id).in_("fingerprint", fps).execute()
 
         # Update uncertain predictions — leave as Uncategorized, store suggestion
         for row in uncertain_rows:
-            client.table("transactions").update({
-                "category":           "Uncategorized",
-                "suggested_category": row["suggested"],
-                "confidence_score":   row["confidence"],
-            }).eq("user_id", user_id).eq("fingerprint", row["fp"]).execute()
+            client.table("transactions").update(
+                {
+                    "category": "Uncategorized",
+                    "suggested_category": row["suggested"],
+                    "confidence_score": row["confidence"],
+                }
+            ).eq("user_id", user_id).eq("fingerprint", row["fp"]).execute()
 
         # Mark job as completed
         if job_id:
             try:
-                client.table("classification_jobs").update(
-                    {"status": "completed"}
-                ).eq("id", job_id).execute()
+                client.table("classification_jobs").update({"status": "completed"}).eq("id", job_id).execute()
             except Exception:
                 pass
 
@@ -169,13 +257,12 @@ def _classify_and_update_transactions(
         logger.warning("bg_category_update_failed", user_id=user_id, error=str(e))
         if job_id:
             try:
+                from apps.api.core.auth import _get_supabase_anon_key, _get_supabase_url
                 from supabase import create_client
-                from apps.api.core.auth import _get_supabase_url, _get_supabase_anon_key
+
                 _c = create_client(_get_supabase_url(), _get_supabase_anon_key())
                 _c.auth.set_session(token, "")
-                _c.table("classification_jobs").update(
-                    {"status": "failed"}
-                ).eq("id", job_id).execute()
+                _c.table("classification_jobs").update({"status": "failed"}).eq("id", job_id).execute()
             except Exception:
                 pass
 
@@ -274,7 +361,16 @@ async def ingest_csv(
     Parse-only endpoint — returns parsed transactions without inserting.
     Useful for previewing data before committing an import.
     """
-    allowed_extensions = (".csv", ".tsv", ".xls", ".xlsx", ".xlsm", ".json", ".txt", ".pdf")
+    allowed_extensions = (
+        ".csv",
+        ".tsv",
+        ".xls",
+        ".xlsx",
+        ".xlsm",
+        ".json",
+        ".txt",
+        ".pdf",
+    )
     filename = file.filename or ""
     if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
         raise HTTPException(
@@ -346,7 +442,16 @@ async def import_file(
     if limiter:
         await limiter(request)
 
-    allowed_extensions = (".csv", ".tsv", ".xls", ".xlsx", ".xlsm", ".json", ".txt", ".pdf")
+    allowed_extensions = (
+        ".csv",
+        ".tsv",
+        ".xls",
+        ".xlsx",
+        ".xlsm",
+        ".json",
+        ".txt",
+        ".pdf",
+    )
     filename = file.filename or ""
     if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
         raise HTTPException(
@@ -406,12 +511,14 @@ async def import_file(
     # --- Track uploaded file ---
     file_hash = hashlib.sha256(contents).hexdigest()
     try:
-        client.table("uploaded_files").insert({
-            "user_id": user_id,
-            "file_hash": file_hash,
-            "filename": filename,
-            "upload_type": "import",
-        }).execute()
+        client.table("uploaded_files").insert(
+            {
+                "user_id": user_id,
+                "file_hash": file_hash,
+                "filename": filename,
+                "upload_type": "import",
+            }
+        ).execute()
     except Exception as e:
         logger.warning("uploaded_file_tracking_failed", error=str(e))
 
@@ -475,11 +582,9 @@ async def import_file(
         }
 
     # --- Step 4: Collect unique descriptions for async classification ---
-    unique_descs = list({
-        str(row.get("description", "") or "")
-        for row, _ in new_rows
-        if str(row.get("description", "") or "").strip()
-    })
+    unique_descs = list(
+        {str(row.get("description", "") or "") for row, _ in new_rows if str(row.get("description", "") or "").strip()}
+    )
 
     # --- Step 5: Build insert rows (Uncategorized — classification is async) ---
     insert_rows = []
@@ -530,12 +635,18 @@ async def import_file(
     job_id: str | None = None
     if fps_to_desc:
         try:
-            job_res = client.table("classification_jobs").insert({
-                "user_id": user_id,
-                "status": "pending",
-                "transaction_ids": inserted_ids or None,
-                "logs": f"Queued async classification for {len(unique_descs)} descriptions from {filename}",
-            }).execute()
+            job_res = (
+                client.table("classification_jobs")
+                .insert(
+                    {
+                        "user_id": user_id,
+                        "status": "pending",
+                        "transaction_ids": inserted_ids or None,
+                        "logs": f"Queued async classification for {len(unique_descs)} descriptions from {filename}",
+                    }
+                )
+                .execute()
+            )
             if job_res.data:
                 job_id = job_res.data[0].get("id")
         except Exception as e:
@@ -551,9 +662,7 @@ async def import_file(
         # Enqueue contrastive pretraining (updates projector weights from unlabeled data)
         unique_descs = list({desc for desc in fps_to_desc.values() if desc.strip()})
         if unique_descs:
-            background_tasks.add_task(
-                _run_contrastive_pretraining_bg, user_id, unique_descs, token
-            )
+            background_tasks.add_task(_run_contrastive_pretraining_bg, user_id, unique_descs, token)
 
     logger.info(
         "import_complete",

@@ -1,6 +1,7 @@
 # packages/categorization/backends/base.py
 from abc import ABC, abstractmethod
 from typing import List
+
 import torch
 
 

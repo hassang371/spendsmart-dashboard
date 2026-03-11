@@ -92,6 +92,7 @@ For tools that list resources:
 - **Default to reasonable limits**: 20-50 items is typical
 
 Example pagination response:
+
 ```json
 {
   "total": 150,
@@ -211,6 +212,7 @@ Provide annotations to help clients understand tool behavior:
 - Clean up resources properly on errors
 
 Example error handling:
+
 ```typescript
 try {
   const result = performOperation();

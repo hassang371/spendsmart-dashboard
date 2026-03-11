@@ -9,6 +9,7 @@ Essential patterns for building fault-tolerant distributed systems.
 **Purpose:** Prevent cascading failures by failing fast when a dependency is unhealthy.
 
 **How It Works:**
+
 ```
 States:
 1. CLOSED (normal operation)
@@ -33,6 +34,7 @@ Configuration:
 ```
 
 **Implementation Example:**
+
 ```python
 # Using resilience4j-like pattern
 @CircuitBreaker(
@@ -62,6 +64,7 @@ async def paymentFallback(order_id: str, amount: float, exception):
 ```
 
 **When to Use:**
+
 ```
 Apply circuit breakers to:
 ✓ External service calls
@@ -82,6 +85,7 @@ Configuration Guidelines:
 **Strategies:**
 
 **1. Exponential Backoff:**
+
 ```
 Retry delays: 100ms, 200ms, 400ms, 800ms, 1600ms
 
@@ -107,6 +111,7 @@ while attempts < max_attempts:
 ```
 
 **2. Retry with Jitter:**
+
 ```
 Why: Prevents synchronized retries (thundering herd)
 
@@ -120,6 +125,7 @@ Recommended: Decorrelated jitter for production systems
 ```
 
 **3. Idempotency Keys:**
+
 ```
 Problem: Retries can cause duplicate operations
 
@@ -138,6 +144,7 @@ Ensures safe retries even for non-idempotent operations
 ```
 
 **Retry Best Practices:**
+
 ```
 DO:
 ✓ Only retry transient errors (timeout, 503, 429)
@@ -159,6 +166,7 @@ DON'T:
 **Purpose:** Isolate resources to prevent total system failure.
 
 **Thread Pool Isolation:**
+
 ```
 Concept: Separate thread pools for different operations
 
@@ -174,6 +182,7 @@ If payment service becomes slow:
 ```
 
 **Connection Pool Isolation:**
+
 ```
 Database Connection Pools:
 - Read-only queries: 50 connections
@@ -184,6 +193,7 @@ Heavy reporting query won't starve transactional operations
 ```
 
 **Rate Limiting per Tenant:**
+
 ```
 Multi-tenant SaaS application:
 
@@ -197,6 +207,7 @@ If tenant-a floods the system:
 ```
 
 **Implementation:**
+
 ```python
 # Using semaphores for concurrency limits
 class BulkheadExecutor:
@@ -221,6 +232,7 @@ class BulkheadExecutor:
 **Timeout Types:**
 
 **1. Connection Timeout:**
+
 ```
 Time allowed to establish connection
 
@@ -231,6 +243,7 @@ httpx.AsyncClient(timeout=httpx.Timeout(connect=3.0))
 ```
 
 **2. Read Timeout:**
+
 ```
 Time allowed to receive response after connection
 
@@ -243,6 +256,7 @@ httpx.AsyncClient(timeout=httpx.Timeout(read=10.0))
 ```
 
 **3. Total Timeout:**
+
 ```
 Overall time budget for entire operation
 
@@ -258,6 +272,7 @@ async with asyncio.timeout(30):
 ```
 
 **Timeout Best Practices:**
+
 ```
 Timeouts Hierarchy:
 Parent timeout > sum of child timeouts
@@ -282,6 +297,7 @@ Set timeouts everywhere:
 **Purpose:** Manage distributed transactions across services.
 
 **Choreography-Based Saga:**
+
 ```
 Example: Order Creation Saga
 
@@ -308,6 +324,7 @@ Cons:
 ```
 
 **Orchestration-Based Saga:**
+
 ```
 Example: Order Saga Orchestrator
 
@@ -347,6 +364,7 @@ Cons:
 ```
 
 **Saga State Management:**
+
 ```
 Persist saga state to handle failures:
 
@@ -371,6 +389,7 @@ On orchestrator restart:
 **Purpose:** Store all state changes as events, derive current state by replaying.
 
 **Implementation:**
+
 ```
 Traditional Approach:
 UPDATE orders SET status = 'shipped' WHERE id = 123;
@@ -386,6 +405,7 @@ Current state = replay all events
 ```
 
 **Event Store:**
+
 ```
 CREATE TABLE events (
     event_id UUID PRIMARY KEY,
@@ -407,6 +427,7 @@ Guarantees:
 ```
 
 **Benefits:**
+
 ```
 ✓ Full audit trail
 ✓ Time travel (replay to any point)
@@ -426,6 +447,7 @@ Challenges:
 **Purpose:** Separate read and write models for different optimization strategies.
 
 **Architecture:**
+
 ```
 Write Side (Command):
 - Receives commands (CreateOrder, UpdateInventory)
@@ -453,6 +475,7 @@ Query Side:
 ```
 
 **Read Models:**
+
 ```
 Multiple specialized views from same events:
 
@@ -475,6 +498,7 @@ Each optimized for specific query patterns
 **Types:**
 
 **1. Liveness Probe:**
+
 ```
 Purpose: Is the service alive?
 
@@ -489,6 +513,7 @@ Kubernetes Action:
 ```
 
 **2. Readiness Probe:**
+
 ```
 Purpose: Is the service ready to receive traffic?
 
@@ -505,6 +530,7 @@ Kubernetes Action:
 ```
 
 **3. Startup Probe:**
+
 ```
 Purpose: Has the service finished initialization?
 
@@ -516,6 +542,7 @@ For slow-starting applications:
 ```
 
 **Implementation:**
+
 ```python
 @app.get("/health/live")
 async def liveness():
@@ -545,6 +572,7 @@ async def readiness():
 **Strategies:**
 
 **1. Cached Responses:**
+
 ```
 async def get_product_recommendations(user_id):
     try:
@@ -556,6 +584,7 @@ async def get_product_recommendations(user_id):
 ```
 
 **2. Default Values:**
+
 ```
 async def get_user_preferences(user_id):
     try:
@@ -570,6 +599,7 @@ async def get_user_preferences(user_id):
 ```
 
 **3. Feature Toggles:**
+
 ```
 if feature_flags.is_enabled("personalized_recommendations"):
     recommendations = await ml_service.get_recommendations()

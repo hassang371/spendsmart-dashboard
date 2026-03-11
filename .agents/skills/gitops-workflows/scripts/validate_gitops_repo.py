@@ -6,8 +6,8 @@ Supports both monorepo and polyrepo patterns with Kustomize and Helm.
 
 import argparse
 import sys
-from typing import Dict, List
 from pathlib import Path
+from typing import Dict, List
 
 try:
     import yaml
@@ -55,9 +55,7 @@ class GitOpsRepoValidator:
         has_overlays = (self.repo_path / "overlays").exists()
 
         if not any([has_apps, has_clusters, has_infrastructure, has_base]):
-            self.warnings.append(
-                "No standard directory structure detected (apps/, clusters/, infrastructure/, base/)"
-            )
+            self.warnings.append("No standard directory structure detected (apps/, clusters/, infrastructure/, base/)")
             self.recommendations.append(
                 "Consider organizing with: apps/ (applications), infrastructure/ (cluster config), clusters/ (per-cluster)"
             )
@@ -67,9 +65,7 @@ class GitOpsRepoValidator:
         if flux_system.exists():
             print("  ✓ Flux bootstrap detected")
             if not (flux_system / "gotk-components.yaml").exists():
-                self.warnings.append(
-                    "Flux bootstrap directory exists but gotk-components.yaml not found"
-                )
+                self.warnings.append("Flux bootstrap directory exists but gotk-components.yaml not found")
 
         # Check for ArgoCD bootstrap (if ArgoCD)
         argocd_patterns = list(self.repo_path.rglob("*argocd-*.yaml"))
@@ -96,52 +92,32 @@ class GitOpsRepoValidator:
                     content = yaml.safe_load(f)
 
                 if not content:
-                    self.issues.append(
-                        f"Empty kustomization file: {kfile.relative_to(self.repo_path)}"
-                    )
+                    self.issues.append(f"Empty kustomization file: {kfile.relative_to(self.repo_path)}")
                     continue
 
                 # Check for required fields
-                if (
-                    "resources" not in content
-                    and "bases" not in content
-                    and "components" not in content
-                ):
-                    self.warnings.append(
-                        f"Kustomization has no resources/bases: {kfile.relative_to(self.repo_path)}"
-                    )
+                if "resources" not in content and "bases" not in content and "components" not in content:
+                    self.warnings.append(f"Kustomization has no resources/bases: {kfile.relative_to(self.repo_path)}")
 
                 # Check for deprecated 'bases' (Kustomize 5.7+)
                 if "bases" in content:
-                    self.warnings.append(
-                        f"Using deprecated 'bases' field: {kfile.relative_to(self.repo_path)}"
-                    )
-                    self.recommendations.append(
-                        "Migrate 'bases:' to 'resources:' (Kustomize 5.0+)"
-                    )
+                    self.warnings.append(f"Using deprecated 'bases' field: {kfile.relative_to(self.repo_path)}")
+                    self.recommendations.append("Migrate 'bases:' to 'resources:' (Kustomize 5.0+)")
 
             except yaml.YAMLError as e:
-                self.issues.append(
-                    f"Invalid YAML in {kfile.relative_to(self.repo_path)}: {e}"
-                )
+                self.issues.append(f"Invalid YAML in {kfile.relative_to(self.repo_path)}: {e}")
             except Exception as e:
-                self.issues.append(
-                    f"Error reading {kfile.relative_to(self.repo_path)}: {e}"
-                )
+                self.issues.append(f"Error reading {kfile.relative_to(self.repo_path)}: {e}")
 
     def _check_yaml_syntax(self):
         """Check YAML files for syntax errors."""
         print("\n📝 Checking YAML syntax...")
 
-        yaml_files = list(self.repo_path.rglob("*.yaml")) + list(
-            self.repo_path.rglob("*.yml")
-        )
+        yaml_files = list(self.repo_path.rglob("*.yaml")) + list(self.repo_path.rglob("*.yml"))
 
         # Exclude certain directories
         exclude_dirs = {".git", "node_modules", "vendor", ".github"}
-        yaml_files = [
-            f for f in yaml_files if not any(ex in f.parts for ex in exclude_dirs)
-        ]
+        yaml_files = [f for f in yaml_files if not any(ex in f.parts for ex in exclude_dirs)]
 
         syntax_errors = 0
         for yfile in yaml_files:
@@ -149,9 +125,7 @@ class GitOpsRepoValidator:
                 with open(yfile, "r") as f:
                     yaml.safe_load_all(f)
             except yaml.YAMLError as e:
-                self.issues.append(
-                    f"YAML syntax error in {yfile.relative_to(self.repo_path)}: {e}"
-                )
+                self.issues.append(f"YAML syntax error in {yfile.relative_to(self.repo_path)}: {e}")
                 syntax_errors += 1
 
         if syntax_errors == 0:
@@ -166,14 +140,10 @@ class GitOpsRepoValidator:
         # Check for namespace definitions
         namespace_files = list(self.repo_path.rglob("*namespace*.yaml"))
         if not namespace_files:
-            self.recommendations.append(
-                "No namespace definitions found. Consider explicitly defining namespaces."
-            )
+            self.recommendations.append("No namespace definitions found. Consider explicitly defining namespaces.")
 
         # Check for image tags (not 'latest')
-        all_yamls = list(self.repo_path.rglob("*.yaml")) + list(
-            self.repo_path.rglob("*.yml")
-        )
+        all_yamls = list(self.repo_path.rglob("*.yaml")) + list(self.repo_path.rglob("*.yml"))
         latest_tag_count = 0
 
         for yfile in all_yamls:
@@ -186,19 +156,11 @@ class GitOpsRepoValidator:
                 pass
 
         if latest_tag_count > 0:
-            self.warnings.append(
-                f"Found {latest_tag_count} files using ':latest' image tag"
-            )
-            self.recommendations.append(
-                "Pin image tags to specific versions or digests for reproducibility"
-            )
+            self.warnings.append(f"Found {latest_tag_count} files using ':latest' image tag")
+            self.recommendations.append("Pin image tags to specific versions or digests for reproducibility")
 
         # Check for resource limits
-        deployment_files = [
-            f
-            for f in all_yamls
-            if "deployment" in str(f).lower() or "statefulset" in str(f).lower()
-        ]
+        deployment_files = [f for f in all_yamls if "deployment" in str(f).lower() or "statefulset" in str(f).lower()]
         missing_limits = 0
 
         for dfile in deployment_files:
@@ -212,26 +174,16 @@ class GitOpsRepoValidator:
                         ]:
                             continue
 
-                        containers = (
-                            doc.get("spec", {})
-                            .get("template", {})
-                            .get("spec", {})
-                            .get("containers", [])
-                        )
+                        containers = doc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
                         for container in containers:
-                            if (
-                                "resources" not in container
-                                or "limits" not in container.get("resources", {})
-                            ):
+                            if "resources" not in container or "limits" not in container.get("resources", {}):
                                 missing_limits += 1
                                 break
             except:
                 pass
 
         if missing_limits > 0:
-            self.recommendations.append(
-                f"{missing_limits} Deployments/StatefulSets missing resource limits"
-            )
+            self.recommendations.append(f"{missing_limits} Deployments/StatefulSets missing resource limits")
 
     def _check_secrets_management(self):
         """Check for secrets management practices."""
@@ -251,9 +203,7 @@ class GitOpsRepoValidator:
                             and doc.get("type") != "kubernetes.io/service-account-token"
                         ):
                             # Check if it's a SealedSecret or ExternalSecret
-                            if doc.get("kind") not in [
-                                "SealedSecret"
-                            ] and "external-secrets.io" not in doc.get(
+                            if doc.get("kind") not in ["SealedSecret"] and "external-secrets.io" not in doc.get(
                                 "apiVersion", ""
                             ):
                                 plain_secrets.append(sfile.relative_to(self.repo_path))
@@ -261,12 +211,8 @@ class GitOpsRepoValidator:
                 pass
 
         if plain_secrets:
-            self.issues.append(
-                f"Found {len(plain_secrets)} plain Kubernetes Secret manifests in Git"
-            )
-            self.recommendations.append(
-                "Use Sealed Secrets, External Secrets Operator, or SOPS for secrets management"
-            )
+            self.issues.append(f"Found {len(plain_secrets)} plain Kubernetes Secret manifests in Git")
+            self.recommendations.append("Use Sealed Secrets, External Secrets Operator, or SOPS for secrets management")
             for s in plain_secrets[:3]:  # Show first 3
                 self.issues.append(f"  - {s}")
 
@@ -289,12 +235,7 @@ class GitOpsRepoValidator:
         if external_secrets:
             print(f"  ✓ Found {len(external_secrets)} External Secrets manifests")
 
-        if (
-            not sops_config.exists()
-            and not sealed_secrets
-            and not external_secrets
-            and plain_secrets
-        ):
+        if not sops_config.exists() and not sealed_secrets and not external_secrets and plain_secrets:
             self.recommendations.append(
                 "No secrets management solution detected. Consider implementing Sealed Secrets, ESO, or SOPS+age"
             )
@@ -325,9 +266,7 @@ Checks:
     )
 
     parser.add_argument("repo_path", help="Path to GitOps repository")
-    parser.add_argument(
-        "--errors-only", action="store_true", help="Show only errors, not warnings"
-    )
+    parser.add_argument("--errors-only", action="store_true", help="Show only errors, not warnings")
 
     args = parser.parse_args()
 

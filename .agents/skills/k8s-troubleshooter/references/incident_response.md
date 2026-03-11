@@ -77,6 +77,7 @@ This playbook provides structured procedures for responding to Kubernetes incide
 5. Check etcd cluster health
 
 **Investigation Steps:**
+
 ```bash
 # Check control plane pods
 kubectl get pods -n kube-system
@@ -120,6 +121,7 @@ ssh <control-plane-node> "top"
 4. Review resource utilization
 
 **Investigation Steps:**
+
 ```bash
 # Check service endpoints
 kubectl get endpoints <service> -n <namespace>
@@ -167,6 +169,7 @@ kubectl get events -n <namespace> --sort-by='.lastTimestamp'
 4. Assess if node is recoverable
 
 **Investigation Steps:**
+
 ```bash
 # Get node status
 kubectl get nodes
@@ -214,6 +217,7 @@ ssh <node> "free -m"
 4. Assess data integrity risk
 
 **Investigation Steps:**
+
 ```bash
 # Check PVC status
 kubectl get pvc --all-namespaces
@@ -265,6 +269,7 @@ kubectl get volumeattachments
 4. Engage security team
 
 **Investigation Steps:**
+
 ```bash
 # Check recent RBAC changes
 kubectl get rolebindings,clusterrolebindings --all-namespaces -o json
@@ -301,6 +306,7 @@ cat /var/log/kubernetes/audit/audit.log | grep <suspicious-activity>
 ## Diagnostic Commands Cheat Sheet
 
 ### Quick Health Check
+
 ```bash
 # Overall cluster health
 kubectl cluster-info
@@ -315,6 +321,7 @@ kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
 ```
 
 ### Pod Diagnostics
+
 ```bash
 # Pod details
 kubectl describe pod <pod> -n <namespace>
@@ -331,6 +338,7 @@ kubectl debug <pod> -it --image=busybox -n <namespace>
 ```
 
 ### Node Diagnostics
+
 ```bash
 # Node details
 kubectl describe node <node>
@@ -345,6 +353,7 @@ kubectl get nodes -o json | jq '.items[].status.conditions'
 ```
 
 ### Service & Network Diagnostics
+
 ```bash
 # Service details
 kubectl describe svc <service> -n <namespace>
@@ -359,6 +368,7 @@ kubectl run tmp-shell --rm -i --tty --image nicolaka/netshoot
 ```
 
 ### Storage Diagnostics
+
 ```bash
 # PVC and PV status
 kubectl get pvc,pv --all-namespaces

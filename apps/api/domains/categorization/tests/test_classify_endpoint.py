@@ -3,13 +3,20 @@
 Tests the /classify/batch, /classify, /feedback, /metrics, and /models endpoints
 using the v2 TransactionClassifier (MiniLM + Cosine Similarity).
 """
+
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from apps.api.core.auth import (
+    CurrentUser,
+    get_current_user,
+    get_current_user_id,
+    get_user_client,
+)
 from apps.api.domains.categorization.router import router
-from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 
 @pytest.fixture
@@ -93,7 +100,11 @@ def mock_classify(monkeypatch):
 def test_batch_classify_returns_predictions(client):
     """POST /classify/batch returns predictions list with v2 categories."""
     payload = {
-        "descriptions": ["Uber trip to airport", "Swiggy food order", "Random unknown store"]
+        "descriptions": [
+            "Uber trip to airport",
+            "Swiggy food order",
+            "Random unknown store",
+        ]
     }
     response = client.post("/api/v1/categorization/classify/batch", json=payload)
 
@@ -150,7 +161,10 @@ def test_single_classify_unknown(client):
 def test_feedback_accepts_corrections(client):
     """POST /feedback accepts category correction payload."""
     payload = {
-        "corrections": {"Dining": ["Uber Eats delivery"], "Taxi & Rideshare": ["Ola cab ride"]}
+        "corrections": {
+            "Dining": ["Uber Eats delivery"],
+            "Taxi & Rideshare": ["Ola cab ride"],
+        }
     }
     response = client.post("/api/v1/categorization/feedback", json=payload)
 

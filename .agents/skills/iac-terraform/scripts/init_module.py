@@ -223,9 +223,7 @@ def create_module_structure(module_name: str, base_path: str = ".") -> Dict:
             file_path = module_path / filename
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            content = template.format(
-                module_name=module_name, module_title=module_title
-            )
+            content = template.format(module_name=module_name, module_title=module_title)
 
             file_path.write_text(content)
             result["files_created"].append(str(file_path.relative_to(base_path)))
@@ -255,9 +253,7 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "module_name", help="Name of the module to create (use lowercase with hyphens)"
-    )
+    parser.add_argument("module_name", help="Name of the module to create (use lowercase with hyphens)")
 
     parser.add_argument(
         "--path",

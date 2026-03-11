@@ -6,9 +6,8 @@ Tests the multi-stage process_description() function that produces:
 - merchant_name: Clean name (UI display)
 - transaction_type: Structural type tag
 """
-import pytest
-from packages.categorization.cleaner import ProcessedText, process_description
 
+from packages.categorization.cleaner import ProcessedText, process_description
 
 # ── UPI Transfer Tests ──────────────────────────────────────────────────
 
@@ -17,10 +16,7 @@ class TestUPITransfers:
     """Test UPI debit and credit transaction parsing."""
 
     def test_upi_debit_extracts_person_name(self):
-        raw = (
-            "WDL TFR   UPI/DR/459686795992/MUJITHABA/YESB/paytmqr6ar/Pay"
-            "   0097696162090 AT 04413 PBB NELLORE"
-        )
+        raw = "WDL TFR   UPI/DR/459686795992/MUJITHABA/YESB/paytmqr6ar/Pay" "   0097696162090 AT 04413 PBB NELLORE"
         result = process_description(raw)
         assert isinstance(result, ProcessedText)
         assert result.merchant_name == "Mujithaba"
@@ -29,10 +25,7 @@ class TestUPITransfers:
         assert result.transaction_type == "upi_transfer"
 
     def test_upi_credit_extracts_person_name(self):
-        raw = (
-            "DEP TFR   UPI/CR/102094690998/LAKSHMI /KKBK/lak"
-            "shmi.44/PAY   0097735162098 AT 04413 PBB NELLORE"
-        )
+        raw = "DEP TFR   UPI/CR/102094690998/LAKSHMI /KKBK/lak" "shmi.44/PAY   0097735162098 AT 04413 PBB NELLORE"
         result = process_description(raw)
         assert result.merchant_name == "Lakshmi"
         assert "Received" in result.informative
@@ -40,20 +33,14 @@ class TestUPITransfers:
         assert result.transaction_type == "upi_transfer"
 
     def test_upi_known_merchant_swiggy(self):
-        raw = (
-            "WDL TFR   UPI/DR/123456789012/SWIGGY/HDFC/swiggy@hdfcbank/Pay"
-            "   0097696162090 AT 04413 PBB NELLORE"
-        )
+        raw = "WDL TFR   UPI/DR/123456789012/SWIGGY/HDFC/swiggy@hdfcbank/Pay" "   0097696162090 AT 04413 PBB NELLORE"
         result = process_description(raw)
         assert result.merchant_name == "Swiggy"
         assert "Transfer" in result.informative
         assert result.transaction_type == "upi_transfer"
 
     def test_upi_debit_with_truncated_name(self):
-        raw = (
-            "WDL TFR   UPI/DR/195855869839/ADITYA F/YESB/BHA"
-            "RATPE07/Pay   0097691162095 AT 04413 PBB NELLORE"
-        )
+        raw = "WDL TFR   UPI/DR/195855869839/ADITYA F/YESB/BHA" "RATPE07/Pay   0097691162095 AT 04413 PBB NELLORE"
         result = process_description(raw)
         assert result.merchant_name == "Aditya F"
         assert result.transaction_type == "upi_transfer"
@@ -139,6 +126,7 @@ class TestBackwardCompatibility:
 
     def test_clean_description_returns_string(self):
         from packages.categorization.cleaner import clean_description
+
         result = clean_description("WDL TFR   UPI/DR/123/TEST/SBIN/test@sbi/Pay AT BRANCH")
         assert isinstance(result, str)
         assert len(result) > 0

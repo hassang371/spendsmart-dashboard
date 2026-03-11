@@ -19,8 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from apps.api.core.problem_detail import problem_response, PROBLEM_TYPES
-from apps.api.core.logging_config import get_request_id_from_state
+from apps.api.core.problem_detail import PROBLEM_TYPES, problem_response
 
 
 class AppError(Exception):

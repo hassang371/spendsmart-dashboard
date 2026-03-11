@@ -16,6 +16,7 @@ The Four Golden Signals from Google's SRE book provide a comprehensive view of s
 - Database query latency
 
 **PromQL Examples**:
+
 ```promql
 # P95 latency
 histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
@@ -42,6 +43,7 @@ avg(rate(http_request_duration_seconds_count[5m])) by (endpoint)
 - Network throughput
 
 **PromQL Examples**:
+
 ```promql
 # Requests per second
 sum(rate(http_requests_total[5m]))
@@ -71,6 +73,7 @@ sum(rate(http_requests_total[5m] offset 7d))
 - Exception counts
 
 **PromQL Examples**:
+
 ```promql
 # Error rate percentage
 sum(rate(http_requests_total{status=~"5.."}[5m]))
@@ -102,6 +105,7 @@ rate(application_errors_total[5m])
 - Thread pool usage
 
 **PromQL Examples**:
+
 ```promql
 # CPU saturation
 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
@@ -128,18 +132,21 @@ queue_depth_current / queue_depth_max * 100
 
 ### Rate
 Number of requests per second:
+
 ```promql
 sum(rate(http_requests_total[5m]))
 ```
 
 ### Errors
 Number of failed requests per second:
+
 ```promql
 sum(rate(http_requests_total{status=~"5.."}[5m]))
 ```
 
 ### Duration
 Time taken to process requests:
+
 ```promql
 histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
 ```
@@ -154,6 +161,7 @@ histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by 
 
 ### Utilization
 Percentage of time resource is busy:
+
 ```promql
 # CPU utilization
 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
@@ -165,6 +173,7 @@ Percentage of time resource is busy:
 
 ### Saturation
 Amount of work the resource cannot service (queued):
+
 ```promql
 # Load average (saturation indicator)
 node_load15
@@ -175,6 +184,7 @@ rate(node_disk_io_time_weighted_seconds_total[5m])
 
 ### Errors
 Count of error events:
+
 ```promql
 # Network errors
 rate(node_network_receive_errs_total[5m])
@@ -196,6 +206,7 @@ Monotonically increasing value (never decreases)
 **Examples**: Request count, error count, bytes sent
 
 **Usage**:
+
 ```promql
 # Always use rate() or increase() with counters
 rate(http_requests_total[5m])  # Requests per second
@@ -208,6 +219,7 @@ Value that can go up and down
 **Examples**: Memory usage, queue depth, concurrent connections
 
 **Usage**:
+
 ```promql
 # Use directly or with aggregations
 avg(memory_usage_bytes)
@@ -220,6 +232,7 @@ Samples observations and counts them in configurable buckets
 **Examples**: Request duration, response size
 
 **Usage**:
+
 ```promql
 # Calculate percentiles
 histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
@@ -256,6 +269,7 @@ Similar to histogram but calculates quantiles on client side
 ✅ Endpoint/route
 
 ### Calculating Cardinality Impact
+
 ```
 Time series = unique combinations of labels
 
@@ -270,6 +284,7 @@ service (5) × environment (3) × region (4) × user_id (1M) = 60M time series �
 ## Naming Conventions
 
 ### Prometheus Naming
+
 ```
 <namespace>_<name>_<unit>_total
 
@@ -287,6 +302,7 @@ node_memory_MemAvailable_bytes
 - Namespace by application/component
 
 ### CloudWatch Naming
+
 ```
 <Namespace>/<MetricName>
 
@@ -375,6 +391,7 @@ Use variables for filtering:
 ## Metric Collection Best Practices
 
 ### Application Instrumentation
+
 ```python
 from prometheus_client import Counter, Histogram, Gauge
 

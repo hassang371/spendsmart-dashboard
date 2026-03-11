@@ -53,6 +53,7 @@ Common causes include:
 **Dashboard**: [Link to primary dashboard]
 
 **Key metrics to check**:
+
 ```bash
 # Request rate
 sum(rate(http_requests_total[5m]))
@@ -72,6 +73,7 @@ histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by 
 ### 2. Check Recent Changes
 
 **Deployments**:
+
 ```bash
 # Kubernetes
 kubectl rollout history deployment/[service-name] -n [namespace]
@@ -88,6 +90,7 @@ kubectl get pods -n [namespace] -o wide | grep [service-name]
 ### 3. Check Logs
 
 **Log query** (adjust for your log system):
+
 ```bash
 # Kubernetes
 kubectl logs deployment/[service-name] -n [namespace] --tail=100 | grep ERROR
@@ -119,6 +122,7 @@ GET /logs-*/_search
 ### 4. Check Dependencies
 
 **Database**:
+
 ```bash
 # Check active connections
 SELECT count(*) FROM pg_stat_activity WHERE state = 'active';
@@ -135,6 +139,7 @@ WHERE state = 'active' AND now() - pg_stat_activity.query_start > interval '5 se
 - [ ] Test API endpoints manually
 
 **Cache** (Redis/Memcached):
+
 ```bash
 # Redis info
 redis-cli -h [host] INFO stats
@@ -146,6 +151,7 @@ redis-cli -h [host] INFO memory
 ### 5. Check Resource Usage
 
 **CPU and Memory**:
+
 ```bash
 # Kubernetes
 kubectl top pods -n [namespace] | grep [service-name]
@@ -155,6 +161,7 @@ kubectl top nodes
 ```
 
 **Prometheus queries**:
+
 ```promql
 # CPU usage by pod
 sum(rate(container_cpu_usage_seconds_total{pod=~"[service-name].*"}[5m])) by (pod)
@@ -171,6 +178,7 @@ sum(container_memory_usage_bytes{pod=~"[service-name].*"}) by (pod)
 ### 6. Check Traces (if available)
 
 **Trace query**:
+
 ```bash
 # Jaeger
 # Search for slow traces (> 1s) in last 30 minutes
@@ -195,6 +203,7 @@ sum(container_memory_usage_bytes{pod=~"[service-name].*"}) by (pod)
 - Error logs correlate with new code
 
 **Solution**:
+
 ```bash
 # Rollback deployment
 kubectl rollout undo deployment/[service-name] -n [namespace]
@@ -217,6 +226,7 @@ kubectl rollout status deployment/[service-name] -n [namespace]
 - Database CPU or connection pool exhausted
 
 **Solution**:
+
 ```bash
 # Identify slow query
 # Kill long-running query (use with caution)
@@ -242,6 +252,7 @@ CREATE INDEX CONCURRENTLY idx_name ON table_name (column_name);
 - Restarts temporarily fix issue
 
 **Solution**:
+
 ```bash
 # Immediate: Restart pods
 kubectl rollout restart deployment/[service-name] -n [namespace]
@@ -264,6 +275,7 @@ kubectl set resources deployment/[service-name] -n [namespace] \
 - High CPU/memory across all instances
 
 **Solution**:
+
 ```bash
 # Scale up immediately
 kubectl scale deployment/[service-name] -n [namespace] --replicas=10
@@ -288,6 +300,7 @@ kubectl scale deployment/[service-name] -n [namespace] --replicas=10
 - Upstream status page shows issues
 
 **Solution**:
+
 ```bash
 # Enable circuit breaker (if available)
 # Adjust timeout configuration
@@ -309,11 +322,13 @@ kubectl scale deployment/[service-name] -n [namespace] --replicas=10
 These should be done first to mitigate impact:
 
 1. **[Action 1]**: [e.g., "Scale up service"]
+
    ```bash
    kubectl scale deployment/[service] --replicas=10
    ```
 
 2. **[Action 2]**: [e.g., "Rollback deployment"]
+
    ```bash
    kubectl rollout undo deployment/[service]
    ```

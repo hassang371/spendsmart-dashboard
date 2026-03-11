@@ -4,10 +4,10 @@ Agent Evaluation Framework
 This module provides utilities for evaluating agent systems.
 """
 
-from typing import Dict, List
+import time
 from dataclasses import dataclass
 from enum import Enum
-import time
+from typing import Dict, List
 
 
 class ScoreLevel(Enum):
@@ -354,9 +354,7 @@ class EvaluationRunner:
         # Here we simulate
         output = f"Simulated output for: {test.get('input', '')}"
 
-        evaluation = self.evaluator.evaluate(
-            task=test, output=output, ground_truth=test.get("expected"), tool_calls=[]
-        )
+        evaluation = self.evaluator.evaluate(task=test, output=output, ground_truth=test.get("expected"), tool_calls=[])
 
         return {
             "test": test,

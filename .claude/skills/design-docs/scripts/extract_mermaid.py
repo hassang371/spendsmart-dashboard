@@ -26,14 +26,13 @@ Requirements:
 """
 
 import argparse
-import os
+import hashlib
 import re
-import sys
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict
-import hashlib
+from typing import Dict, List, Optional
 
 
 class MermaidDiagram:
@@ -51,7 +50,7 @@ class MermaidDiagram:
 
     def get_first_line(self, max_length: int = 50) -> str:
         """Get the first line of the diagram for display."""
-        first_line = self.content.split('\n')[0].strip()
+        first_line = self.content.split("\n")[0].strip()
         if len(first_line) > max_length:
             return first_line[:max_length] + "..."
         return first_line
@@ -61,14 +60,11 @@ class MermaidExtractor:
     """Extract and process Mermaid diagrams from Markdown files."""
 
     # Pattern to match Mermaid code blocks
-    MERMAID_PATTERN = re.compile(
-        r'```mermaid\s*\n(.*?)```',
-        re.DOTALL | re.MULTILINE
-    )
+    MERMAID_PATTERN = re.compile(r"```mermaid\s*\n(.*?)```", re.DOTALL | re.MULTILINE)
 
     def __init__(self, markdown_file: Path):
         self.markdown_file = markdown_file
-        self.content = markdown_file.read_text(encoding='utf-8')
+        self.content = markdown_file.read_text(encoding="utf-8")
         self.diagrams: List[MermaidDiagram] = []
         self._extract_diagrams()
 
@@ -78,7 +74,7 @@ class MermaidExtractor:
         for index, match in enumerate(self.MERMAID_PATTERN.finditer(self.content), start=1):
             diagram_content = match.group(1)
             # Count newlines before this match to get line number
-            lines_before = self.content[:match.start()].count('\n')
+            lines_before = self.content[: match.start()].count("\n")
             diagram = MermaidDiagram(diagram_content, lines_before + 1, index)
             self.diagrams.append(diagram)
 
@@ -99,7 +95,7 @@ class MermaidExtractor:
         for diagram in self.diagrams:
             filename = diagram.get_filename(prefix=prefix, extension="mmd")
             output_path = output_dir / filename
-            output_path.write_text(diagram.content, encoding='utf-8')
+            output_path.write_text(diagram.content, encoding="utf-8")
             saved_files.append(output_path)
             print(f"  ✓ Saved: {output_path}")
 
@@ -140,10 +136,10 @@ class MermaidExtractor:
             results[diagram.index] = error
 
             if error:
-                print(f"❌ FAILED")
+                print("❌ FAILED")
                 print(f"    Error: {error}")
             else:
-                print(f"✅ OK")
+                print("✅ OK")
 
         # Summary
         failed_count = sum(1 for err in results.values() if err)
@@ -159,14 +155,22 @@ class MermaidExtractor:
             output_file = tmpdir_path / f"diagram-{diagram.index}.svg"
 
             # Write diagram to temp file
-            input_file.write_text(diagram.content, encoding='utf-8')
+            input_file.write_text(diagram.content, encoding="utf-8")
 
             try:
                 result = subprocess.run(
-                    ['mmdc', '-i', str(input_file), '-o', str(output_file), '-b', 'transparent'],
+                    [
+                        "mmdc",
+                        "-i",
+                        str(input_file),
+                        "-o",
+                        str(output_file),
+                        "-b",
+                        "transparent",
+                    ],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=30,
                 )
 
                 if result.returncode != 0:
@@ -193,6 +197,7 @@ class MermaidExtractor:
         Returns:
             Modified Markdown content
         """
+
         def replace_block(match):
             diagram_content = match.group(1)
             # Find which diagram this is
@@ -209,11 +214,7 @@ class MermaidExtractor:
     def _check_mmdc_installed() -> bool:
         """Check if mermaid-cli (mmdc) is installed."""
         try:
-            result = subprocess.run(
-                ['mmdc', '--version'],
-                capture_output=True,
-                timeout=5
-            )
+            result = subprocess.run(["mmdc", "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
@@ -221,7 +222,7 @@ class MermaidExtractor:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Extract Mermaid diagrams from Markdown files',
+        description="Extract Mermaid diagrams from Markdown files",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -236,22 +237,45 @@ Examples:
 
   # Replace with image references
   python extract_mermaid.py document.md --replace-with-images --image-format png
-        """
+        """,
     )
 
-    parser.add_argument('markdown_file', type=Path, help='Input Markdown file')
-    parser.add_argument('--output-dir', '-o', type=Path, help='Output directory for extracted diagrams')
-    parser.add_argument('--prefix', default='diagram', help='Prefix for output filenames (default: diagram)')
-    parser.add_argument('--list-only', '-l', action='store_true', help='List diagrams without extracting')
-    parser.add_argument('--validate', '-v', action='store_true', help='Validate diagrams with mmdc')
-    parser.add_argument('--replace-with-images', '-r', action='store_true',
-                        help='Replace Mermaid blocks with image references')
-    parser.add_argument('--image-format', choices=['png', 'svg'], default='png',
-                        help='Image format for replacement (default: png)')
-    parser.add_argument('--image-dir', default='diagrams',
-                        help='Image directory path for references (default: diagrams)')
-    parser.add_argument('--output-markdown', type=Path,
-                        help='Output file for modified markdown (with --replace-with-images)')
+    parser.add_argument("markdown_file", type=Path, help="Input Markdown file")
+    parser.add_argument("--output-dir", "-o", type=Path, help="Output directory for extracted diagrams")
+    parser.add_argument(
+        "--prefix",
+        default="diagram",
+        help="Prefix for output filenames (default: diagram)",
+    )
+    parser.add_argument(
+        "--list-only",
+        "-l",
+        action="store_true",
+        help="List diagrams without extracting",
+    )
+    parser.add_argument("--validate", "-v", action="store_true", help="Validate diagrams with mmdc")
+    parser.add_argument(
+        "--replace-with-images",
+        "-r",
+        action="store_true",
+        help="Replace Mermaid blocks with image references",
+    )
+    parser.add_argument(
+        "--image-format",
+        choices=["png", "svg"],
+        default="png",
+        help="Image format for replacement (default: png)",
+    )
+    parser.add_argument(
+        "--image-dir",
+        default="diagrams",
+        help="Image directory path for references (default: diagrams)",
+    )
+    parser.add_argument(
+        "--output-markdown",
+        type=Path,
+        help="Output file for modified markdown (with --replace-with-images)",
+    )
 
     args = parser.parse_args()
 
@@ -283,13 +307,10 @@ Examples:
             sys.exit(1)
 
     elif args.replace_with_images:
-        modified_content = extractor.replace_with_images(
-            image_format=args.image_format,
-            image_dir=args.image_dir
-        )
+        modified_content = extractor.replace_with_images(image_format=args.image_format, image_dir=args.image_dir)
 
         if args.output_markdown:
-            args.output_markdown.write_text(modified_content, encoding='utf-8')
+            args.output_markdown.write_text(modified_content, encoding="utf-8")
             print(f"\n✓ Modified Markdown saved to: {args.output_markdown}")
         else:
             print("\nModified Markdown:\n")
@@ -306,5 +327,5 @@ Examples:
         print("\nUse --output-dir to extract diagrams or --help for more options.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

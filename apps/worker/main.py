@@ -1,18 +1,17 @@
+import logging
 import os
 import time
-import logging
 from datetime import datetime, timezone
-from supabase import create_client, Client
+
 from dotenv import load_dotenv
 
-from apps.worker.job_states import JobStatus, transition, InvalidTransitionError
+from apps.worker.job_states import InvalidTransitionError, JobStatus, transition
+from supabase import Client, create_client
 
 # Imports
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Load environment variables from root .env only
@@ -21,17 +20,13 @@ load_dotenv()
 # Support both standard SUPABASE_URL and Next.js public convention as fallback
 URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
 # Use Service Role Key for background worker to bypass RLS
-KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
-    "SUPABASE_SERVICE_KEY"
-)
+KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
 
 if not URL:
     logger.error("SUPABASE_URL not set (also checked NEXT_PUBLIC_SUPABASE_URL)")
 
 if not KEY:
-    logger.warning(
-        "SUPABASE_SERVICE_ROLE_KEY not found. Worker might fail to update jobs due to RLS."
-    )
+    logger.warning("SUPABASE_SERVICE_ROLE_KEY not found. Worker might fail to update jobs due to RLS.")
 
 
 def get_supabase() -> Client:
@@ -105,22 +100,13 @@ def process_next_job(supabase: Client) -> bool:
         # Training jobs for the forecasting worker only.
         # Adapter-training jobs are queued via Celery and carry
         # source_row_count/celery_task_id metadata.
-        response = (
-            supabase.table("training_jobs")
-            .select("*")
-            .eq("status", JobStatus.PENDING)
-            .limit(20)
-            .execute()
-        )
+        response = supabase.table("training_jobs").select("*").eq("status", JobStatus.PENDING).limit(20).execute()
 
         if response.data:
             candidates = [
                 job
                 for job in response.data
-                if (
-                    job.get("job_type") == "forecasting"
-                    or str(job.get("logs") or "").startswith("forecasting:")
-                )
+                if (job.get("job_type") == "forecasting" or str(job.get("logs") or "").startswith("forecasting:"))
                 and not job.get("celery_task_id")
             ]
             if not candidates:
@@ -193,19 +179,13 @@ def process_next_job(supabase: Client) -> bool:
                                 {
                                     "status": JobStatus.FAILED,
                                     "logs": str(e),
-                                    "updated_at": datetime.now(
-                                        timezone.utc
-                                    ).isoformat(),
+                                    "updated_at": datetime.now(timezone.utc).isoformat(),
                                 }
                             ).eq("id", job_id).execute()
-                            logger.info(
-                                f"Job {job_id}: failure status write recovered on retry {attempt}."
-                            )
+                            logger.info(f"Job {job_id}: failure status write recovered on retry {attempt}.")
                             break
                         except Exception as retry_err:
-                            logger.error(
-                                f"Job {job_id}: failure status retry {attempt} failed: {retry_err}"
-                            )
+                            logger.error(f"Job {job_id}: failure status retry {attempt} failed: {retry_err}")
 
             return True
 

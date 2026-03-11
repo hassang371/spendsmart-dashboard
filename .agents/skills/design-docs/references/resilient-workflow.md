@@ -112,6 +112,7 @@ Write the Mermaid diagram code following the patterns in the loaded reference gu
 **Output Directory:** `./diagrams/` (relative to markdown file location)
 
 **Generated Files:**
+
 ```
 ./diagrams/<base_filename>.mmd    # Mermaid source code
 ./diagrams/<base_filename>.png    # Rendered image (or .svg)
@@ -158,6 +159,7 @@ If troubleshooting guide doesn't have a match:
 ```
 
 Optionally include a link to the source:
+
 ```markdown
 ![Diagram Description](./diagrams/filename.png)
 
@@ -201,6 +203,7 @@ Optionally include a link to the source:
 - Title: "User Authentication Flow"
 
 **Output files:**
+
 ```
 ./diagrams/api_design_doc_01_sequence_user_authenticatio.mmd
 ./diagrams/api_design_doc_01_sequence_user_authenticatio.png
@@ -423,6 +426,7 @@ Construct search queries with:
 4. Key error text: first 100 characters of error message
 
 **Example:**
+
 ```
 mermaid flowchart syntax error: Parse error on line 2 reserved word end
 ```
@@ -468,6 +472,7 @@ mkdir -p ./diagrams/
 ### Step 4: Save .mmd File
 
 Create the file with naming convention:
+
 ```bash
 # Generate filename
 FILENAME="<markdown>_<num>_<type>_<title>.mmd"
@@ -494,9 +499,11 @@ Check exit code:
 
 1. **Read error message** from mmdc output
 2. **Open troubleshooting guide:**
+
    ```bash
    cat references/guides/troubleshooting.md
    ```
+
 3. **Search for matching error** (Ctrl+F for keywords)
 4. **Apply the fix** from "Correct" example
 5. **Retry Step 5**
@@ -527,6 +534,7 @@ Only after validation succeeds:
 1. **Identify type:** Sequence diagram
 2. **Load guide:** `references/guides/diagrams/sequence-diagrams.md`
 3. **Generate code:**
+
    ```mermaid
    sequenceDiagram
        participant U as User
@@ -538,11 +546,13 @@ Only after validation succeeds:
        D-->>A: User data
        A-->>U: JWT token
    ```
+
 4. **Save files:**
    - `./diagrams/auth_doc_01_sequence_user_login.mmd`
    - `./diagrams/auth_doc_01_sequence_user_login.png`
 5. **Validate:** `mmdc -i ... -o ...` → Success
 6. **Add to markdown:**
+
    ```markdown
    ## Login Flow
 
@@ -552,6 +562,7 @@ Only after validation succeeds:
 ### Example 2: Handling Validation Error
 
 **Diagram Code:**
+
 ```mermaid
 flowchart TD
     start --> end
@@ -564,10 +575,12 @@ flowchart TD
 1. **Search troubleshooting.md** → Match Error #5
 2. **Apply fix:** Change `end` to `"end"` or `End`
 3. **Fixed code:**
+
    ```mermaid
    flowchart TD
        start --> End
    ```
+
 4. **Retry validation** → Success
 5. **Save and add to markdown**
 
@@ -579,9 +592,11 @@ flowchart TD
 
 1. **Search troubleshooting.md** → No match
 2. **Use perplexity_ask:**
+
    ```
    "mermaid flowchart custom directive unknown parsing error"
    ```
+
 3. **Get solution** from search result
 4. **Apply fix and retry**
 5. **If still failing:** Escalate to brave_web_search, then gemini skill

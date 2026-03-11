@@ -37,6 +37,7 @@ When to use cheaper alternatives and cost-effective service options for common A
 - **Tip**: Fargate Spot offers up to 70% savings for fault-tolerant tasks
 
 **Decision Matrix**
+
 ```
 Consistent 24/7 load → EC2 with Reserved Instances
 Variable load, containerized → Fargate (or Fargate Spot)
@@ -77,12 +78,14 @@ Batch processing → Fargate Spot or EC2 Spot
 ### S3 Storage Classes
 
 **Frequently Accessed Data**
+
 ```
 S3 Standard → $0.023/GB/month
 Use when: Accessing files multiple times per month
 ```
 
 **Infrequently Accessed Data**
+
 ```
 S3 Standard → S3 Standard-IA
 $0.023/GB/month → $0.0125/GB/month (46% cheaper)
@@ -92,6 +95,7 @@ Use when: Backups, disaster recovery, infrequently accessed files
 ```
 
 **Unknown Access Patterns**
+
 ```
 S3 Standard → S3 Intelligent-Tiering
 $0.023/GB/month → Automatic optimization
@@ -101,6 +105,7 @@ Best for: Mixed workloads, analytics datasets
 ```
 
 **Archive Storage**
+
 ```
 S3 Standard → S3 Glacier Instant Retrieval
 $0.023/GB → $0.004/GB (83% cheaper)
@@ -119,6 +124,7 @@ Use when: Long-term archive, regulatory compliance, rarely accessed
 ```
 
 **Decision Tree**
+
 ```
 Accessed daily → S3 Standard
 Accessed monthly → S3 Standard-IA
@@ -131,6 +137,7 @@ Archive, can wait 12 hours → Glacier Deep Archive
 ### EBS Volume Types
 
 **General Purpose Volumes**
+
 ```
 gp2 → gp3
 $0.10/GB → $0.08/GB (20% cheaper)
@@ -139,6 +146,7 @@ Action: Convert all gp2 to gp3 (no downtime required)
 ```
 
 **High Performance Workloads**
+
 ```
 io1 → io2
 Same price, better durability and IOPS
@@ -150,6 +158,7 @@ Test gp3 before committing to io2
 ```
 
 **Throughput-Optimized Workloads**
+
 ```
 gp3 → st1 (Throughput Optimized HDD)
 $0.08/GB → $0.045/GB (44% cheaper)
@@ -158,6 +167,7 @@ Sequential access patterns, throughput more important than IOPS
 ```
 
 **Cold Data**
+
 ```
 gp3 → sc1 (Cold HDD)
 $0.08/GB → $0.015/GB (81% cheaper)
@@ -187,6 +197,7 @@ Example: Archive storage, cold backups
 - **Optimization**: Use EFS Intelligent-Tiering to auto-move to IA class
 
 **Decision Matrix**
+
 ```
 Single instance, block storage → EBS
 Multiple instances, shared files → EFS (with Intelligent-Tiering)
@@ -227,6 +238,7 @@ Windows file shares → FSx for Windows
 - **Consideration**: Factor in operational overhead
 
 **Decision Matrix**
+
 ```
 Standard workload, managed preferred → RDS
 High availability, many reads → Aurora
@@ -255,6 +267,7 @@ Dev/test, intermittent use → Aurora Serverless v2
 - **Commitment**: 1-3 years
 
 **Break-Even Calculation**
+
 ```
 On-Demand: $1.25 per million writes
 Provisioned: ~$0.47 per million writes (at capacity)
@@ -266,6 +279,7 @@ Action: Start with on-demand, switch to provisioned once patterns clear
 ### Database Migration Options
 
 **From Commercial to Open Source**
+
 ```
 Oracle → Aurora PostgreSQL or RDS PostgreSQL
 Savings: 90% on licensing costs
@@ -277,6 +291,7 @@ Consider: Application compatibility, migration effort
 ```
 
 **From RDS to Aurora**
+
 ```
 Only if: High availability requirements, many read replicas needed
 Cost increase: 20-50% more
@@ -284,6 +299,7 @@ Benefit: Better performance, automatic failover, scaling
 ```
 
 **From Aurora to RDS**
+
 ```
 When: Don't need Aurora features, cost-conscious
 Savings: 20-50%
@@ -314,6 +330,7 @@ Downgrade if: Single-AZ sufficient, limited read replicas needed
 - **Savings**: 75% vs NAT Gateway
 
 **Decision Matrix**
+
 ```
 S3 or DynamoDB only → Gateway Endpoint (FREE)
 Other AWS services → Interface Endpoint
@@ -378,6 +395,7 @@ Dev/test, low traffic → NAT Instance or single NAT Gateway
 - **Alternative**: Kinesis Data Firehose (simpler, cheaper for basic needs)
 
 **Decision Matrix**
+
 ```
 Simple queue → SQS
 Multiple consumers → SNS
@@ -407,6 +425,7 @@ Log aggregation → Kinesis Firehose
 - **Tip**: Consolidate workloads to fewer clusters
 
 **Decision Matrix**
+
 ```
 AWS-native, cost-sensitive → ECS on EC2
 Variable load, easy management → ECS on Fargate
@@ -455,6 +474,7 @@ Use this mental model when evaluating alternatives:
 ```
 
 **Example:**
+
 ```
 Current: ALB for static site = $20/month
 Alternative: CloudFront + S3 = $2/month

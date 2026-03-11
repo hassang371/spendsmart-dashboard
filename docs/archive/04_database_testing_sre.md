@@ -6,9 +6,9 @@
 
 ### 1.1 Current Schema Audit
 
-**Tables:** 2 (`transactions`, `training_jobs`) + 1 missing (`uploaded_files`)  
-**Indexes:** 5 total  
-**RLS:** Enabled on both tables  
+**Tables:** 2 (`transactions`, `training_jobs`) + 1 missing (`uploaded_files`)
+**Indexes:** 5 total
+**RLS:** Enabled on both tables
 **Extensions:** `uuid-ossp`
 
 #### Current Index Assessment

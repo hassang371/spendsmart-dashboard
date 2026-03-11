@@ -1,7 +1,7 @@
-import re
 import random
-from typing import List, Dict
+import re
 from collections import Counter
+from typing import Dict, List
 
 
 class TextAugmenter:
@@ -122,9 +122,7 @@ def clean_description(text: str) -> str:
     text = re.sub(r"\b\d{4,}\b", "", text)
 
     # 6. Remove generic words
-    text = re.sub(
-        r"\b(TXN|REF|ID|NO|TRANSFER|PAYMENT|TO|BY|FROM|BILL|IN|VIA)\b", "", text
-    )
+    text = re.sub(r"\b(TXN|REF|ID|NO|TRANSFER|PAYMENT|TO|BY|FROM|BILL|IN|VIA)\b", "", text)
 
     # 7. Remove special characters and extra spaces
     text = re.sub(r"[^A-Z\s]", " ", text)

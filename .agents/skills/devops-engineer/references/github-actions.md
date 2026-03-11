@@ -83,6 +83,7 @@ jobs:
 ## Common Workflow Patterns
 
 ### Matrix Builds (Multi-version testing)
+
 ```yaml
 jobs:
   test:
@@ -98,6 +99,7 @@ jobs:
 ```
 
 ### Reusable Workflows
+
 ```yaml
 # .github/workflows/deploy.yml
 on:
@@ -119,6 +121,7 @@ jobs:
 ```
 
 ### Caching Dependencies
+
 ```yaml
 - uses: actions/cache@v4
   with:

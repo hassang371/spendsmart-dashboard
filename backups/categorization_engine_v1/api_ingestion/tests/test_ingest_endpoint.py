@@ -4,14 +4,15 @@ Migrated from apps/api/tests/test_ingestion.py to test the new domain router.
 """
 
 import io
-import torch
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+import torch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from apps.api.domains.ingestion.router import router
 from apps.api.core.auth import get_user_client
+from apps.api.domains.ingestion.router import router
 
 
 @pytest.fixture

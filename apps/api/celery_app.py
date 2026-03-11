@@ -1,6 +1,7 @@
 """Celery application configuration for async training jobs."""
 
 import os
+
 from celery import Celery
 
 # Use Redis as broker and backend

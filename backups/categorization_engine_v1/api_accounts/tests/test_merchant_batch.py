@@ -1,11 +1,13 @@
 """Tests for merchant-batch reclassification behavior."""
-import pytest
+
 from unittest.mock import MagicMock
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from apps.api.domains.accounts.router import router
 from apps.api.core.auth import get_user_client
+from apps.api.domains.accounts.router import router
 
 
 @pytest.fixture
@@ -62,8 +64,7 @@ def test_reclassify_single_transaction_also_updates_merchant_matches(app_client)
     assert response.status_code == 200
     data = response.json()
     assert "merchant_updated" in data, (
-        "Response must include 'merchant_updated' count — "
-        "merchant-batch reclassification not implemented"
+        "Response must include 'merchant_updated' count — " "merchant-batch reclassification not implemented"
     )
 
 
@@ -82,8 +83,9 @@ def test_no_old_category_skips_merchant_batch(app_client):
 
 def test_fine_tuning_triggered_after_merchant_batch():
     """After merchant-batch reclassification, supervised fine-tuning must be triggered."""
-    from apps.api.domains.accounts import router as accounts_module
     import inspect
+
+    from apps.api.domains.accounts import router as accounts_module
 
     src = inspect.getsource(accounts_module.update_transaction)
     assert "_run_supervised_finetuning_bg" in src, (
@@ -114,21 +116,17 @@ def test_merchant_name_used_for_batch_when_populated(app_client, mock_client_wit
     assert response.status_code == 200
 
     eq_calls = tbl.eq.call_args_list
-    merchant_name_matched = any(
-        call.args and call.args[0] == "merchant_name"
-        for call in eq_calls
-    )
-    assert merchant_name_matched, (
-        "When merchant_name is populated, batch must match on merchant_name field"
-    )
+    merchant_name_matched = any(call.args and call.args[0] == "merchant_name" for call in eq_calls)
+    assert merchant_name_matched, "When merchant_name is populated, batch must match on merchant_name field"
 
 
 def test_suggested_category_cleared_on_correction(app_client, mock_client_with_tx):
     """Correcting a category must clear suggested_category and confidence_score."""
-    from apps.api.domains.accounts import router as accounts_module
     import inspect
 
+    from apps.api.domains.accounts import router as accounts_module
+
     src = inspect.getsource(accounts_module.update_transaction)
-    assert "suggested_category" in src and "confidence_score" in src, (
-        "update_transaction must clear suggested_category and confidence_score on correction"
-    )
+    assert (
+        "suggested_category" in src and "confidence_score" in src
+    ), "update_transaction must clear suggested_category and confidence_score on correction"

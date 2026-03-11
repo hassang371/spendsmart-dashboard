@@ -10,10 +10,10 @@ Routes user actions/events to specific Tools and SOPs.
 - **Action:** UI sends batched payloads to `POST /api/import` (CLI helper can still use `tools/import_transactions.py`).
 - **Arguments:** `file_path`, `user_id`.
 - **Logic:**
-    - Parse file (see `ingestion.md`).
-    - Validate Schema.
-    - Insert into Supabase `transactions`.
-    - Report success/failure count.
+  - Parse file (see `ingestion.md`).
+  - Validate Schema.
+  - Insert into Supabase `transactions`.
+  - Report success/failure count.
 
 ### 2. Analysis (Future)
 - **Trigger:** User requests "Analyze spending".

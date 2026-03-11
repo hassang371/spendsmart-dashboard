@@ -66,8 +66,7 @@ def test_safe_to_spend_applies_user_id_filter(mock_client):
     eq_calls = [str(c) for c in query.eq.call_args_list]
     user_id_filter_applied = any("user_id" in c and user_id in c for c in eq_calls)
     assert user_id_filter_applied, (
-        "BUG-002: .eq('user_id', user_id) was NOT called in the safe-to-spend "
-        f"query. eq calls were: {eq_calls}"
+        "BUG-002: .eq('user_id', user_id) was NOT called in the safe-to-spend " f"query. eq calls were: {eq_calls}"
     )
 
 
@@ -102,8 +101,9 @@ def test_safe_to_spend_no_other_user_rows_returned(mock_client):
     # Verify .eq was called with the correct user_id (not other_user_id)
     all_eq_args = [call.args for call in query.eq.call_args_list]
     assert (
-        ("user_id", user_id) in all_eq_args
-    ), f"Expected eq('user_id', '{user_id}') in query chain. Got: {all_eq_args}"
+        "user_id",
+        user_id,
+    ) in all_eq_args, f"Expected eq('user_id', '{user_id}') in query chain. Got: {all_eq_args}"
     assert (
         "user_id",
         other_user_id,

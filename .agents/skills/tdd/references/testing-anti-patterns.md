@@ -21,6 +21,7 @@ Tests must verify real behavior, not mock behavior. Mocks are a means to isolate
 ## Anti-Pattern 1: Testing Mock Behavior
 
 **The violation:**
+
 ```typescript
 // ❌ BAD: Testing that the mock exists
 test('renders sidebar', () => {
@@ -37,6 +38,7 @@ test('renders sidebar', () => {
 **your human partner's correction:** "Are we testing the behavior of a mock?"
 
 **The fix:**
+
 ```typescript
 // ✅ GOOD: Test real component or don't mock it
 test('renders sidebar', () => {
@@ -63,6 +65,7 @@ BEFORE asserting on any mock element:
 ## Anti-Pattern 2: Test-Only Methods in Production
 
 **The violation:**
+
 ```typescript
 // ❌ BAD: destroy() only used in tests
 class Session {
@@ -83,6 +86,7 @@ afterEach(() => session.destroy());
 - Confuses object lifecycle with entity lifecycle
 
 **The fix:**
+
 ```typescript
 // ✅ GOOD: Test utilities handle test cleanup
 // Session has no destroy() - it's stateless in production
@@ -118,6 +122,7 @@ BEFORE adding any method to production class:
 ## Anti-Pattern 3: Mocking Without Understanding
 
 **The violation:**
+
 ```typescript
 // ❌ BAD: Mock breaks test logic
 test('detects duplicate server', () => {
@@ -137,6 +142,7 @@ test('detects duplicate server', () => {
 - Test passes for wrong reason or fails mysteriously
 
 **The fix:**
+
 ```typescript
 // ✅ GOOD: Mock at correct level
 test('detects duplicate server', () => {
@@ -177,6 +183,7 @@ BEFORE mocking any method:
 ## Anti-Pattern 4: Incomplete Mocks
 
 **The violation:**
+
 ```typescript
 // ❌ BAD: Partial mock - only fields you think you need
 const mockResponse = {
@@ -197,6 +204,7 @@ const mockResponse = {
 **The Iron Rule:** Mock the COMPLETE data structure as it exists in reality, not just fields your immediate test uses.
 
 **The fix:**
+
 ```typescript
 // ✅ GOOD: Mirror real API completeness
 const mockResponse = {
@@ -228,6 +236,7 @@ BEFORE creating mock responses:
 ## Anti-Pattern 5: Integration Tests as Afterthought
 
 **The violation:**
+
 ```
 ✅ Implementation complete
 ❌ No tests written
@@ -240,6 +249,7 @@ BEFORE creating mock responses:
 - Can't claim complete without tests
 
 **The fix:**
+
 ```
 TDD cycle:
 1. Write failing test

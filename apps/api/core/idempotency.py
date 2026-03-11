@@ -11,10 +11,10 @@ import os
 from typing import Any, Callable
 
 import redis.asyncio as redis
-from fastapi import Depends, Header, HTTPException, Request, Response
+import structlog
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import structlog
 
 from apps.api.core.auth import get_current_user
 
@@ -37,7 +37,7 @@ async def get_idempotency_key(
         alias="Idempotency-Key",
         description="Optional idempotent key to prevent duplicate mutations.",
     ),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ) -> str | None:
     """Dependency to extract and validate the idempotency key.
 
@@ -47,12 +47,12 @@ async def get_idempotency_key(
         return None
 
     user_id = current_user.id
-    
+
     # Hash the raw payload body if available to bind the key strictly to the content
     # For many routes taking JSON bodies, we can hash the body bytes.
     # However, since FastAPI consumes the stream when parsing, we just use the raw string key
     # along with the user ID and path.
-    
+
     # Create a unique namespace for this key
     fingerprint = hashlib.sha256(f"{user_id}:{request.url.path}:{idempotency_key}".encode()).hexdigest()
     return f"idempotency:{fingerprint}"
@@ -63,7 +63,7 @@ async def with_idempotency(
     execute_mutation: Callable,
 ) -> Any:
     """Execute a mutation idempotently if a cache key is provided.
-    
+
     Usage:
         @router.post("/batch")
         async def batch_update(
@@ -72,7 +72,7 @@ async def with_idempotency(
             async def run_update():
                 # Perform DB update
                 return {"updated": 100}
-                
+
             return await with_idempotency(key, run_update)
     """
     if not cache_key or not _redis_client:
@@ -98,8 +98,8 @@ async def with_idempotency(
         set_nx = await _redis_client.set(
             cache_key,
             json.dumps({"__idempotency_in_progress": True}),
-            ex=60, # 1 minute timeout for the operation to complete
-            nx=True
+            ex=60,  # 1 minute timeout for the operation to complete
+            nx=True,
         )
         if not set_nx:
             # Another request is currently processing this idempotency key

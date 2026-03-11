@@ -42,21 +42,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         # Disable browser features the API doesn't need
-        response.headers["Permissions-Policy"] = (
-            "geolocation=(), microphone=(), camera=(), payment=()"
-        )
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), payment=()"
 
         # CSP for an API: reject all content, disallow framing
         # Since we serve JSON only (no HTML/scripts), this is very restrictive
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; frame-ancestors 'none'"
-        )
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
 
         # HSTS: only in production (breaks local HTTP dev if always on)
         if self._production:
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains; preload"
-            )
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
         # Remove server header to avoid fingerprinting the framework/version
         # MutableHeaders does not support .pop(); use conditional delete instead

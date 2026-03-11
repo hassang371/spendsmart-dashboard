@@ -58,6 +58,7 @@ expect(result).toBeDefined();
 ## Implementation
 
 Generic polling function:
+
 ```typescript
 async function waitFor<T>(
   condition: () => T | undefined | null | false,

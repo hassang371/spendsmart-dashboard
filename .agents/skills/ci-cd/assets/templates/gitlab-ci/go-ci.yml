@@ -537,12 +537,3 @@ workflow:
 # Interruptible jobs
 .interruptible_template:
   interruptible: true
-
-lint:
-  extends: [.go_template, .interruptible_template]
-
-test:
-  extends: [.go_template, .interruptible_template]
-
-integration-test:
-  extends: [.go_template, .interruptible_template]

@@ -206,6 +206,7 @@ aws resourcegroupstaggingapi get-resources \
 **Recommended Budgets**
 
 **1. Overall Monthly Budget**
+
 ```yaml
 Budget Name: Company-Wide-Monthly-Budget
 Amount: $50,000/month
@@ -217,6 +218,7 @@ Alerts:
 ```
 
 **2. Per-Environment Budgets**
+
 ```yaml
 Budget Name: Production-Environment-Budget
 Amount: $30,000/month
@@ -234,6 +236,7 @@ Alerts:
 ```
 
 **3. Per-Team Budgets**
+
 ```yaml
 Budget Name: Team-Platform-Budget
 Amount: $15,000/month
@@ -244,6 +247,7 @@ Alerts:
 ```
 
 **4. Per-Project Budgets**
+
 ```yaml
 Budget Name: Project-Phoenix-Budget
 Amount: $8,000/month
@@ -469,6 +473,7 @@ def lambda_handler(event, context):
 - Application-specific services
 
 **Implementation**:
+
 ```
 Total AWS Bill: $100,000
 
@@ -586,6 +591,7 @@ Action:
 ### Key FinOps Metrics
 
 **1. Cost Metrics**
+
 ```yaml
 Total Monthly Cloud Spend:
   Target: Within budget
@@ -605,6 +611,7 @@ Unit Economics:
 ```
 
 **2. Efficiency Metrics**
+
 ```yaml
 Compute Utilization:
   Metric: Average CPU utilization
@@ -624,6 +631,7 @@ RI/SP Utilization:
 ```
 
 **3. Operational Metrics**
+
 ```yaml
 Tag Compliance:
   Metric: % of resources with required tags
@@ -643,6 +651,7 @@ Mean Time to Optimize (MTTO):
 ```
 
 **4. Organizational Metrics**
+
 ```yaml
 FinOps Engagement:
   Metric: % of teams attending monthly reviews
@@ -735,6 +744,6 @@ Optimization Velocity:
 - Spot.io (Cost optimization platform)
 
 **FinOps Foundation**
-- https://www.finops.org
+- <https://www.finops.org>
 - FinOps Certified Practitioner certification
 - FinOps community and best practices

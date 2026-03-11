@@ -17,11 +17,13 @@
 **How it works**: Public key encryption, controller decrypts in-cluster
 
 **Setup**:
+
 ```bash
 kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
 ```
 
 **Usage**:
+
 ```bash
 # Create sealed secret
 kubectl create secret generic my-secret --dry-run=client -o yaml --from-literal=password=supersecret | \
@@ -48,11 +50,13 @@ git commit -m "Add sealed secret"
 - Doppler
 
 **Setup**:
+
 ```bash
 helm install external-secrets external-secrets/external-secrets -n external-secrets-system --create-namespace
 ```
 
 **Usage**:
+
 ```yaml
 apiVersion: external-secrets.io/v1beta1
 kind: SecretStore
@@ -93,6 +97,7 @@ spec:
 **Recommended over PGP as of 2024-2025**
 
 **Setup age**:
+
 ```bash
 # Install age
 brew install age  # macOS
@@ -104,6 +109,7 @@ age-keygen -o key.txt
 ```
 
 **Setup SOPS**:
+
 ```bash
 # Install SOPS
 brew install sops
@@ -118,6 +124,7 @@ EOF
 ```
 
 **Encrypt secrets**:
+
 ```bash
 # Create secret
 kubectl create secret generic my-secret --dry-run=client -o yaml --from-literal=password=supersecret > secret.yaml
@@ -130,6 +137,7 @@ git add secret.enc.yaml .sops.yaml
 ```
 
 **Flux Integration**:
+
 ```yaml
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -160,6 +168,7 @@ spec:
 
 ### 3. Encryption Scope
 **SOPS .sops.yaml**:
+
 ```yaml
 creation_rules:
   - path_regex: production/.*
@@ -172,6 +181,7 @@ creation_rules:
 
 ### 4. Git Pre-commit Hook
 Prevent committing plain secrets:
+
 ```bash
 #!/bin/bash
 # .git/hooks/pre-commit

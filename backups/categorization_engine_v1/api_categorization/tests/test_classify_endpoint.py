@@ -1,11 +1,13 @@
 """Tests for POST /classify and POST /feedback endpoints."""
-import pytest
-from httpx import AsyncClient, ASGITransport
+
 from types import SimpleNamespace
 
-from apps.api.main import app
-from apps.api.core.auth import get_user_client
+import pytest
 import torch
+from httpx import ASGITransport, AsyncClient
+
+from apps.api.core.auth import get_user_client
+from apps.api.main import app
 
 
 @pytest.fixture
@@ -34,9 +36,7 @@ def mock_classifier(monkeypatch):
             self.updated_anchors.update(labeled_texts)
 
     mock_instance = MockClassifier()
-    monkeypatch.setattr(
-        "apps.api.domains.categorization.service.get_classifier", lambda: mock_instance
-    )
+    monkeypatch.setattr("apps.api.domains.categorization.service.get_classifier", lambda: mock_instance)
     return mock_instance
 
 
@@ -57,11 +57,7 @@ def mock_user_client():
 
     class MockClient:
         def __init__(self):
-            self.auth = SimpleNamespace(
-                get_user=lambda: SimpleNamespace(
-                    user=SimpleNamespace(id="test-user-id")
-                )
-            )
+            self.auth = SimpleNamespace(get_user=lambda: SimpleNamespace(user=SimpleNamespace(id="test-user-id")))
 
         def table(self, _name):
             return MockTable()
@@ -77,13 +73,9 @@ def mock_user_client():
 @pytest.mark.asyncio
 async def test_classify_returns_category_map(mock_classifier):
     """POST /classify with unique descriptions returns {description: category} map."""
-    payload = {
-        "descriptions": ["Uber trip to airport", "Zomato order #123", "Random store"]
-    }
+    payload = {"descriptions": ["Uber trip to airport", "Zomato order #123", "Random store"]}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/api/v1/categorization/classify/batch", json=payload)
 
     assert response.status_code == 200
@@ -93,7 +85,7 @@ async def test_classify_returns_category_map(mock_classifier):
     assert "predictions" in data
     assert len(data["predictions"]) == 3
     preds = data["predictions"]
-    
+
     assert preds[0]["category"] == "Transport"
     assert preds[1]["category"] == "Food"
     assert preds[2]["category"] == "Misc"
@@ -104,9 +96,7 @@ async def test_classify_empty_descriptions(mock_classifier):
     """POST /classify with empty list returns 400."""
     payload = {"descriptions": []}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/api/v1/categorization/classify/batch", json=payload)
 
     assert response.status_code == 400
@@ -117,9 +107,7 @@ async def test_classify_missing_descriptions_field(mock_classifier):
     """POST /classify without descriptions field returns 400."""
     payload = {"texts": ["something"]}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/api/v1/categorization/classify/batch", json=payload)
 
     assert response.status_code == 422
@@ -131,13 +119,9 @@ async def test_classify_missing_descriptions_field(mock_classifier):
 @pytest.mark.asyncio
 async def test_feedback_updates_classifier(mock_classifier):
     """POST /feedback accepts category correction payload."""
-    payload = {
-        "corrections": {"Food": ["Uber Eats delivery"], "Transport": ["Ola cab ride"]}
-    }
+    payload = {"corrections": {"Food": ["Uber Eats delivery"], "Transport": ["Ola cab ride"]}}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/api/v1/categorization/feedback", json=payload)
 
     assert response.status_code == 200
@@ -152,9 +136,7 @@ async def test_feedback_empty_corrections(mock_classifier):
     """POST /feedback with empty corrections returns 400."""
     payload = {"corrections": {}}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/api/v1/categorization/feedback", json=payload)
 
     assert response.status_code == 400
@@ -163,12 +145,13 @@ async def test_feedback_empty_corrections(mock_classifier):
 @pytest.mark.asyncio
 async def test_metrics_endpoint_exists(mock_classifier):
     """GET /categorization/metrics must return accuracy and per_class keys."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.get("/api/v1/categorization/metrics")
 
-    assert response.status_code in (200, 404), f"Unexpected status {response.status_code}"
+    assert response.status_code in (
+        200,
+        404,
+    ), f"Unexpected status {response.status_code}"
     if response.status_code == 200:
         data = response.json()
         assert "overall_accuracy" in data

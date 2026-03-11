@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.core.errors import (
-    AppError,
     AuthenticationError,
     NotFoundError,
     ValidationError,

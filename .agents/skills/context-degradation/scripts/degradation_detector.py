@@ -13,9 +13,10 @@ PRODUCTION NOTES:
   Production systems may benefit from fine-tuned classifiers or model-based detection.
 """
 
-import numpy as np
-from typing import List, Dict
 import re
+from typing import Dict, List
+
+import numpy as np
 
 
 def measure_attention_distribution(context_tokens: List[str], query: str) -> List[Dict]:
@@ -39,21 +40,15 @@ def measure_attention_distribution(context_tokens: List[str], query: str) -> Lis
             {
                 "position": position,
                 "attention": attention,
-                "region": "attention_favored"
-                if (is_beginning or is_end)
-                else "attention_degraded",
-                "tokens": context_tokens[position][:50]
-                if position < 5 or position > n - 5
-                else None,
+                "region": "attention_favored" if (is_beginning or is_end) else "attention_degraded",
+                "tokens": context_tokens[position][:50] if position < 5 or position > n - 5 else None,
             }
         )
 
     return attention_by_position
 
 
-def _estimate_attention(
-    position: int, total: int, is_beginning: bool, is_end: bool
-) -> float:
+def _estimate_attention(position: int, total: int, is_beginning: bool, is_end: bool) -> float:
     """
     Estimate attention weight for position.
 
@@ -84,9 +79,7 @@ def _estimate_attention(
 # Lost-in-Middle Detection
 
 
-def detect_lost_in_middle(
-    critical_positions: List[int], attention_distribution: List[Dict]
-) -> Dict:
+def detect_lost_in_middle(critical_positions: List[int], attention_distribution: List[Dict]) -> Dict:
     """
     Check if critical information is in attention-degraded positions.
 
@@ -159,21 +152,13 @@ def analyze_context_structure(context: str) -> Dict:
     middle_start = int(n * 0.3)
     middle_end = int(n * 0.7)
 
-    middle_content = sum(
-        s["length"]
-        for s in sections
-        if s["start"] >= middle_start and s["start"] <= middle_end
-    )
+    middle_content = sum(s["length"] for s in sections if s["start"] >= middle_start and s["start"] <= middle_end)
 
     return {
         "total_lines": n,
         "sections": sections,
         "middle_content_ratio": middle_content / n if n > 0 else 0,
-        "degradation_risk": "high"
-        if middle_content / n > 0.5
-        else "medium"
-        if middle_content / n > 0.3
-        else "low",
+        "degradation_risk": "high" if middle_content / n > 0.5 else "medium" if middle_content / n > 0.3 else "low",
     }
 
 
@@ -210,8 +195,7 @@ class PoisoningDetector:
                     "text": sentence,
                     "verified": None,
                     "has_error_indicator": any(
-                        re.search(pattern, sentence, re.IGNORECASE)
-                        for pattern in self.error_patterns
+                        re.search(pattern, sentence, re.IGNORECASE) for pattern in self.error_patterns
                     ),
                 }
             )
@@ -226,11 +210,7 @@ class PoisoningDetector:
         indicators = []
 
         # Check for error accumulation
-        error_count = sum(
-            1
-            for pattern in self.error_patterns
-            if re.search(pattern, context, re.IGNORECASE)
-        )
+        error_count = sum(1 for pattern in self.error_patterns if re.search(pattern, context, re.IGNORECASE))
 
         if error_count > 3:
             indicators.append(
@@ -270,11 +250,7 @@ class PoisoningDetector:
         return {
             "poisoning_risk": len(indicators) > 0,
             "indicators": indicators,
-            "overall_risk": "high"
-            if len(indicators) > 2
-            else "medium"
-            if len(indicators) > 0
-            else "low",
+            "overall_risk": "high" if len(indicators) > 2 else "medium" if len(indicators) > 0 else "low",
         }
 
     def _detect_contradictions(self, text: str) -> List[str]:
@@ -290,15 +266,11 @@ class PoisoningDetector:
         ]
 
         for pattern1, pattern2 in conflict_patterns:
-            if re.search(pattern1, text, re.IGNORECASE) and re.search(
-                pattern2, text, re.IGNORECASE
-            ):
+            if re.search(pattern1, text, re.IGNORECASE) and re.search(pattern2, text, re.IGNORECASE):
                 # Find sentences containing these patterns
                 sentences = text.split(".")
                 for sentence in sentences:
-                    if re.search(pattern1, sentence, re.IGNORECASE) or re.search(
-                        pattern2, sentence, re.IGNORECASE
-                    ):
+                    if re.search(pattern1, sentence, re.IGNORECASE) or re.search(pattern2, sentence, re.IGNORECASE):
                         if sentence.strip() and len(sentence.strip()) < 200:
                             contradictions.append(sentence.strip()[:100])
 
@@ -351,9 +323,7 @@ class ContextHealthAnalyzer:
             "current_task",
         )
 
-        degradation = detect_lost_in_middle(
-            critical_positions or list(range(10)), attention_dist
-        )
+        degradation = detect_lost_in_middle(critical_positions or list(range(10)), attention_dist)
 
         # Poisoning check
         poisoning = PoisoningDetector().detect_poisoning(context)
@@ -375,17 +345,13 @@ class ContextHealthAnalyzer:
                 "poisoning_risk": poisoning["overall_risk"],
             },
             "issues": {"lost_in_middle": degradation, "poisoning": poisoning},
-            "recommendations": self._generate_recommendations(
-                utilization, degradation, poisoning
-            ),
+            "recommendations": self._generate_recommendations(utilization, degradation, poisoning),
         }
 
         self.metrics_history.append(result)
         return result
 
-    def _calculate_health_score(
-        self, utilization: float, degradation: float, poisoning_risk: float
-    ) -> float:
+    def _calculate_health_score(self, utilization: float, degradation: float, poisoning_risk: float) -> float:
         """Calculate composite health score."""
         # Weighted combination
         utilization_penalty = min(utilization * 0.5, 0.3)
@@ -406,9 +372,7 @@ class ContextHealthAnalyzer:
         else:
             return "critical"
 
-    def _generate_recommendations(
-        self, utilization: float, degradation: Dict, poisoning: Dict
-    ) -> List[str]:
+    def _generate_recommendations(self, utilization: float, degradation: Dict, poisoning: Dict) -> List[str]:
         """Generate recommendations based on analysis."""
         recommendations = []
 
@@ -418,15 +382,11 @@ class ContextHealthAnalyzer:
 
         if degradation.get("at_risk"):
             recommendations.append("Critical information in degraded attention region")
-            recommendations.append(
-                "Move key information to beginning or end of context"
-            )
+            recommendations.append("Move key information to beginning or end of context")
 
         if poisoning["poisoning_risk"]:
             recommendations.append("Context poisoning indicators detected")
-            recommendations.append(
-                "Review and remove potentially erroneous information"
-            )
+            recommendations.append("Review and remove potentially erroneous information")
 
         if not recommendations:
             recommendations.append("Context appears healthy - continue monitoring")

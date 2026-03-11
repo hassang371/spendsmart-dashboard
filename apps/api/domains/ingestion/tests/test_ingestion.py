@@ -1,17 +1,19 @@
 """Tests for the CSV ingestion endpoint."""
+
 import io
-import torch
+
 import pytest
-from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
+from apps.api.core.auth import (
+    CurrentUser,
+    get_current_user,
+    get_current_user_id,
+    get_user_client,
+)
 from apps.api.main import app
-from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 client = TestClient(app)
-
-
-
 
 
 @pytest.fixture(autouse=True)

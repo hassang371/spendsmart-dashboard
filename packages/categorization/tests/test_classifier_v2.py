@@ -2,7 +2,9 @@
 
 Tests the MiniLM + Cosine Similarity + Linear Adapter classifier.
 """
+
 import pytest
+
 from packages.categorization.classifier import TransactionClassifier
 from packages.categorization.constants import Category
 

@@ -5,6 +5,7 @@
 ### Monorepo Pattern
 
 **Structure**:
+
 ```
 gitops-repo/
 ├── apps/
@@ -38,6 +39,7 @@ gitops-repo/
 ### Polyrepo Pattern
 
 **Structure**:
+
 ```
 infrastructure-repo/     (Platform team)
 app-team-1-repo/        (Team 1)
@@ -78,6 +80,7 @@ cluster-config-repo/    (Platform team)
 ## App-of-Apps Pattern (ArgoCD)
 
 **Root Application**:
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -92,6 +95,7 @@ spec:
 ```
 
 **Apps Directory**:
+
 ```
 apps/
 ├── app1.yaml    (Application manifest)
@@ -104,6 +108,7 @@ apps/
 ## Environment Structure
 
 ### Option 1: Directory Per Environment
+
 ```
 apps/
 ├── base/
@@ -115,6 +120,7 @@ apps/
 ```
 
 ### Option 2: Branch Per Environment
+
 ```
 main branch      → production
 staging branch   → staging
@@ -126,6 +132,7 @@ dev branch       → development
 ## Flux Repository Organization
 
 **Recommended Structure**:
+
 ```
 flux-repo/
 ├── clusters/
@@ -161,16 +168,19 @@ flux-repo/
 ## Promotion Strategies
 
 ### 1. Manual PR-based
+
 ```
 dev/ → (PR) → staging/ → (PR) → production/
 ```
 
 ### 2. Automated with CI
+
 ```
 dev/ → (auto-promote on tests pass) → staging/ → (manual approval) → production/
 ```
 
 ### 3. Progressive with Canary
+
 ```
 production/stable/ → canary deployment → production/all/
 ```

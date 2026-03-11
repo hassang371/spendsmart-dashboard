@@ -6,6 +6,5 @@ def test_contrastive_pretraining_queued_after_import():
     from apps.api.domains.ingestion import router as ingestion_module
 
     assert hasattr(ingestion_module, "_run_contrastive_pretraining_bg"), (
-        "Missing _run_contrastive_pretraining_bg function — "
-        "contrastive pretraining not triggered post-import"
+        "Missing _run_contrastive_pretraining_bg function — " "contrastive pretraining not triggered post-import"
     )

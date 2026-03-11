@@ -1,7 +1,8 @@
 """Tests for HypCDTrainer loss functions in training.py (losses.py deleted)."""
+
 import torch
-import pytest
 from geoopt import PoincareBall
+
 from packages.categorization.hypcd import HyperbolicProjector
 from packages.categorization.training import HypCDTrainer
 
@@ -37,8 +38,8 @@ def test_angle_loss_aligned_beats_orthogonal():
     trainer = make_trainer()
 
     z_i = torch.tensor([[0.3, 0.0]])
-    z_j_aligned = torch.tensor([[0.25, 0.0]])   # Same direction
-    z_j_ortho = torch.tensor([[0.0, 0.3]])       # Perpendicular
+    z_j_aligned = torch.tensor([[0.25, 0.0]])  # Same direction
+    z_j_ortho = torch.tensor([[0.0, 0.3]])  # Perpendicular
 
     loss_aligned = trainer.angle_loss(z_i, z_j_aligned)
     loss_ortho = trainer.angle_loss(z_i, z_j_ortho)

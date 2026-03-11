@@ -5,16 +5,14 @@ Supports ArgoCD 3.x API with annotation-based tracking.
 """
 
 import argparse
-import sys
 import json
-from typing import Dict, List, Any, Optional
+import sys
+from typing import Any, Dict, List, Optional
 
 try:
     import requests
 except ImportError:
-    print(
-        "⚠️  Warning: 'requests' library not found. Install with: pip install requests"
-    )
+    print("⚠️  Warning: 'requests' library not found. Install with: pip install requests")
     sys.exit(1)
 
 try:
@@ -87,9 +85,7 @@ class ArgoCDHealthChecker:
             "health_status": health.get("status", "Unknown"),
             "health_message": health.get("message", ""),
             "sync_status": sync.get("status", "Unknown"),
-            "sync_revision": sync.get("revision", "N/A")[:8]
-            if sync.get("revision")
-            else "N/A",
+            "sync_revision": sync.get("revision", "N/A")[:8] if sync.get("revision") else "N/A",
             "operation_phase": operation_state.get("phase", "N/A"),
             "issues": [],
             "recommendations": [],
@@ -104,9 +100,7 @@ class ArgoCDHealthChecker:
         if result["sync_status"] == "OutOfSync":
             result["issues"].append("Application is out of sync with Git")
             result["recommendations"].append("Run: argocd app sync " + name)
-            result["recommendations"].append(
-                "Check if manual sync is required (sync policy)"
-            )
+            result["recommendations"].append("Check if manual sync is required (sync policy)")
 
         if result["sync_status"] == "Unknown":
             result["issues"].append("Sync status is unknown")
@@ -119,23 +113,17 @@ class ArgoCDHealthChecker:
         if operation_state.get("phase") == "Failed":
             result["issues"].append("Last operation failed")
             if "message" in operation_state:
-                result["issues"].append(
-                    f"Operation message: {operation_state['message']}"
-                )
+                result["issues"].append(f"Operation message: {operation_state['message']}")
             result["recommendations"].append("Check operation details in ArgoCD UI")
             result["recommendations"].append(f"argocd app get {name}")
 
         # Check resource conditions (ArgoCD 3.x)
         resources = app.get("status", {}).get("resources", [])
         unhealthy_resources = [
-            r
-            for r in resources
-            if r.get("health", {}).get("status") not in ["Healthy", "Unknown", ""]
+            r for r in resources if r.get("health", {}).get("status") not in ["Healthy", "Unknown", ""]
         ]
         if unhealthy_resources:
-            result["issues"].append(
-                f"{len(unhealthy_resources)} resources are unhealthy"
-            )
+            result["issues"].append(f"{len(unhealthy_resources)} resources are unhealthy")
             for r in unhealthy_resources[:3]:  # Show first 3
                 kind = r.get("kind", "Unknown")
                 name = r.get("name", "Unknown")
@@ -146,9 +134,7 @@ class ArgoCDHealthChecker:
             )
 
         # Check for annotation-based tracking (ArgoCD 3.x default)
-        tracking_method = (
-            app.get("spec", {}).get("syncPolicy", {}).get("syncOptions", [])
-        )
+        tracking_method = app.get("spec", {}).get("syncPolicy", {}).get("syncOptions", [])
         has_label_tracking = "UseLabel=true" in tracking_method
         if has_label_tracking:
             result["recommendations"].append(
@@ -157,9 +143,7 @@ class ArgoCDHealthChecker:
 
         return result
 
-    def check_all_applications(
-        self, name: Optional[str] = None, show_healthy: bool = False
-    ) -> List[Dict]:
+    def check_all_applications(self, name: Optional[str] = None, show_healthy: bool = False) -> List[Dict]:
         """Check all applications or specific application."""
         apps = self.get_applications(name)
         results = []
@@ -174,9 +158,7 @@ class ArgoCDHealthChecker:
     def print_summary(self, results: List[Dict]):
         """Print summary of application health."""
         if not results:
-            print(
-                "✅ No applications found or all healthy (use --show-healthy to see healthy apps)"
-            )
+            print("✅ No applications found or all healthy (use --show-healthy to see healthy apps)")
             return
 
         # Summary statistics
@@ -269,15 +251,11 @@ ArgoCD 3.x Features:
     )
 
     parser.add_argument("--server", required=True, help="ArgoCD server URL")
-    parser.add_argument(
-        "--token", help="ArgoCD auth token (or set ARGOCD_TOKEN env var)"
-    )
+    parser.add_argument("--token", help="ArgoCD auth token (or set ARGOCD_TOKEN env var)")
     parser.add_argument("--username", help="ArgoCD username")
     parser.add_argument("--password", help="ArgoCD password")
     parser.add_argument("--app", help="Specific application name to check")
-    parser.add_argument(
-        "--show-healthy", action="store_true", help="Show healthy applications"
-    )
+    parser.add_argument("--show-healthy", action="store_true", help="Show healthy applications")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     args = parser.parse_args()
@@ -295,9 +273,7 @@ ArgoCD 3.x Features:
             password=args.password,
         )
 
-        results = checker.check_all_applications(
-            name=args.app, show_healthy=args.show_healthy
-        )
+        results = checker.check_all_applications(name=args.app, show_healthy=args.show_healthy)
 
         if args.json:
             print(json.dumps(results, indent=2))

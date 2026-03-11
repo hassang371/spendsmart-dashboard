@@ -9,6 +9,7 @@ This document provides the complete evaluation framework for measuring context c
 Test factual retention of specific details from conversation history.
 
 **Structure:**
+
 ```
 Question: [Ask for specific fact from truncated history]
 Expected: [Exact detail that should be preserved]
@@ -25,6 +26,7 @@ Scoring: Match accuracy of technical details
 Test file tracking and modification awareness.
 
 **Structure:**
+
 ```
 Question: [Ask about files created, modified, or examined]
 Expected: [Complete list with change descriptions]
@@ -41,6 +43,7 @@ Scoring: Completeness of file list and accuracy of change descriptions
 Test ability to continue work without re-fetching context.
 
 **Structure:**
+
 ```
 Question: [Ask about next steps or current state]
 Expected: [Actionable next steps based on session history]
@@ -57,6 +60,7 @@ Scoring: Ability to continue without requesting re-read of files
 Test retention of reasoning chains and decision rationale.
 
 **Structure:**
+
 ```
 Question: [Ask about why a decision was made]
 Expected: [Reasoning that led to the decision]

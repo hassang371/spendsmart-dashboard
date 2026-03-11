@@ -1,7 +1,9 @@
 """Tests for hyperbolic math primitives now in hypcd.py (hyperbolic_nn.py deleted)."""
+
 import torch
 from geoopt import PoincareBall
-from packages.categorization.hypcd import HypLinear, HyperbolicProjector, HypFFN
+
+from packages.categorization.hypcd import HyperbolicProjector, HypFFN, HypLinear
 
 manifold = PoincareBall(c=1.0)
 

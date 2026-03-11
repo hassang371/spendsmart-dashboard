@@ -1,7 +1,5 @@
 """Tests for ingestion domain — fingerprinting, service, router."""
 
-import pytest
-
 from apps.api.domains.ingestion.service import generate_fingerprint
 
 

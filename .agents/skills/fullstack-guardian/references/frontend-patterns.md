@@ -3,6 +3,7 @@
 ## TypeScript Configuration
 
 ### Strict Setup
+
 ```json
 {
   "compilerOptions": {
@@ -34,6 +35,7 @@
 ## Real-time Features
 
 ### WebSocket Hook
+
 ```typescript
 function useWebSocket(url: string) {
   const [isConnected, setIsConnected] = useState(false);
@@ -74,6 +76,7 @@ function Chat() {
 ```
 
 ### Optimistic Updates
+
 ```typescript
 // React Query with optimistic update
 function useUpdateTodo() {
@@ -113,6 +116,7 @@ function useUpdateTodo() {
 ```
 
 ### Presence Hook
+
 ```typescript
 function usePresence(roomId: string) {
   const [users, setUsers] = useState<User[]>([]);
@@ -138,6 +142,7 @@ function usePresence(roomId: string) {
 ## Performance Optimization
 
 ### Code Splitting & Lazy Loading
+
 ```typescript
 import { lazy, Suspense } from 'react';
 
@@ -172,6 +177,7 @@ function Dashboard() {
 ```
 
 ### Bundle Analysis
+
 ```javascript
 // webpack.config.js
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
@@ -184,6 +190,7 @@ module.exports = {
 ```
 
 ### Lazy Load Images
+
 ```typescript
 function LazyImage({ src, alt }: Props) {
   const [imgSrc, setImgSrc] = useState('/placeholder.jpg');
@@ -211,6 +218,7 @@ function LazyImage({ src, alt }: Props) {
 ## Accessibility
 
 ### Accessible Modal
+
 ```typescript
 function Modal({ isOpen, onClose, title, children }: Props) {
   const titleId = useId();
@@ -235,6 +243,7 @@ function Modal({ isOpen, onClose, title, children }: Props) {
 ```
 
 ### Keyboard Navigation
+
 ```typescript
 function Dropdown({ items }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -260,6 +269,7 @@ function Dropdown({ items }: Props) {
 ```
 
 ### Focus Trap
+
 ```typescript
 function useFocusTrap(ref: RefObject<HTMLElement>) {
   useEffect(() => {
@@ -293,6 +303,7 @@ function useFocusTrap(ref: RefObject<HTMLElement>) {
 ## Testing
 
 ### Component Testing with Testing Library
+
 ```typescript
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

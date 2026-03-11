@@ -10,13 +10,16 @@ Removed: contrastive pretraining, HypCD references, hybrid loss.
 
 import io
 import os
+
 import torch
 
 try:
     import structlog
+
     logger = structlog.get_logger()
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 _BUCKET = "models"
@@ -39,6 +42,7 @@ class AdapterManager:
     @property
     def _storage(self):
         from supabase import create_client
+
         return create_client(self._supabase_url, self._supabase_key).storage
 
     # ── Load / Save Helpers ──────────────────────────────────────────
@@ -73,8 +77,12 @@ class AdapterManager:
                 torch.save(state, buf)
                 buf.seek(0)
                 self._storage.from_(_BUCKET).upload(
-                    storage_path, buf.read(),
-                    file_options={"content-type": "application/octet-stream", "upsert": "true"},
+                    storage_path,
+                    buf.read(),
+                    file_options={
+                        "content-type": "application/octet-stream",
+                        "upsert": "true",
+                    },
                 )
             except Exception as e:
                 logger.warning("supabase_upload_failed", path=storage_path, error=str(e))

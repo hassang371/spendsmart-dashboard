@@ -22,11 +22,12 @@ from typing import Optional
 @dataclass
 class ProcessedText:
     """Multi-stage output from process_description()."""
-    raw: str              # Original bank string
-    informative: str      # "UPI Transfer to Allan G via YESB" (model input)
-    merchant_name: str    # "Allan G" (UI display)
-    transaction_type: str # "upi_transfer" | "pos_purchase" | "atm_withdrawal" | ...
-    bank_name: Optional[str] = None # Optional extracted bank name (e.g. YESB)
+
+    raw: str  # Original bank string
+    informative: str  # "UPI Transfer to Allan G via YESB" (model input)
+    merchant_name: str  # "Allan G" (UI display)
+    transaction_type: str  # "upi_transfer" | "pos_purchase" | "atm_withdrawal" | ...
+    bank_name: Optional[str] = None  # Optional extracted bank name (e.g. YESB)
 
 
 # ── Bank Statement Lexicon ──────────────────────────────────────────────
@@ -117,9 +118,7 @@ _RETAIL_TERMINAL_RE = re.compile(r"\b\d{1,4}(RetailCCA|RetailPOS|Retail)\b", re.
 _ACCOUNT_NUM_RE = re.compile(r"\b\d{8,}\b")
 
 # IMPS reference pattern: IMPS/NNN/IBKL-xx154 -null/... (standalone)
-_IMPS_STANDALONE_RE = re.compile(
-    r"IMPS/(\d+)/([^/\s]+)\s*[-]?\s*(null|NULL)?\s*/?(.*)", re.IGNORECASE
-)
+_IMPS_STANDALONE_RE = re.compile(r"IMPS/(\d+)/([^/\s]+)\s*[-]?\s*(null|NULL)?\s*/?(.*)", re.IGNORECASE)
 
 
 def _match_known_merchant(*fields: str) -> Optional[str]:
@@ -206,9 +205,7 @@ def process_description(text: str) -> ProcessedText:
 
     # ── 1. UPI Transactions ──────────────────────────────────────────────
     # Format: (WDL|DEP) TFR UPI/(DR|CR)/<UTR>/<NAME>/<BANK>/<UPI_ID>/<APP>...
-    upi_regex = (
-        r"(?:WDL|DEP) TFR\s+UPI/(DR|CR)/([^/]+)/([^/]+)/([^/]+)/([^/]+)/(\S+)"
-    )
+    upi_regex = r"(?:WDL|DEP) TFR\s+UPI/(DR|CR)/([^/]+)/([^/]+)/([^/]+)/([^/]+)/(\S+)"
     upi_match = re.search(upi_regex, text)
     if upi_match:
         mode, utr, raw_name, bank, raw_upi_id, raw_app = upi_match.groups()
@@ -468,8 +465,12 @@ def process_description(text: str) -> ProcessedText:
 
     # ── 6.b Declined / Failed / Insufficient balance transactions ─────────
     declined_keywords = [
-        "INSUFFICIENT BAL", "INSUFF", "DECLINED", "DECLINE",
-        "POS DECLINE", "FAILED",
+        "INSUFFICIENT BAL",
+        "INSUFF",
+        "DECLINED",
+        "DECLINE",
+        "POS DECLINE",
+        "FAILED",
     ]
     is_declined = any(kw in text.upper() for kw in declined_keywords)
     if is_declined:
@@ -507,7 +508,8 @@ def process_description(text: str) -> ProcessedText:
         # Gift / transfer with beneficiary name
         gift_match = re.search(
             r"(?:Gift to relatives\s*/\s*Friends|INB|Transfer to Family.*?(?:\bOF\b))\s+(.*?)(?:\d{9,}|$)",
-            rest, re.IGNORECASE
+            rest,
+            re.IGNORECASE,
         )
         if gift_match:
             name = _clean_name(gift_match.group(1))
@@ -551,7 +553,9 @@ def process_description(text: str) -> ProcessedText:
     # Remove known structural prefixes
     cleaned_fb = re.sub(
         r"^(WDL TFR|DEP TFR|POS ATM PURCH|OTHPG\s*\S+|UPI|IMPS|NEFT|RTGS)\s*",
-        "", text, flags=re.IGNORECASE
+        "",
+        text,
+        flags=re.IGNORECASE,
     ).strip()
     cleaned_fb = _strip_noise(cleaned_fb)
     known_fb = _match_known_merchant(text, cleaned_fb)

@@ -74,6 +74,7 @@ You MUST complete each phase before proceeding to the next.
    **WHEN system has multiple components (CI → build → signing, API → service → database):**
 
    **BEFORE proposing fixes, add diagnostic instrumentation:**
+
    ```
    For EACH component boundary:
      - Log what data enters component
@@ -87,6 +88,7 @@ You MUST complete each phase before proceeding to the next.
    ```
 
    **Example (multi-layer system):**
+
    ```bash
    # Layer 1: Workflow
    echo "=== Secrets available in workflow: ==="

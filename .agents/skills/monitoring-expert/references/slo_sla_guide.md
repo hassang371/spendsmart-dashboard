@@ -27,6 +27,7 @@
 - "p95 latency < 1s or refund"
 
 ### Relationship
+
 ```
 SLI = Measurement
 SLO = Target (internal goal)
@@ -78,6 +79,7 @@ SLA: Guaranteed availability = 99.5% (with penalties)
 ### Examples by Service Type
 
 **Web Application**:
+
 ```
 SLI 1: Request Success Rate
   = successful_requests / total_requests
@@ -90,6 +92,7 @@ SLI 3: Availability
 ```
 
 **API Service**:
+
 ```
 SLI 1: Error Rate
   = (4xx_errors + 5xx_errors) / total_requests
@@ -102,6 +105,7 @@ SLI 3: Throughput
 ```
 
 **Batch Processing**:
+
 ```
 SLI 1: Job Success Rate
   = successful_jobs / total_jobs
@@ -114,6 +118,7 @@ SLI 3: Freshness
 ```
 
 **Storage Service**:
+
 ```
 SLI 1: Durability
   = data_not_lost / total_data
@@ -139,6 +144,7 @@ SLI 3: Write Success Rate
 ### Example Process
 
 **Current Performance** (30 days):
+
 ```
 p50 latency: 120ms
 p95 latency: 450ms
@@ -150,6 +156,7 @@ Availability: 99.95%
 ```
 
 **Initial SLOs**:
+
 ```
 Latency: p95 < 500ms (slightly worse than current p95)
 Error rate: < 0.1% (double current rate)
@@ -194,6 +201,7 @@ If SLO is 99.9%, error budget is 0.1%
 ### Calculation
 
 **For availability**:
+
 ```
 Monthly error budget = (1 - SLO) × time_period
 
@@ -202,6 +210,7 @@ Error budget = 0.001 × 30 days = 0.03 days = 43.2 minutes
 ```
 
 **For request-based SLIs**:
+
 ```
 Error budget = (1 - SLO) × total_requests
 
@@ -212,6 +221,7 @@ Error budget = 0.001 × 10,000,000 = 10,000 failed requests
 ### Error Budget Consumption
 
 **Formula**:
+
 ```
 Budget consumed = actual_errors / allowed_errors × 100%
 
@@ -288,6 +298,7 @@ Time to exhaust = 30 days / 5 = 6 days
 Alert on burn rate across multiple time windows:
 
 **Fast burn** (1 hour window):
+
 ```
 Burn rate > 14.4x → Exhausts budget in 2 days
 Alert after 2 minutes
@@ -295,6 +306,7 @@ Severity: Critical (page immediately)
 ```
 
 **Moderate burn** (6 hour window):
+
 ```
 Burn rate > 6x → Exhausts budget in 5 days
 Alert after 30 minutes
@@ -302,6 +314,7 @@ Severity: Warning (create ticket)
 ```
 
 **Slow burn** (3 day window):
+
 ```
 Burn rate > 1x → Exhausts budget by end of month
 Alert after 6 hours
@@ -311,6 +324,7 @@ Severity: Info (monitor)
 ### Implementation
 
 **Prometheus**:
+
 ```yaml
 # Fast burn alert (1h window, 2m grace period)
 - alert: ErrorBudgetFastBurn
@@ -349,6 +363,7 @@ Severity: Info (monitor)
 ### Dashboard Structure
 
 **Overall Health**:
+
 ```
 ┌─────────────────────────────────────────┐
 │  SLO Compliance: 99.92% ✅              │
@@ -358,6 +373,7 @@ Severity: Info (monitor)
 ```
 
 **SLI Performance**:
+
 ```
 Latency p95: 420ms (Target: 500ms) ✅
 Error Rate: 0.08% (Target: < 0.1%) ✅
@@ -365,6 +381,7 @@ Availability: 99.95% (Target: > 99.9%) ✅
 ```
 
 **Error Budget Trend**:
+
 ```
 Graph showing:
 - Error budget consumption over time
@@ -376,6 +393,7 @@ Graph showing:
 ### Monthly SLO Report
 
 **Template**:
+
 ```markdown
 # SLO Report: October 2024
 
@@ -443,12 +461,14 @@ Graph showing:
 ### Components
 
 **Service Description**:
+
 ```
 The API Service provides RESTful endpoints for user management,
 authentication, and data retrieval.
 ```
 
 **Covered Metrics**:
+
 ```
 - Availability: Service is reachable and returns valid responses
 - Latency: Time from request to response
@@ -456,6 +476,7 @@ authentication, and data retrieval.
 ```
 
 **SLA Targets**:
+
 ```
 Service commits to:
 1. 99.9% monthly uptime
@@ -464,6 +485,7 @@ Service commits to:
 ```
 
 **Measurement**:
+
 ```
 Metrics calculated from server-side monitoring:
 - Uptime: Successful health check probes / total probes
@@ -474,6 +496,7 @@ Calculated monthly (first of month for previous month).
 ```
 
 **Exclusions**:
+
 ```
 SLA does not cover:
 - Scheduled maintenance (with 7 days notice)
@@ -484,6 +507,7 @@ SLA does not cover:
 ```
 
 **Service Credits**:
+
 ```
 Monthly Uptime    | Service Credit
 ----------------  | --------------
@@ -493,6 +517,7 @@ Monthly Uptime    | Service Credit
 ```
 
 **Claiming Credits**:
+
 ```
 Customer must:
 1. Report violation within 30 days
@@ -504,6 +529,7 @@ Customer must:
 ### Example SLAs by Industry
 
 **E-commerce**:
+
 ```
 - 99.95% availability
 - p95 page load < 2s
@@ -512,6 +538,7 @@ Customer must:
 ```
 
 **Financial Services**:
+
 ```
 - 99.99% availability
 - p99 transaction < 500ms
@@ -520,6 +547,7 @@ Customer must:
 ```
 
 **Media/Content**:
+
 ```
 - 99.9% availability
 - p95 video start < 3s
@@ -545,6 +573,7 @@ Customer must:
 - Avoid SLO sprawl
 
 ### 4. SLAs More Conservative Than SLOs
+
 ```
 Internal SLO: 99.95%
 Customer SLA: 99.9%

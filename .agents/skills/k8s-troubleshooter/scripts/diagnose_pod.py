@@ -7,15 +7,13 @@ Analyzes a pod's health and returns structured diagnostic information
 import json
 import subprocess
 import sys
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
 def run_kubectl(args: List[str]) -> Dict[str, Any]:
     """Run kubectl command and return parsed JSON"""
     try:
-        result = subprocess.run(
-            ["kubectl"] + args, capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(["kubectl"] + args, capture_output=True, text=True, check=True)
         return json.loads(result.stdout) if result.stdout else {}
     except subprocess.CalledProcessError as e:
         return {"error": e.stderr}
@@ -83,16 +81,12 @@ def analyze_pod(pod_data: Dict[str, Any]) -> Dict[str, Any]:
             if reason == "ImagePullBackOff":
                 recommendations.append("Check image name and registry credentials")
             elif reason == "CrashLoopBackOff":
-                recommendations.append(
-                    f"Check logs for container {name} to identify crash cause"
-                )
+                recommendations.append(f"Check logs for container {name} to identify crash cause")
 
         if "terminated" in state:
             reason = state["terminated"].get("reason", "Unknown")
             exit_code = state["terminated"].get("exitCode", 0)
-            issues.append(
-                f"Container {name} terminated: {reason} (exit code {exit_code})"
-            )
+            issues.append(f"Container {name} terminated: {reason} (exit code {exit_code})")
 
         restart_count = container.get("restartCount", 0)
         if restart_count > 5:
@@ -103,20 +97,14 @@ def analyze_pod(pod_data: Dict[str, Any]) -> Dict[str, Any]:
     for container in spec.get("containers", []):
         resources = container.get("resources", {})
         if not resources.get("requests"):
-            recommendations.append(
-                f"Consider setting resource requests for container {container.get('name')}"
-            )
+            recommendations.append(f"Consider setting resource requests for container {container.get('name')}")
         if not resources.get("limits"):
-            recommendations.append(
-                f"Consider setting resource limits for container {container.get('name')}"
-            )
+            recommendations.append(f"Consider setting resource limits for container {container.get('name')}")
 
     # Check restart policy
     restart_policy = spec.get("restartPolicy", "Always")
     if restart_policy == "Never" and issues:
-        recommendations.append(
-            "Restart policy is 'Never' - pod won't restart automatically"
-        )
+        recommendations.append("Restart policy is 'Never' - pod won't restart automatically")
 
     return {"phase": phase, "issues": issues, "recommendations": recommendations}
 

@@ -1,28 +1,22 @@
 """Tests for the CSV ingestion endpoint."""
+
 import io
-import torch
-import pytest
 from types import SimpleNamespace
+
+import pytest
 from fastapi.testclient import TestClient
 
-from apps.api.main import app
 from apps.api.core.auth import get_user_client
+from apps.api.main import app
 
 client = TestClient(app)
-
-
-
 
 
 @pytest.fixture(autouse=True)
 def mock_user_client():
     class MockClient:
         def __init__(self):
-            self.auth = SimpleNamespace(
-                get_user=lambda: SimpleNamespace(
-                    user=SimpleNamespace(id="test-user-id")
-                )
-            )
+            self.auth = SimpleNamespace(get_user=lambda: SimpleNamespace(user=SimpleNamespace(id="test-user-id")))
 
     app.dependency_overrides[get_user_client] = lambda: MockClient()
     yield

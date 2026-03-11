@@ -54,6 +54,7 @@ Analyzes source code, bytecode, or binaries for security vulnerabilities without
 ### CodeQL (GitHub)
 
 **GitHub Actions:**
+
 ```yaml
 name: CodeQL Analysis
 
@@ -109,6 +110,7 @@ jobs:
 ### Semgrep
 
 **GitHub Actions:**
+
 ```yaml
 - name: Run Semgrep
   uses: returntocorp/semgrep-action@v1
@@ -120,6 +122,7 @@ jobs:
 ```
 
 **GitLab CI:**
+
 ```yaml
 semgrep:
   stage: test
@@ -140,6 +143,7 @@ semgrep:
 ### Language-Specific SAST
 
 **Python - Bandit:**
+
 ```yaml
 # GitHub Actions
 - name: Run Bandit
@@ -161,6 +165,7 @@ bandit:
 ```
 
 **JavaScript - ESLint Security Plugin:**
+
 ```yaml
 # GitHub Actions
 - name: Run ESLint Security
@@ -170,6 +175,7 @@ bandit:
 ```
 
 **Go - Gosec:**
+
 ```yaml
 # GitHub Actions
 - name: Run Gosec
@@ -191,6 +197,7 @@ gosec:
 ### SonarQube/SonarCloud
 
 **GitHub Actions:**
+
 ```yaml
 - name: SonarCloud Scan
   uses: SonarSource/sonarcloud-github-action@master
@@ -207,6 +214,7 @@ gosec:
 ```
 
 **GitLab CI:**
+
 ```yaml
 sonarqube:
   stage: test
@@ -228,6 +236,7 @@ Tests running applications for vulnerabilities by simulating attacks.
 ### OWASP ZAP
 
 **Full scan workflow (GitHub Actions):**
+
 ```yaml
 name: DAST Scan
 
@@ -267,6 +276,7 @@ jobs:
 ```
 
 **GitLab CI:**
+
 ```yaml
 dast:
   stage: test
@@ -292,31 +302,38 @@ dast:
 **ZAP scan types:**
 
 1. **Baseline Scan** (Fast, ~1-2 min)
+
 ```bash
 zap-baseline.py -t https://staging.example.com -r report.html
 ```
+
 - Passive scanning only
 - No active attacks
 - Good for PR checks
 
-2. **Full Scan** (Comprehensive, 10-60 min)
+1. **Full Scan** (Comprehensive, 10-60 min)
+
 ```bash
 zap-full-scan.py -t https://staging.example.com -r report.html
 ```
+
 - Active + Passive scanning
 - Attempts exploits
 - Use on staging only
 
-3. **API Scan**
+1. **API Scan**
+
 ```bash
 zap-api-scan.py -t https://api.example.com/openapi.json -f openapi -r report.html
 ```
+
 - For REST APIs
 - OpenAPI/Swagger support
 
 ### Other DAST Tools
 
 **Nuclei:**
+
 ```yaml
 - name: Run Nuclei
   uses: projectdiscovery/nuclei-action@main
@@ -326,6 +343,7 @@ zap-api-scan.py -t https://api.example.com/openapi.json -f openapi -r report.htm
 ```
 
 **Nikto (Web server scanner):**
+
 ```yaml
 nikto:
   stage: dast
@@ -343,6 +361,7 @@ Identifies vulnerabilities in third-party dependencies and libraries.
 ### Dependency Scanning
 
 **GitHub Dependabot (Built-in):**
+
 ```yaml
 # .github/dependabot.yml
 version: 2
@@ -360,6 +379,7 @@ updates:
 ```
 
 **GitHub Actions - Dependency Review:**
+
 ```yaml
 - name: Dependency Review
   uses: actions/dependency-review-action@v4
@@ -368,6 +388,7 @@ updates:
 ```
 
 **npm audit:**
+
 ```yaml
 - name: npm audit
   run: |
@@ -377,6 +398,7 @@ updates:
 ```
 
 **pip-audit (Python):**
+
 ```yaml
 - name: Python Security Check
   run: |
@@ -385,6 +407,7 @@ updates:
 ```
 
 **Snyk:**
+
 ```yaml
 # GitHub Actions
 - name: Run Snyk
@@ -406,6 +429,7 @@ snyk:
 ```
 
 **OWASP Dependency-Check:**
+
 ```yaml
 - name: OWASP Dependency Check
   run: |
@@ -436,6 +460,7 @@ dependency_scanning:
 ### Image Scanning
 
 **Trivy (Comprehensive):**
+
 ```yaml
 # GitHub Actions
 - name: Run Trivy
@@ -466,6 +491,7 @@ trivy:
 ```
 
 **Grype:**
+
 ```yaml
 - name: Scan with Grype
   uses: anchore/scan-action@v3
@@ -482,6 +508,7 @@ trivy:
 ```
 
 **Clair:**
+
 ```yaml
 clair:
   stage: scan
@@ -493,6 +520,7 @@ clair:
 ### SBOM (Software Bill of Materials)
 
 **Syft:**
+
 ```yaml
 - name: Generate SBOM
   uses: anchore/sbom-action@v0
@@ -509,6 +537,7 @@ clair:
 ```
 
 **CycloneDX:**
+
 ```yaml
 - name: Generate CycloneDX SBOM
   run: |
@@ -523,6 +552,7 @@ clair:
 ### Pre-commit Prevention
 
 **TruffleHog:**
+
 ```yaml
 # GitHub Actions
 - name: TruffleHog Scan
@@ -541,6 +571,7 @@ trufflehog:
 ```
 
 **Gitleaks:**
+
 ```yaml
 # GitHub Actions
 - name: Gitleaks
@@ -557,6 +588,7 @@ gitleaks:
 ```
 
 **GitGuardian:**
+
 ```yaml
 - name: GitGuardian scan
   uses: GitGuardian/ggshield-action@master
@@ -579,6 +611,7 @@ Enable in: **Settings → Code security and analysis → Secret scanning**
 ### Fail Pipeline on Security Issues
 
 **Threshold-based gates:**
+
 ```yaml
 security-gate:
   stage: gate
@@ -602,6 +635,7 @@ security-gate:
 ```
 
 **SonarQube Quality Gate:**
+
 ```yaml
 - name: Check Quality Gate
   run: |
@@ -615,6 +649,7 @@ security-gate:
 ### Manual Approval for Production
 
 **GitHub Actions:**
+
 ```yaml
 deploy-production:
   runs-on: ubuntu-latest
@@ -627,6 +662,7 @@ deploy-production:
 ```
 
 **GitLab CI:**
+
 ```yaml
 deploy:production:
   stage: deploy
@@ -645,6 +681,7 @@ deploy:production:
 ### License Compliance
 
 **FOSSology:**
+
 ```yaml
 license-scan:
   stage: compliance
@@ -654,6 +691,7 @@ license-scan:
 ```
 
 **License Finder:**
+
 ```yaml
 - name: Check Licenses
   run: |
@@ -662,6 +700,7 @@ license-scan:
 ```
 
 **npm license checker:**
+
 ```yaml
 - name: License Check
   run: |
@@ -671,6 +710,7 @@ license-scan:
 ### Policy as Code
 
 **Open Policy Agent (OPA):**
+
 ```yaml
 policy-check:
   stage: gate
@@ -685,6 +725,7 @@ policy-check:
 ## Complete DevSecOps Pipeline
 
 **Comprehensive example (GitHub Actions):**
+
 ```yaml
 name: DevSecOps Pipeline
 

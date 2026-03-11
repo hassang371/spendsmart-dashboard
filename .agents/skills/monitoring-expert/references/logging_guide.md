@@ -5,11 +5,13 @@
 ### Why Structured Logs?
 
 **Unstructured** (text):
+
 ```
 2024-10-28 14:32:15 User john@example.com logged in from 192.168.1.1
 ```
 
 **Structured** (JSON):
+
 ```json
 {
   "timestamp": "2024-10-28T14:32:15Z",
@@ -117,6 +119,7 @@ Every log entry should include:
 
 ### 1. Timestamp
 ISO 8601 format with timezone:
+
 ```json
 {
   "timestamp": "2024-10-28T14:32:15.123Z"
@@ -125,6 +128,7 @@ ISO 8601 format with timezone:
 
 ### 2. Level
 Standard levels: debug, info, warn, error, critical
+
 ```json
 {
   "level": "error"
@@ -133,6 +137,7 @@ Standard levels: debug, info, warn, error, critical
 
 ### 3. Message
 Human-readable description:
+
 ```json
 {
   "message": "User authentication failed"
@@ -141,6 +146,7 @@ Human-readable description:
 
 ### 4. Service/Application
 What component logged this:
+
 ```json
 {
   "service": "api-gateway",
@@ -149,6 +155,7 @@ What component logged this:
 ```
 
 ### 5. Environment
+
 ```json
 {
   "environment": "production"
@@ -160,6 +167,7 @@ What component logged this:
 ## Recommended Fields
 
 ### Request Context
+
 ```json
 {
   "request_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -171,6 +179,7 @@ What component logged this:
 ```
 
 ### Performance Metrics
+
 ```json
 {
   "duration_ms": 245,
@@ -179,6 +188,7 @@ What component logged this:
 ```
 
 ### Error Details
+
 ```json
 {
   "error_type": "ValidationError",
@@ -189,6 +199,7 @@ What component logged this:
 ```
 
 ### Business Context
+
 ```json
 {
   "order_id": "ORD-12345",
@@ -203,6 +214,7 @@ What component logged this:
 ## Implementation Examples
 
 ### Python (using structlog)
+
 ```python
 import structlog
 
@@ -227,6 +239,7 @@ logger.info(
 ```
 
 ### Node.js (using Winston)
+
 ```javascript
 const winston = require('winston');
 
@@ -246,6 +259,7 @@ logger.info('User logged in', {
 ```
 
 ### Go (using zap)
+
 ```go
 import "go.uber.org/zap"
 
@@ -260,6 +274,7 @@ logger.Info("User logged in",
 ```
 
 ### Java (using Logback with JSON)
+
 ```java
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -281,11 +296,13 @@ logger.info("User logged in",
 ### Pattern 1: ELK Stack (Elasticsearch, Logstash, Kibana)
 
 **Architecture**:
+
 ```
 Application → Filebeat → Logstash → Elasticsearch → Kibana
 ```
 
 **filebeat.yml**:
+
 ```yaml
 filebeat.inputs:
   - type: log
@@ -300,6 +317,7 @@ output.logstash:
 ```
 
 **logstash.conf**:
+
 ```
 input {
   beats {
@@ -332,11 +350,13 @@ output {
 ### Pattern 2: Loki (Grafana Loki)
 
 **Architecture**:
+
 ```
 Application → Promtail → Loki → Grafana
 ```
 
 **promtail-config.yml**:
+
 ```yaml
 server:
   http_listen_port: 9080
@@ -369,6 +389,7 @@ scrape_configs:
 ```
 
 **Query in Grafana**:
+
 ```logql
 {job="app"} |= "error" | json | level="error"
 ```
@@ -376,6 +397,7 @@ scrape_configs:
 ### Pattern 3: CloudWatch Logs
 
 **Install CloudWatch agent**:
+
 ```json
 {
   "logs": {
@@ -396,6 +418,7 @@ scrape_configs:
 ```
 
 **Query with CloudWatch Insights**:
+
 ```
 fields @timestamp, level, message, user_id
 | filter level = "error"
@@ -406,6 +429,7 @@ fields @timestamp, level, message, user_id
 ### Pattern 4: Fluentd/Fluent Bit
 
 **fluent-bit.conf**:
+
 ```
 [INPUT]
     Name              tail
@@ -434,6 +458,7 @@ fields @timestamp, level, message, user_id
 
 ### Find Errors in Time Range
 **Elasticsearch**:
+
 ```json
 GET /app-logs-*/_search
 {
@@ -452,11 +477,13 @@ GET /app-logs-*/_search
 ```
 
 **Loki (LogQL)**:
+
 ```logql
 {job="app", level="error"} |= "error"
 ```
 
 **CloudWatch Insights**:
+
 ```
 fields @timestamp, @message
 | filter level = "error"
@@ -465,6 +492,7 @@ fields @timestamp, @message
 
 ### Count Errors by Type
 **Elasticsearch**:
+
 ```json
 GET /app-logs-*/_search
 {
@@ -479,12 +507,14 @@ GET /app-logs-*/_search
 ```
 
 **Loki**:
+
 ```logql
 sum by (error_type) (count_over_time({job="app", level="error"}[1h]))
 ```
 
 ### Find Slow Requests
 **Elasticsearch**:
+
 ```json
 GET /app-logs-*/_search
 {
@@ -497,6 +527,7 @@ GET /app-logs-*/_search
 
 ### Trace Request Through Services
 **Elasticsearch** (using request_id):
+
 ```json
 GET /_search
 {
@@ -519,6 +550,7 @@ GET /_search
 ### Sampling Strategies
 
 **1. Random Sampling**:
+
 ```python
 import random
 
@@ -527,6 +559,7 @@ if random.random() < 0.1:  # Sample 10%
 ```
 
 **2. Rate Limiting**:
+
 ```python
 from rate_limiter import RateLimiter
 
@@ -537,6 +570,7 @@ if limiter.allow():
 ```
 
 **3. Error-Biased Sampling**:
+
 ```python
 # Always log errors, sample successful requests
 if level == "error" or random.random() < 0.01:
@@ -544,6 +578,7 @@ if level == "error" or random.random() < 0.01:
 ```
 
 **4. Head-Based Sampling** (trace-aware):
+
 ```python
 # If trace is sampled, log all related logs
 if trace_context.is_sampled():
@@ -572,6 +607,7 @@ if trace_context.is_sampled():
 - Low cost
 
 ### Example: Elasticsearch ILM Policy
+
 ```json
 {
   "policy": {
@@ -615,6 +651,7 @@ if trace_context.is_sampled():
 ### PII Redaction
 
 **Before logging**:
+
 ```python
 import re
 
@@ -633,6 +670,7 @@ logger.info("User data", user_input=redact_pii(user_input))
 ```
 
 **In Logstash**:
+
 ```
 filter {
   mutate {
@@ -647,6 +685,7 @@ filter {
 ### Access Control
 
 **Elasticsearch** (with Security):
+
 ```yaml
 # Role for developers
 dev_logs:
@@ -657,6 +696,7 @@ dev_logs:
 ```
 
 **CloudWatch** (IAM Policy):
+
 ```json
 {
   "Effect": "Allow",
@@ -706,6 +746,7 @@ dev_logs:
 ## Performance Optimization
 
 ### 1. Async Logging
+
 ```python
 import logging
 from logging.handlers import QueueHandler, QueueListener
@@ -724,6 +765,7 @@ listener.start()
 ```
 
 ### 2. Conditional Logging
+
 ```python
 # Avoid expensive operations if not logging
 if logger.isEnabledFor(logging.DEBUG):
@@ -731,6 +773,7 @@ if logger.isEnabledFor(logging.DEBUG):
 ```
 
 ### 3. Batching
+
 ```python
 # Batch logs before sending
 batch = []
@@ -742,6 +785,7 @@ for log in logs:
 ```
 
 ### 4. Compression
+
 ```yaml
 # Filebeat with compression
 output.logstash:

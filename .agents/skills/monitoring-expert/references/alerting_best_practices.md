@@ -129,11 +129,13 @@ Alert on aggregate performance across multiple instances.
 ### Required Fields
 
 **summary**: One-line description of the issue
+
 ```yaml
 summary: "High error rate on {{ $labels.service }}: {{ $value | humanizePercentage }}"
 ```
 
 **description**: Detailed explanation with context
+
 ```yaml
 description: |
   Error rate on {{ $labels.service }} is {{ $value | humanizePercentage }},
@@ -144,6 +146,7 @@ description: |
 ```
 
 **runbook_url**: Link to investigation steps
+
 ```yaml
 runbook_url: "https://runbooks.example.com/alerts/{{ $labels.alertname }}"
 ```
@@ -151,11 +154,13 @@ runbook_url: "https://runbooks.example.com/alerts/{{ $labels.alertname }}"
 ### Optional but Recommended
 
 **dashboard**: Link to relevant dashboard
+
 ```yaml
 dashboard: "https://grafana.example.com/d/service-dashboard?var-service={{ $labels.service }}"
 ```
 
 **logs**: Link to logs
+
 ```yaml
 logs: "https://kibana.example.com/app/discover#/?_a=(query:(query_string:(query:'service:{{ $labels.service }}')))"
 ```
@@ -167,12 +172,14 @@ logs: "https://kibana.example.com/app/discover#/?_a=(query:(query_string:(query:
 ### Required Labels
 
 **severity**: Critical, warning, or info
+
 ```yaml
 labels:
   severity: critical
 ```
 
 **team**: Who should handle this alert
+
 ```yaml
 labels:
   team: platform
@@ -180,6 +187,7 @@ labels:
 ```
 
 **component**: What part of the system
+
 ```yaml
 labels:
   component: api-gateway
@@ -187,6 +195,7 @@ labels:
 ```
 
 ### Example Complete Alert
+
 ```yaml
 - alert: HighLatency
   expr: |
@@ -264,6 +273,7 @@ Prevent alert flapping by requiring the condition to be true for a duration.
 ### Guidelines
 
 **Critical alerts**: Short duration (2-5m)
+
 ```yaml
 - alert: ServiceDown
   expr: up == 0
@@ -271,6 +281,7 @@ Prevent alert flapping by requiring the condition to be true for a duration.
 ```
 
 **Warning alerts**: Longer duration (10-30m)
+
 ```yaml
 - alert: HighMemoryUsage
   expr: memory_usage > 80
@@ -278,6 +289,7 @@ Prevent alert flapping by requiring the condition to be true for a duration.
 ```
 
 **Resource saturation**: Medium duration (5-10m)
+
 ```yaml
 - alert: HighCPU
   expr: cpu_usage > 90
@@ -369,6 +381,7 @@ time_intervals:
 ### Intelligent Grouping
 
 **Group by service and environment**:
+
 ```yaml
 route:
   group_by: ['alertname', 'service', 'environment']
@@ -413,6 +426,7 @@ Every alert should link to a runbook with:
 - What is the urgency?
 
 ### 2. Investigation Steps
+
 ```markdown
 ## Investigation
 
@@ -432,6 +446,7 @@ Every alert should link to a runbook with:
 ```
 
 ### 3. Common Causes
+
 ```markdown
 ## Common Causes
 
@@ -442,6 +457,7 @@ Every alert should link to a runbook with:
 ```
 
 ### 4. Resolution Steps
+
 ```markdown
 ## Resolution
 
@@ -461,6 +477,7 @@ Every alert should link to a runbook with:
 ```
 
 ### 5. Escalation
+
 ```markdown
 ## Escalation
 
@@ -507,6 +524,7 @@ If issue persists after 30 minutes:
 ## Alert Testing
 
 ### Test Alert Firing
+
 ```bash
 # Trigger test alert in Prometheus
 amtool alert add alertname="TestAlert" \
@@ -522,6 +540,7 @@ curl -X POST http://alertmanager:9093/api/v1/alerts \
 ```
 
 ### Verify Alert Rules
+
 ```bash
 # Check syntax
 promtool check rules alerts.yml
@@ -535,6 +554,7 @@ promtool test rules test.yml
 ```
 
 ### Test Alertmanager Routing
+
 ```bash
 # Test which receiver an alert would go to
 amtool config routes test \
@@ -555,6 +575,7 @@ amtool config routes test \
 - **Handoff**: Monday morning (not Friday evening)
 
 ### On-Call Checklist
+
 ```markdown
 ## Pre-shift
 - [ ] Test pager/phone
@@ -588,6 +609,7 @@ amtool config routes test \
 Monitor your monitoring system!
 
 ### Key Metrics
+
 ```promql
 # Alert firing frequency
 sum(ALERTS{alertstate="firing"}) by (alertname)

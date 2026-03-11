@@ -28,6 +28,7 @@ Comprehensive guide to diagnosing and resolving common CI/CD pipeline issues.
 4. Workflow disabled in repository settings
 
 **Diagnostics:**
+
 ```bash
 # Validate YAML
 yamllint .github/workflows/ci.yml
@@ -37,6 +38,7 @@ gh workflow list --repo owner/repo
 ```
 
 **Solutions:**
+
 ```yaml
 # Check trigger configuration
 on:
@@ -54,6 +56,7 @@ gh workflow enable ci.yml --repo owner/repo
 **Symptoms:** Pipeline doesn't start
 
 **Diagnostics:**
+
 ```bash
 # Validate .gitlab-ci.yml
 gl-ci-lint < .gitlab-ci.yml
@@ -80,6 +83,7 @@ gl-ci-lint < .gitlab-ci.yml
 5. Time-dependent tests
 
 **Identify flaky tests:**
+
 ```yaml
 # GitHub Actions - Run multiple times
 strategy:
@@ -90,6 +94,7 @@ steps:
 ```
 
 **Solutions:**
+
 ```javascript
 // Add retries to flaky tests
 jest.retryTimes(3);
@@ -104,6 +109,7 @@ await waitFor(() => expect(element).toBeInDocument(), {
 ```
 
 **Network retry pattern:**
+
 ```yaml
 - name: Install with retry
   uses: nick-invision/retry@v2
@@ -118,6 +124,7 @@ await waitFor(() => expect(element).toBeInDocument(), {
 **Symptoms:** "Job exceeded maximum time" or similar
 
 **Solutions:**
+
 ```yaml
 # GitHub Actions - Increase timeout
 jobs:
@@ -140,6 +147,7 @@ test:
 **Symptoms:** "Process completed with exit code 1"
 
 **Diagnostics:**
+
 ```yaml
 # Add verbose logging
 - run: npm test -- --verbose
@@ -181,6 +189,7 @@ test:
 4. Private package access issues
 
 **Solutions:**
+
 ```yaml
 # Clear cache and reinstall
 - run: rm -rf node_modules package-lock.json
@@ -203,6 +212,7 @@ cache:
 **Symptoms:** Dependency resolution errors, peer dependency warnings
 
 **Diagnostics:**
+
 ```bash
 # Check for conflicts
 npm ls
@@ -213,6 +223,7 @@ npm list --depth=1
 ```
 
 **Solutions:**
+
 ```json
 // Use overrides (package.json)
 {
@@ -234,6 +245,7 @@ npm list --depth=1
 **Symptoms:** "401 Unauthorized" or "404 Not Found" for private packages
 
 **GitHub Packages:**
+
 ```yaml
 - run: |
     echo "@myorg:registry=https://npm.pkg.github.com" >> .npmrc
@@ -242,12 +254,14 @@ npm list --depth=1
 ```
 
 **npm Registry:**
+
 ```yaml
 - run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
 - run: npm ci
 ```
 
 **GitLab Package Registry:**
+
 ```yaml
 before_script:
   - echo "@mygroup:registry=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/npm/" >> .npmrc
@@ -263,6 +277,7 @@ before_script:
 **Symptoms:** Docker commands fail with connection error
 
 **GitHub Actions:**
+
 ```yaml
 # Ensure Docker is available
 runs-on: ubuntu-latest  # Has Docker pre-installed
@@ -272,6 +287,7 @@ steps:
 ```
 
 **GitLab CI:**
+
 ```yaml
 # Use Docker-in-Docker
 image: docker:latest
@@ -290,6 +306,7 @@ variables:
 **Symptoms:** "Error response from daemon: pull access denied" or timeout
 
 **Solutions:**
+
 ```yaml
 # GitHub Actions - Login to registry
 - uses: docker/login-action@v3
@@ -317,6 +334,7 @@ variables:
 **Symptoms:** Docker build fails with disk space error
 
 **Solutions:**
+
 ```yaml
 # GitHub Actions - Clean up space
 - run: docker system prune -af --volumes
@@ -341,6 +359,7 @@ variables:
 **Symptoms:** Build fails for ARM/different architecture
 
 **Solution:**
+
 ```yaml
 - uses: docker/setup-qemu-action@v3
 
@@ -364,6 +383,7 @@ variables:
 **Symptoms:** Cannot push, create release, or access API
 
 **Solutions:**
+
 ```yaml
 # Add necessary permissions
 permissions:
@@ -383,6 +403,7 @@ permissions:
 **Symptoms:** Cannot push to repository or access API
 
 **Solutions:**
+
 ```yaml
 # Use CI_JOB_TOKEN for API access
 script:
@@ -401,6 +422,7 @@ before_script:
 **Symptoms:** "failed to push some refs" or "protected branch"
 
 **Solutions:**
+
 ```yaml
 # GitHub Actions - Check branch protection
 # Settings > Branches > Branch protection rules
@@ -424,6 +446,7 @@ permissions:
 **Symptoms:** "Unable to locate credentials"
 
 **Solutions:**
+
 ```yaml
 # Using OIDC (recommended)
 - uses: aws-actions/configure-aws-credentials@v4
@@ -449,6 +472,7 @@ permissions:
 ### Slow Pipeline Execution
 
 **Diagnostics:**
+
 ```bash
 # GitHub - View timing
 gh run view <run-id> --log
@@ -469,6 +493,7 @@ gh run view <run-id> --log
 **Symptoms:** Cache always misses, builds still slow
 
 **Diagnostics:**
+
 ```yaml
 - uses: actions/cache@v4
   id: cache
@@ -486,6 +511,7 @@ gh run view <run-id> --log
 4. Cache evicted (LRU after 7 days on GitHub)
 
 **Solutions:**
+
 ```yaml
 # Use consistent key
 key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -505,6 +531,7 @@ restore-keys: |
 ### GitHub Actions
 
 **"Resource not accessible by integration":**
+
 ```yaml
 # Add required permission
 permissions:
@@ -528,6 +555,7 @@ permissions:
 - Runner not configured for this project
 
 **Solutions:**
+
 ```yaml
 # Remove tags to use any available runner
 job:
@@ -543,6 +571,7 @@ job:
 - Infrastructure issue
 
 **Check runner logs:**
+
 ```bash
 # On runner host
 journalctl -u gitlab-runner -f
@@ -555,6 +584,7 @@ journalctl -u gitlab-runner -f
 ### Enable Debug Logging
 
 **GitHub Actions:**
+
 ```yaml
 # Repository > Settings > Secrets > Add:
 # ACTIONS_RUNNER_DEBUG = true
@@ -562,6 +592,7 @@ journalctl -u gitlab-runner -f
 ```
 
 **GitLab CI:**
+
 ```yaml
 variables:
   CI_DEBUG_TRACE: "true"  # Caution: May expose secrets!
@@ -570,6 +601,7 @@ variables:
 ### Interactive Debugging
 
 **GitHub Actions:**
+
 ```yaml
 # Add tmate for SSH access
 - uses: mxschmitt/action-tmate@v3
@@ -577,6 +609,7 @@ variables:
 ```
 
 **Local reproduction:**
+
 ```bash
 # Use act to run GitHub Actions locally
 act -j build
@@ -625,6 +658,7 @@ repos:
 ### CI/CD Health Monitoring
 
 Use the `scripts/ci_health.py` script:
+
 ```bash
 python3 scripts/ci_health.py --platform github --repo owner/repo
 ```
@@ -642,14 +676,14 @@ python3 scripts/ci_health.py --platform github --repo owner/repo
 ## Getting Help
 
 **GitHub Actions:**
-- Community Forum: https://github.community
-- Documentation: https://docs.github.com/actions
-- Status: https://www.githubstatus.com
+- Community Forum: <https://github.community>
+- Documentation: <https://docs.github.com/actions>
+- Status: <https://www.githubstatus.com>
 
 **GitLab CI:**
-- Forum: https://forum.gitlab.com
-- Documentation: https://docs.gitlab.com/ee/ci
-- Status: https://status.gitlab.com
+- Forum: <https://forum.gitlab.com>
+- Documentation: <https://docs.gitlab.com/ee/ci>
+- Status: <https://status.gitlab.com>
 
 **General CI/CD:**
 - Stack Overflow: Tag [github-actions] or [gitlab-ci]

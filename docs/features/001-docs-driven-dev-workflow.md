@@ -83,6 +83,7 @@ graph TD
 | `scripts/mermaid_to_image.py` | **[RESTORED]** PNG/SVG rendering |
 
 **Source repos referenced:**
+
 - [`design-doc-mermaid`](https://github.com/SpillwaveSolutions/design-doc-mermaid.git) — Mermaid guides + templates (upstream, 4 files restored in 2026-03-08 upgrade)
 - [`claude-code-skills`](https://github.com/levnikolaevich/claude-code-skills.git) — Cherry-picked: Epic→Story→Task hierarchy (ln-200), structured verification (ln-310, ln-500)
 
@@ -91,8 +92,10 @@ graph TD
 ### 2.2 Enhanced Existing Workflows
 
 #### `brainstorm.md`
-**Before:** 2-3 round implicit limit, no checklist, no diagram requirement  
+
+**Before:** 2-3 round implicit limit, no checklist, no diagram requirement
 **After:**
+
 - Minimum 5-10+ rounds enforced
 - Completeness checklist: problem, users, constraints, alternatives, diagrams, edge cases, risks
 - Mermaid sketching encouraged during brainstorm
@@ -100,15 +103,19 @@ graph TD
 - Transitions into `design-docs` skill when done
 
 #### `write-plan.md`
-**Before:** Flat task list  
+
+**Before:** Flat task list
 **After:**
+
 - Epic → Story → Task 3-level hierarchy (from ln-200 scope-decomposer)
 - Mermaid diagrams embedded in plans where useful
 - References LLD document (links to the doc created in step 2)
 
 #### `verify.md`
-**Before:** Simple checklist  
+
+**Before:** Simple checklist
 **After:**
+
 - Structured validation checklist (from ln-310)
 - 4-level verdict system:
   - ✅ **PASS** — all checks green, proceed
@@ -132,6 +139,7 @@ graph LR
 ```
 
 **Commit strategy (conventional commits):**
+
 - `docs:` — after documentation step
 - `feat:` / `fix:` / `test:` / `refactor:` — per logical unit during execution
 - `chore:` — HLD updates, Linear issue close, final cleanup
@@ -175,6 +183,7 @@ Level 3 — Bundled resources
 ```
 
 **Impact:**
+
 - `design-docs` was consuming ~6,800 lines of context per activation (full-load)
 - With progressive disclosure it now consumes ~184 lines (SKILL.md only) + only the specific reference needed
 - Context waste reduced by ~97% per activation for complex skills
@@ -193,10 +202,11 @@ Level 3 — Bundled resources
 
 ### 2.6 Skill-Creator Upgrade (Updated 2026-03-08)
 
-**Old:** Local copy of `skill-creator`, incrementally edited, out of sync with upstream  
+**Old:** Local copy of `skill-creator`, incrementally edited, out of sync with upstream
 **New:** Replaced from canonical source ([anthropics/skills](https://github.com/anthropics/skills)) then customized
 
 Customizations re-applied on top of upstream:
+
 - Updated `description` field to include workflow creation + "single entry point for ANY new capability"
 - Added **Step 0 Classification** decision tree (Antigravity-specific):
   - Skill vs Workflow vs Paired (Skill + Workflow) routing
@@ -239,11 +249,12 @@ docs/
 ```
 
 **Workspace setup:**
+
 - Organization: **SCALE** (`scale-ind`)
 - Team: **SCA**
 - Project: [SpendSmart Dashboard](https://linear.app/scale-ind/project/spendsmart-dashboard-3982848882ec)
 
-**Workflow states available:** Backlog → Todo → In Progress → In Review → Done → Canceled → Duplicate  
+**Workflow states available:** Backlog → Todo → In Progress → In Review → Done → Canceled → Duplicate
 **Labels available:** Bug, Feature, Improvement
 
 ---
@@ -311,6 +322,7 @@ The agent will follow `docs-driven-dev.md` automatically via the activation map 
 ### Phase 1 (2026-03-06 — Original)
 
 **New Files:**
+
 ```
 .agents/skills/design-docs/          ← entire new skill
 .agents/workflows/docs-driven-dev.md ← new master workflow
@@ -324,6 +336,7 @@ docs/archive/                         ← 9 migrated files
 ```
 
 **Modified Files:**
+
 ```
 .agents/workflows/brainstorm.md       ← extended, checklist added
 .agents/workflows/write-plan.md       ← Epic→Story→Task hierarchy
@@ -336,18 +349,21 @@ docs/archive/                         ← 9 migrated files
 ### Phase 2 (2026-03-08 — Progressive Disclosure Upgrade)
 
 **Replaced:**
+
 ```
 .agents/skills/skill-creator/         ← replaced with upstream Anthropic version
                                          + Step 0 Classification re-applied
 ```
 
 **Modified:**
+
 ```
 .agents/workflows/global-rule.md      ← skill loading: full-load → progressive disclosure
 .agents/skills/design-docs/SKILL.md   ← rewritten as progressive disclosure router (184 lines)
 ```
 
 **Restored from upstream (design-doc-mermaid):**
+
 ```
 .agents/skills/design-docs/references/troubleshooting.md          ← 28 Mermaid error fixes
 .agents/skills/design-docs/references/resilient-workflow.md       ← validation pipeline
@@ -373,12 +389,14 @@ docs/archive/                         ← 9 migrated files
 ## 8. Scope
 
 ### In Scope
+
 - Agent configuration (Claude + Gemini workflows and skills)
 - Docs directory structure and conventions
 - Skill loading protocol (progressive disclosure)
 - Brainstorming gate enforcement
 
 ### Out of Scope
+
 - Application code changes (no API/DB/frontend changes)
 - Linear MCP setup (deferred — needs API key)
 - Splitting existing docs into per-topic LLDs

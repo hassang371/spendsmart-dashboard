@@ -1,7 +1,9 @@
 from enum import Enum
 
+
 class JobStatus(str, Enum):
     """Lifecycle states for background jobs."""
+
     PENDING = "pending"
     CLAIMED = "claimed"
     PROCESSING = "processing"
@@ -11,6 +13,7 @@ class JobStatus(str, Enum):
 
 class InvalidTransitionError(ValueError):
     """Raised when an illegal state transition is attempted."""
+
     pass
 
 

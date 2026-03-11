@@ -18,6 +18,7 @@ Common Terraform and Terragrunt issues with solutions.
 ### State Lock Error
 
 **Symptom:**
+
 ```
 Error locking state: Error acquiring the state lock
 Lock Info:
@@ -36,16 +37,19 @@ Lock Info:
 **Resolution:**
 
 1. **Verify no one else is running terraform:**
+
 ```bash
 # Check with team first!
 ```
 
-2. **Force unlock (use with caution):**
+1. **Force unlock (use with caution):**
+
 ```bash
 terraform force-unlock abc123
 ```
 
-3. **For DynamoDB backend, check lock table:**
+1. **For DynamoDB backend, check lock table:**
+
 ```bash
 aws dynamodb get-item \
   --table-name terraform-state-lock \
@@ -62,6 +66,7 @@ aws dynamodb get-item \
 ### State Drift Detected
 
 **Symptom:**
+
 ```
 Note: Objects have changed outside of Terraform
 
@@ -77,16 +82,18 @@ since the last "terraform apply":
 **Resolution:**
 
 1. **Review the drift:**
+
 ```bash
 terraform plan -detailed-exitcode
 ```
 
-2. **Options:**
+1. **Options:**
    - **Import changes:** Update terraform to match reality
    - **Revert changes:** Apply terraform to restore desired state
    - **Refresh state:** `terraform apply -refresh-only`
 
-3. **Import specific changes:**
+2. **Import specific changes:**
+
 ```bash
 # Update your .tf files, then:
 terraform plan  # Verify it matches
@@ -104,6 +111,7 @@ terraform apply
 ### State Corruption
 
 **Symptom:**
+
 ```
 Error: Failed to load state
 Error: state snapshot was created by Terraform v1.5.0,
@@ -118,13 +126,15 @@ which is newer than current v1.3.0
 **Resolution:**
 
 1. **Version mismatch:**
+
 ```bash
 # Upgrade to matching version
 tfenv install 1.5.0
 tfenv use 1.5.0
 ```
 
-2. **Restore from backup:**
+1. **Restore from backup:**
+
 ```bash
 # For S3 backend with versioning
 aws s3api list-object-versions \
@@ -139,7 +149,8 @@ aws s3api get-object \
   terraform.tfstate
 ```
 
-3. **Rebuild state (last resort):**
+1. **Rebuild state (last resort):**
+
 ```bash
 # Remove corrupted state
 terraform state rm aws_instance.example
@@ -161,6 +172,7 @@ terraform import aws_instance.example i-1234567890abcdef0
 ### Provider Version Conflict
 
 **Symptom:**
+
 ```
 Error: Incompatible provider version
 
@@ -171,6 +183,7 @@ a package available for your current platform
 **Resolution:**
 
 1. **Specify version constraints:**
+
 ```hcl
 terraform {
   required_providers {
@@ -182,13 +195,15 @@ terraform {
 }
 ```
 
-2. **Clean provider cache:**
+1. **Clean provider cache:**
+
 ```bash
 rm -rf .terraform
 terraform init -upgrade
 ```
 
-3. **Lock file sync:**
+1. **Lock file sync:**
+
 ```bash
 terraform providers lock \
   -platform=darwin_amd64 \
@@ -201,6 +216,7 @@ terraform providers lock \
 ### Authentication Failures
 
 **Symptom:**
+
 ```
 Error: error configuring Terraform AWS Provider:
 no valid credential sources found
@@ -214,16 +230,18 @@ no valid credential sources found
 **Resolution:**
 
 1. **Verify credentials:**
+
 ```bash
 aws sts get-caller-identity
 ```
 
-2. **Check credential order:**
+1. **Check credential order:**
    - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
    - Shared credentials file (~/.aws/credentials)
    - IAM role (for EC2/ECS)
 
-3. **Configure provider:**
+2. **Configure provider:**
+
 ```hcl
 provider "aws" {
   region = "us-east-1"
@@ -238,7 +256,8 @@ provider "aws" {
 }
 ```
 
-4. **Check IAM permissions:**
+1. **Check IAM permissions:**
+
 ```bash
 # Test specific permission
 aws ec2 describe-instances --dry-run
@@ -257,6 +276,7 @@ aws ec2 describe-instances --dry-run
 ### Resource Already Exists
 
 **Symptom:**
+
 ```
 Error: creating EC2 Instance: EntityAlreadyExists:
 Resource with id 'i-1234567890abcdef0' already exists
@@ -265,16 +285,19 @@ Resource with id 'i-1234567890abcdef0' already exists
 **Resolution:**
 
 1. **Import existing resource:**
+
 ```bash
 terraform import aws_instance.web i-1234567890abcdef0
 ```
 
-2. **Verify configuration matches:**
+1. **Verify configuration matches:**
+
 ```bash
 terraform plan  # Should show no changes after import
 ```
 
-3. **If configuration differs, update it:**
+1. **If configuration differs, update it:**
+
 ```hcl
 resource "aws_instance" "web" {
   ami           = "ami-abc123"  # Match existing
@@ -287,6 +310,7 @@ resource "aws_instance" "web" {
 ### Dependency Errors
 
 **Symptom:**
+
 ```
 Error: resource depends on resource "aws_vpc.main" that
 is not declared in the configuration
@@ -295,6 +319,7 @@ is not declared in the configuration
 **Resolution:**
 
 1. **Add explicit dependency:**
+
 ```hcl
 resource "aws_subnet" "private" {
   vpc_id = aws_vpc.main.id
@@ -305,7 +330,8 @@ resource "aws_subnet" "private" {
 }
 ```
 
-2. **Use data sources for existing resources:**
+1. **Use data sources for existing resources:**
+
 ```hcl
 data "aws_vpc" "existing" {
   id = "vpc-12345678"
@@ -321,6 +347,7 @@ resource "aws_subnet" "new" {
 ### Timeout Errors
 
 **Symptom:**
+
 ```
 Error: timeout while waiting for state to become 'available'
 (last state: 'pending', timeout: 10m0s)
@@ -329,6 +356,7 @@ Error: timeout while waiting for state to become 'available'
 **Resolution:**
 
 1. **Increase timeout:**
+
 ```hcl
 resource "aws_db_instance" "main" {
   # ... configuration ...
@@ -341,12 +369,14 @@ resource "aws_db_instance" "main" {
 }
 ```
 
-2. **Check resource status manually:**
+1. **Check resource status manually:**
+
 ```bash
 aws rds describe-db-instances --db-instance-identifier mydb
 ```
 
-3. **Retry the operation:**
+1. **Retry the operation:**
+
 ```bash
 terraform apply
 ```
@@ -358,6 +388,7 @@ terraform apply
 ### Module Source Not Found
 
 **Symptom:**
+
 ```
 Error: Failed to download module
 
@@ -368,6 +399,7 @@ git::https://github.com/company/terraform-modules.git//vpc
 **Resolution:**
 
 1. **Verify source URL:**
+
 ```hcl
 module "vpc" {
   source = "git::https://github.com/company/terraform-modules.git//vpc?ref=v1.0.0"
@@ -375,7 +407,8 @@ module "vpc" {
 }
 ```
 
-2. **For private repos, configure Git auth:**
+1. **For private repos, configure Git auth:**
+
 ```bash
 # SSH key
 git config --global url."git@github.com:".insteadOf "https://github.com/"
@@ -384,7 +417,8 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 git config --global url."https://oauth2:TOKEN@github.com/".insteadOf "https://github.com/"
 ```
 
-3. **Clear module cache:**
+1. **Clear module cache:**
+
 ```bash
 rm -rf .terraform/modules
 terraform init
@@ -395,6 +429,7 @@ terraform init
 ### Module Version Conflicts
 
 **Symptom:**
+
 ```
 Error: Inconsistent dependency lock file
 
@@ -405,11 +440,13 @@ root module requires version 2.0.0
 **Resolution:**
 
 1. **Update lock file:**
+
 ```bash
 terraform init -upgrade
 ```
 
-2. **Pin module version:**
+1. **Pin module version:**
+
 ```hcl
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
@@ -424,6 +461,7 @@ module "vpc" {
 ### Dependency Cycle Detected
 
 **Symptom:**
+
 ```
 Error: Dependency cycle detected:
   module-a depends on module-b
@@ -434,6 +472,7 @@ Error: Dependency cycle detected:
 **Resolution:**
 
 1. **Review dependencies in terragrunt.hcl:**
+
 ```hcl
 dependency "vpc" {
   config_path = "../vpc"
@@ -446,12 +485,13 @@ dependency "database" {
 # Don't create circular references!
 ```
 
-2. **Refactor to remove cycle:**
+1. **Refactor to remove cycle:**
    - Split modules differently
    - Use data sources instead of dependencies
    - Pass values through variables
 
-3. **Use mock outputs during planning:**
+2. **Use mock outputs during planning:**
+
 ```hcl
 dependency "vpc" {
   config_path = "../vpc"
@@ -468,6 +508,7 @@ dependency "vpc" {
 ### Hook Failures
 
 **Symptom:**
+
 ```
 Error: Hook execution failed
 Command: pre_apply_hook.sh
@@ -477,12 +518,14 @@ Exit code: 1
 **Resolution:**
 
 1. **Debug the hook:**
+
 ```bash
 # Run hook manually
 bash .terragrunt-cache/.../pre_apply_hook.sh
 ```
 
-2. **Add error handling to hook:**
+1. **Add error handling to hook:**
+
 ```bash
 #!/bin/bash
 set -e  # Exit on error
@@ -494,7 +537,8 @@ if ! command -v jq &> /dev/null; then
 fi
 ```
 
-3. **Make hook executable:**
+1. **Make hook executable:**
+
 ```bash
 chmod +x hooks/pre_apply_hook.sh
 ```
@@ -504,6 +548,7 @@ chmod +x hooks/pre_apply_hook.sh
 ### Include Path Issues
 
 **Symptom:**
+
 ```
 Error: Cannot include file
 Path does not exist: ../common.hcl
@@ -512,6 +557,7 @@ Path does not exist: ../common.hcl
 **Resolution:**
 
 1. **Use correct relative path:**
+
 ```hcl
 include "root" {
   path = find_in_parent_folders()
@@ -522,7 +568,8 @@ include "common" {
 }
 ```
 
-2. **Verify file exists:**
+1. **Verify file exists:**
+
 ```bash
 ls -la ../common.hcl
 ```
@@ -547,19 +594,22 @@ ls -la ../common.hcl
 **Resolution:**
 
 1. **Split state files:**
+
 ```
 networking/     # Separate state
 compute/        # Separate state
 database/       # Separate state
 ```
 
-2. **Use targeted operations:**
+1. **Use targeted operations:**
+
 ```bash
 terraform plan -target=aws_instance.web
 terraform apply -target=module.vpc
 ```
 
-3. **Optimize data sources:**
+1. **Optimize data sources:**
+
 ```hcl
 # Bad - queries every plan
 data "aws_ami" "ubuntu" {
@@ -573,12 +623,14 @@ variable "ami_id" {
 }
 ```
 
-4. **Enable parallelism:**
+1. **Enable parallelism:**
+
 ```bash
 terraform apply -parallelism=20  # Default is 10
 ```
 
-5. **Use caching (Terragrunt):**
+1. **Use caching (Terragrunt):**
+
 ```hcl
 remote_state {
   backend = "s3"

@@ -11,7 +11,6 @@ Fixes:
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
-from supabase import Client
 
 from apps.api.core.auth import get_user_client
 from apps.api.domains.categorization.schemas import (
@@ -27,6 +26,7 @@ from apps.api.domains.categorization.service import (
     classify_single_in_process,
     get_classifier,
 )
+from supabase import Client
 
 router = APIRouter(prefix="/categorization", tags=["categorization"])
 logger = structlog.get_logger()
@@ -108,18 +108,22 @@ async def submit_feedback(
     rows_to_insert: list[dict[str, str]] = []
     for key, value in corrections.items():
         if isinstance(value, str):
-            rows_to_insert.append({
-                "user_id": user_response.user.id,
-                "description": str(key),
-                "corrected_category": value,
-            })
+            rows_to_insert.append(
+                {
+                    "user_id": user_response.user.id,
+                    "description": str(key),
+                    "corrected_category": value,
+                }
+            )
         elif isinstance(value, list):
             for description in value:
-                rows_to_insert.append({
-                    "user_id": user_response.user.id,
-                    "description": str(description),
-                    "corrected_category": str(key),
-                })
+                rows_to_insert.append(
+                    {
+                        "user_id": user_response.user.id,
+                        "description": str(description),
+                        "corrected_category": str(key),
+                    }
+                )
 
     if not rows_to_insert:
         raise HTTPException(status_code=400, detail="No valid corrections provided")
@@ -129,9 +133,7 @@ async def submit_feedback(
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to store feedback")
 
-    updated_categories = sorted(
-        {row["corrected_category"] for row in rows_to_insert if row["corrected_category"]}
-    )
+    updated_categories = sorted({row["corrected_category"] for row in rows_to_insert if row["corrected_category"]})
     return {"status": "ok", "updated_categories": updated_categories}
 
 
@@ -192,8 +194,8 @@ async def get_classification_metrics(client: Client = Depends(get_user_client)):
     Returns per-class F1, confidence histogram, and rule vs. model split.
     Requires at least 1 manually corrected transaction.
     """
-    from sklearn.metrics import accuracy_score, precision_recall_fscore_support
     import numpy as np
+    from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
     user_response = client.auth.get_user()
     if not user_response or not user_response.user:
@@ -243,7 +245,8 @@ async def get_classification_metrics(client: Client = Depends(get_user_client)):
 
     acc = float(accuracy_score(y_true, y_pred))
     precision, recall, f1, support = precision_recall_fscore_support(
-        y_true, y_pred,
+        y_true,
+        y_pred,
         labels=list(range(len(label_names))),
         zero_division=0,
     )
@@ -251,9 +254,9 @@ async def get_classification_metrics(client: Client = Depends(get_user_client)):
     per_class = {
         label_names[i]: {
             "precision": float(precision[i]),
-            "recall":    float(recall[i]),
-            "f1":        float(f1[i]),
-            "support":   int(support[i]),
+            "recall": float(recall[i]),
+            "f1": float(f1[i]),
+            "support": int(support[i]),
         }
         for i in range(len(label_names))
         if support[i] > 0
@@ -302,10 +305,12 @@ async def list_models(client: Client = Depends(get_user_client)):
         if filename.endswith(".pt"):
             filepath = os.path.join(user_dir, filename)
             stat = os.stat(filepath)
-            models.append({
-                "name": filename,
-                "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                "created_at": stat.st_mtime,
-            })
+            models.append(
+                {
+                    "name": filename,
+                    "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                    "created_at": stat.st_mtime,
+                }
+            )
 
     return {"models": sorted(models, key=lambda x: x["created_at"], reverse=True)}

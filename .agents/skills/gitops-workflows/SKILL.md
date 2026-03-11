@@ -322,6 +322,7 @@ flux bootstrap github --context staging-cluster --path clusters/staging
 ### Option 1: SOPS + age (Recommended 2025)
 
 **Setup**:
+
 ```bash
 # Generate age key
 age-keygen -o key.txt
@@ -371,6 +372,7 @@ python3 scripts/secret_audit.py /path/to/repo
 ### Argo Rollouts (with ArgoCD)
 
 **Canary Deployment**:
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
@@ -392,6 +394,7 @@ spec:
 ### Flagger (with Flux)
 
 **Canary with Metrics Analysis**:
+
 ```yaml
 apiVersion: flagger.app/v1beta1
 kind: Canary
@@ -418,6 +421,7 @@ spec:
 ### Common Issues
 
 **ArgoCD OutOfSync**:
+
 ```bash
 # Check differences
 argocd app diff my-app
@@ -430,6 +434,7 @@ python3 scripts/check_argocd_health.py --server https://argocd.example.com --tok
 ```
 
 **Flux Not Reconciling**:
+
 ```bash
 # Check resources
 flux get all
@@ -443,6 +448,7 @@ flux reconcile kustomization my-app
 ```
 
 **Detect Drift**:
+
 ```bash
 # ArgoCD drift detection
 python3 scripts/sync_drift_detector.py --argocd --app my-app

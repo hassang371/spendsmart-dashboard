@@ -1,6 +1,7 @@
 import hashlib
-import pandas as pd
 from typing import IO
+
+import pandas as pd
 
 
 def normalize_merchant(merchant: str) -> str:
@@ -12,9 +13,7 @@ def normalize_merchant(merchant: str) -> str:
     return str(merchant).strip().upper()
 
 
-def generate_fingerprint(
-    iso_date: str, amount: float, merchant: str, salt: str = ""
-) -> str:
+def generate_fingerprint(iso_date: str, amount: float, merchant: str, salt: str = "") -> str:
     """
     Generates a unique SHA256 fingerprint for a transaction.
     Format: SHA256({ISO_Date_Sec}|{Amount_Float}|{Merchant_Normalized}|{salt})
@@ -90,21 +89,15 @@ def _normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     if "debit" in df.columns and "credit" in df.columns:
         # Fill NaNs with 0
-        df["debit"] = pd.to_numeric(
-            _clean_currency(df["debit"]), errors="coerce"
-        ).fillna(0)
-        df["credit"] = pd.to_numeric(
-            _clean_currency(df["credit"]), errors="coerce"
-        ).fillna(0)
+        df["debit"] = pd.to_numeric(_clean_currency(df["debit"]), errors="coerce").fillna(0)
+        df["credit"] = pd.to_numeric(_clean_currency(df["credit"]), errors="coerce").fillna(0)
 
         # Calculate amount
         df["amount"] = df["credit"] - df["debit"]
 
     elif "amount" in df.columns:
         # Clean amount column (strip currency prefixes)
-        df["amount"] = pd.to_numeric(
-            _clean_currency(df["amount"]), errors="coerce"
-        ).fillna(0)
+        df["amount"] = pd.to_numeric(_clean_currency(df["amount"]), errors="coerce").fillna(0)
     else:
         # Logical error or empty logic, but let's return what we have
         if "amount" not in df.columns:
@@ -128,9 +121,7 @@ def _normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # 4. Standardize Date
     if "date" in df.columns:
         # Coerce errors to NaT, then drop or handle? For now, standard behavior.
-        df["date"] = pd.to_datetime(
-            df["date"], dayfirst=True, errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
+        df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce").dt.strftime("%Y-%m-%d")
 
     # 5. Ensure merchant column exists
     if "merchant" not in df.columns and "description" in df.columns:
@@ -161,6 +152,7 @@ def _parse_pdf(file_content: bytes) -> pd.DataFrame:
     the result with _normalize_dataframe so downstream code gets standard columns.
     """
     import io
+
     import pdfplumber
 
     all_rows: list[list] = []
@@ -187,9 +179,7 @@ def _parse_pdf(file_content: bytes) -> pd.DataFrame:
                         all_rows.append(row)
 
     if not all_rows or header is None:
-        raise ValueError(
-            "No table found in PDF. Ensure it is a bank statement with tabular data."
-        )
+        raise ValueError("No table found in PDF. Ensure it is a bank statement with tabular data.")
 
     df = pd.DataFrame(all_rows, columns=header)
     # Drop fully-empty rows
@@ -198,9 +188,7 @@ def _parse_pdf(file_content: bytes) -> pd.DataFrame:
     return _normalize_dataframe(df)
 
 
-def parse_file(
-    file_content: bytes, filename: str, password: str = None
-) -> pd.DataFrame:
+def parse_file(file_content: bytes, filename: str, password: str = None) -> pd.DataFrame:
     """
     Parses a transaction file (CSV, Excel, JSON, TSV, PDF) based on extension/content.
     """
@@ -218,11 +206,7 @@ def parse_file(
         except UnicodeDecodeError:
             return b.decode("windows-1252", errors="replace")
 
-    if (
-        filename_lower.endswith(".xlsx")
-        or filename_lower.endswith(".xls")
-        or filename_lower.endswith(".xlsm")
-    ):
+    if filename_lower.endswith(".xlsx") or filename_lower.endswith(".xls") or filename_lower.endswith(".xlsm"):
         # Use v2 excel parser
         from packages.ingestion_engine.excel_parser import parse_excel_transaction_file
 

@@ -35,8 +35,7 @@ def parse_skill_md(skill_path: Path) -> tuple[str, str, str]:
                 continuation_lines: list[str] = []
                 i += 1
                 while i < len(frontmatter_lines) and (
-                    frontmatter_lines[i].startswith("  ")
-                    or frontmatter_lines[i].startswith("\t")
+                    frontmatter_lines[i].startswith("  ") or frontmatter_lines[i].startswith("\t")
                 ):
                     continuation_lines.append(frontmatter_lines[i].strip())
                     i += 1

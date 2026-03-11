@@ -8,23 +8,33 @@ and batch reclassification. The frontend no longer writes directly
 to Supabase.
 """
 
-import structlog
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Path, Query
-from pydantic import BaseModel, Field
-from supabase import Client
 from typing import Optional
+
+import structlog
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+)
+from pydantic import BaseModel, Field
 
 from apps.api.core.auth import get_current_user, get_current_user_id, get_user_client
 from apps.api.core.filtering import TransactionFilter
 from apps.api.core.pagination import CursorPage, PaginationParams
-from apps.api.domains.accounts.schemas import ProfileOut, TransactionOut
+from apps.api.domains.accounts.schemas import ProfileOut
 from apps.api.domains.accounts.service import list_user_transactions
+from supabase import Client
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 logger = structlog.get_logger()
 
 
 # --- Request schemas ---
+
 
 def _run_supervised_finetuning_bg(
     user_id: str,
@@ -86,6 +96,7 @@ def _extract_merchant_keyword(description: str) -> str | None:
 
 class TransactionUpdate(BaseModel):
     """Updateable fields for a single transaction."""
+
     category: Optional[str] = Field(default=None, max_length=255, description="New category")
     amount: Optional[float] = Field(default=None, description="New amount (for income flip)")
     old_category: Optional[str] = Field(
@@ -97,6 +108,7 @@ class TransactionUpdate(BaseModel):
 
 class BatchUpdateItem(BaseModel):
     """A single item in a batch update request."""
+
     id: str = Field(description="Transaction UUID to update")
     category: str = Field(..., max_length=255, description="New category to set")
     amount: Optional[float] = Field(default=None, description="New amount if changed")
@@ -104,6 +116,7 @@ class BatchUpdateItem(BaseModel):
 
 class BatchUpdateRequest(BaseModel):
     """Batch update request for reclassifying multiple transactions."""
+
     updates: list[BatchUpdateItem] = Field(..., max_items=1000, description="List of transactions to update")
 
 
@@ -128,9 +141,7 @@ async def list_transactions(
     Pass `next_cursor` from a previous response as the `cursor` query param
     to fetch the next page.
     """
-    pagination = PaginationParams(
-        limit=limit, cursor=cursor, include_total=include_total
-    )
+    pagination = PaginationParams(limit=limit, cursor=cursor, include_total=include_total)
     filters = TransactionFilter(
         date_from=date_from,
         date_to=date_to,
@@ -189,12 +200,7 @@ async def get_transaction_counts(
     """
 
     try:
-        all_res = (
-            client.table("transactions")
-            .select("*", count="exact", head=True)
-            .eq("user_id", user_id)
-            .execute()
-        )
+        all_res = client.table("transactions").select("*", count="exact", head=True).eq("user_id", user_id).execute()
         debit_res = (
             client.table("transactions")
             .select("*", count="exact", head=True)
@@ -246,6 +252,7 @@ async def batch_update_transactions(
     # Group items by (category, amount) to collapse N serial round-trips into
     # one Supabase call per unique update payload.
     from collections import defaultdict
+
     groups: dict[tuple, list[str]] = defaultdict(list)
     for item in request.updates:
         key = (item.category, item.amount)
@@ -309,13 +316,7 @@ async def update_transaction(
         raise HTTPException(status_code=400, detail="No fields to update")
 
     try:
-        result = (
-            client.table("transactions")
-            .update(updates)
-            .eq("id", transaction_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
+        result = client.table("transactions").update(updates).eq("id", transaction_id).eq("user_id", user_id).execute()
         if not result.data:
             raise HTTPException(status_code=404, detail="Transaction not found")
 
@@ -376,23 +377,21 @@ async def update_transaction(
                     if merchant_updated > 0 and batch_result.data:
                         for r in batch_result.data:
                             try:
-                                client.table("training_corrections").insert({
-                                    "user_id": user_id,
-                                    "transaction_id": r.get("id"),
-                                    "description": r.get("description", ""),
-                                    "original_category": update.old_category,
-                                    "corrected_category": update.category,
-                                }).execute()
+                                client.table("training_corrections").insert(
+                                    {
+                                        "user_id": user_id,
+                                        "transaction_id": r.get("id"),
+                                        "description": r.get("description", ""),
+                                        "original_category": update.old_category,
+                                        "corrected_category": update.category,
+                                    }
+                                ).execute()
                             except Exception:
                                 pass
 
                     # Trigger supervised fine-tuning on the corrected pairs
                     if merchant_updated > 0 and batch_result.data and background_tasks:
-                        ft_texts = [
-                            r.get("description", "")
-                            for r in batch_result.data
-                            if r.get("description")
-                        ]
+                        ft_texts = [r.get("description", "") for r in batch_result.data if r.get("description")]
                         if ft_texts:
                             ft_categories = [update.category] * len(ft_texts)
                             background_tasks.add_task(
@@ -425,4 +424,3 @@ async def get_profile(
         id=current_user.id,
         email=current_user.email,
     )
-

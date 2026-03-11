@@ -11,18 +11,18 @@ The signature is NOT verified here (Supabase handles that); we only
 check the 'exp' claim to return a clear 401 on expired tokens.
 """
 
-import os
-import json
-import time
 import base64
-import structlog
+import json
+import os
+import time
 from dataclasses import dataclass
 from typing import Optional
 
+import structlog
 from fastapi import Depends, Header, HTTPException
-from supabase import Client, create_client
 
 from apps.api.core.config import settings
+from supabase import Client, create_client
 
 logger = structlog.get_logger()
 
@@ -43,9 +43,7 @@ def _get_supabase_anon_key() -> str:
     if settings and settings.SUPABASE_ANON_KEY:
         return settings.SUPABASE_ANON_KEY
     # Fallback to direct env lookup
-    key = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get(
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-    )
+    key = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     if not key:
         raise RuntimeError("SUPABASE_ANON_KEY is not configured")
     return key
@@ -164,9 +162,7 @@ async def get_current_user(token: str = Depends(get_user_token)) -> CurrentUser:
         raise
     except Exception as e:
         logger.warning("auth_verification_failed", error=str(e))
-        raise HTTPException(
-            status_code=401, detail="Invalid or expired authentication token"
-        )
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
 
 
 async def get_current_user_id(user: CurrentUser = Depends(get_current_user)) -> str:

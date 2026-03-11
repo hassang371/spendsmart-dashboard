@@ -81,6 +81,7 @@ spec:
 ## Rollback Procedures
 
 ### Kubernetes Rollback
+
 ```bash
 # View rollout history
 kubectl rollout history deployment/app
@@ -96,11 +97,13 @@ kubectl rollout status deployment/app
 ```
 
 ### ArgoCD Rollback
+
 ```bash
 argocd app rollback app-prod --revision=123
 ```
 
 ### Terraform Rollback
+
 ```bash
 # Identify previous state
 terraform state list

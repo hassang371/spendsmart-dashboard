@@ -1,12 +1,13 @@
 """Tests for HypCD training pipeline."""
+
 import torch
 from geoopt import PoincareBall
 
 
 def test_hypcd_trainer_init():
     """HypCDTrainer should initialize with RiemannianAdam."""
-    from packages.categorization.training import HypCDTrainer
     from packages.categorization.hypcd import HyperbolicProjector
+    from packages.categorization.training import HypCDTrainer
 
     projector = HyperbolicProjector(768, 256, 128)
     manifold = PoincareBall(c=1.0)
@@ -20,8 +21,8 @@ def test_hypcd_trainer_init():
 
 def test_hyperbolic_distance_loss():
     """Distance loss should measure hyperbolic distances."""
-    from packages.categorization.training import HypCDTrainer
     from packages.categorization.hypcd import HyperbolicProjector
+    from packages.categorization.training import HypCDTrainer
 
     projector = HyperbolicProjector(10, 8, 5)
     manifold = PoincareBall(c=1.0)
@@ -42,8 +43,8 @@ def test_hyperbolic_distance_loss():
 
 def test_angle_loss():
     """Angle loss should measure cosine similarity in tangent space."""
-    from packages.categorization.training import HypCDTrainer
     from packages.categorization.hypcd import HyperbolicProjector
+    from packages.categorization.training import HypCDTrainer
 
     projector = HyperbolicProjector(10, 8, 5)
     manifold = PoincareBall(c=1.0)

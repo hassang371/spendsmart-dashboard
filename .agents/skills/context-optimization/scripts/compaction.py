@@ -86,9 +86,7 @@ def categorize_messages(messages: list) -> dict:
         elif role == "user":
             categories["conversation"].append({**msg, "category": "conversation"})
         elif "retrieved" in msg.get("tags", []):
-            categories["retrieved_document"].append(
-                {**msg, "category": "retrieved_document"}
-            )
+            categories["retrieved_document"].append({**msg, "category": "retrieved_document"})
         else:
             categories["other"].append({**msg, "category": "other"})
 
@@ -141,9 +139,7 @@ def summarize_conversation(content: str, max_length: int = 500) -> str:
     # Identify key decisions and questions
     import re
 
-    decisions = re.findall(
-        r"(?i)(?:decided|decision|chose|chosen)[:\s]+([^.]+)", content
-    )
+    decisions = re.findall(r"(?i)(?:decided|decision|chose|chosen)[:\s]+([^.]+)", content)
     questions = re.findall(r"(?:\?|question)[:\s]+([^.]+)", content)
 
     summary_parts = []

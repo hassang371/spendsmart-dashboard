@@ -458,15 +458,6 @@ workflow:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_TAG'
 
-# Interruptible jobs
+# Additional optimizations
 .interruptible_template:
   interruptible: true
-
-lint:
-  extends: [.python_template, .interruptible_template]
-
-test:
-  extends: [.python_template, .interruptible_template]
-
-integration-test:
-  extends: [.python_template, .interruptible_template]

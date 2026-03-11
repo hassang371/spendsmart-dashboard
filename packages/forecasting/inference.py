@@ -7,16 +7,16 @@ and running predictions on new data.
 
 import io
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet
 
-from packages.forecasting.trainer import (
-    prepare_training_data,
-    MAX_ENCODER_LENGTH,
-)
 from packages.forecasting.dataset import create_timeseries_dataset
+from packages.forecasting.trainer import (
+    MAX_ENCODER_LENGTH,
+    prepare_training_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +74,7 @@ def load_model(supabase, user_id: str) -> Optional[TemporalFusionTransformer]:
     try:
         with io.BytesIO(res) as buffer:
             # map_location="cpu" is safer for inference servers
-            tft = TemporalFusionTransformer.load_from_checkpoint(
-                buffer, map_location="cpu"
-            )
+            tft = TemporalFusionTransformer.load_from_checkpoint(buffer, map_location="cpu")
             tft.eval()
             tft.freeze()  # optimizing for inference
             _MODEL_CACHE[user_id] = tft
@@ -93,9 +91,7 @@ def invalidate_cache(user_id: str):
         logger.info(f"Invalidated model cache for user {user_id}")
 
 
-def predict_with_tft(
-    model: TemporalFusionTransformer, df: pd.DataFrame, horizon: int = 30
-) -> Dict[str, Any]:
+def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon: int = 30) -> Dict[str, Any]:
     """
     Run inference using the loaded model.
 
@@ -115,27 +111,19 @@ def predict_with_tft(
         return {"error": str(e)}
 
     if len(history_df) < MAX_ENCODER_LENGTH:
-        return {
-            "error": f"Not enough history. Need {MAX_ENCODER_LENGTH} days, got {len(history_df)}."
-        }
+        return {"error": f"Not enough history. Need {MAX_ENCODER_LENGTH} days, got {len(history_df)}."}
 
     # 2. Prepare future dataframe
     last_date = history_df["date"].max()
-    future_dates = pd.date_range(
-        start=last_date + pd.Timedelta(days=1), periods=horizon, freq="D"
-    )
+    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=horizon, freq="D")
 
     future_df = pd.DataFrame({"date": future_dates})
-    future_df["time_idx"] = range(
-        history_df["time_idx"].max() + 1, history_df["time_idx"].max() + 1 + horizon
-    )
+    future_df["time_idx"] = range(history_df["time_idx"].max() + 1, history_df["time_idx"].max() + 1 + horizon)
     # Use same group_id as history for consistency with training
     future_df["group_id"] = history_df["group_id"].iloc[0]
 
     # Add calendar features
-    future_df["day_of_week"] = (
-        future_df["date"].dt.dayofweek.astype(str).astype("category")
-    )
+    future_df["day_of_week"] = future_df["date"].dt.dayofweek.astype(str).astype("category")
     future_df["day_of_month"] = future_df["date"].dt.day.astype(str).astype("category")
 
     # Handle is_payday for future
@@ -143,9 +131,7 @@ def predict_with_tft(
     # (This aligns with detect_paydays logic which flags specific days of month)
     # We need to re-run detection on history to see which DOMs are paydays
     # The 'history_df' already has 'is_payday' column.
-    payday_doms = set(
-        history_df[history_df["is_payday"] == "1"]["day_of_month"].astype(int).unique()
-    )
+    payday_doms = set(history_df[history_df["is_payday"] == "1"]["day_of_month"].astype(int).unique())
     # Note: prepare_training_data converts day_of_month to int or str?
     # In trainer.py it converts to category. Let's check source logic.
     # It calls loader.enrich_features -> day_of_month is just date.day usually.
@@ -206,10 +192,7 @@ def predict_with_tft(
         logger.error(f"Failed to reconstruct reference dataset for from_dataset: {e}")
         return {"error": f"Inference dataset construction failed: {e}"}
 
-    pred_ds = TimeSeriesDataSet.from_dataset(
-        reference_ds, combined_df, predict=True, stop_randomization=True
-    )
-
+    pred_ds = TimeSeriesDataSet.from_dataset(reference_ds, combined_df, predict=True, stop_randomization=True)
 
     # We predict for the specific group "0" (there is only one anyway)
     # The dataset should produce logic to cover the future if configured right.

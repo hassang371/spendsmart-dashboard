@@ -16,22 +16,19 @@ Requirements:
 """
 
 import argparse
-import boto3
-from datetime import datetime, timedelta
-from collections import defaultdict
-from tabulate import tabulate
 import sys
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+import boto3
+from tabulate import tabulate
 
 
 class CostAnomalyDetector:
     def __init__(self, profile: str = None, days: int = 30):
-        self.session = (
-            boto3.Session(profile_name=profile) if profile else boto3.Session()
-        )
+        self.session = boto3.Session(profile_name=profile) if profile else boto3.Session()
         self.days = days
-        self.ce = self.session.client(
-            "ce", region_name="us-east-1"
-        )  # Cost Explorer is global
+        self.ce = self.session.client("ce", region_name="us-east-1")  # Cost Explorer is global
 
         self.findings = {"anomalies": [], "top_services": [], "trend_analysis": []}
 
@@ -127,9 +124,7 @@ class CostAnomalyDetector:
                     service_totals[service] = service_totals.get(service, 0) + cost
 
             # Get top 10 services
-            sorted_services = sorted(
-                service_totals.items(), key=lambda x: x[1], reverse=True
-            )[:10]
+            sorted_services = sorted(service_totals.items(), key=lambda x: x[1], reverse=True)[:10]
 
             total_cost = sum(service_totals.values())
 
@@ -233,11 +228,7 @@ class CostAnomalyDetector:
 
             # Sort by absolute change
             self.findings["trend_analysis"].sort(
-                key=lambda x: abs(
-                    float(
-                        x["Change"].replace("$", "").replace("+", "").replace("-", "")
-                    )
-                ),
+                key=lambda x: abs(float(x["Change"].replace("$", "").replace("+", "").replace("-", ""))),
                 reverse=True,
             )
 
@@ -290,9 +281,7 @@ class CostAnomalyDetector:
         if self.findings["top_services"]:
             print("\nTOP COST DRIVERS")
             print("-" * 110)
-            print(
-                tabulate(self.findings["top_services"], headers="keys", tablefmt="grid")
-            )
+            print(tabulate(self.findings["top_services"], headers="keys", tablefmt="grid"))
 
         # Trend Analysis
         if self.findings["trend_analysis"]:

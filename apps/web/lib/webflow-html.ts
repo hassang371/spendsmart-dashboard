@@ -9,8 +9,8 @@ export const WEBFLOW_LANDING_HTML = `
       </noscript>
       <!-- End Google Tag Manager (noscript) -->
     </div>
-    
-    
+
+
     <div class="cursor">
       <div class="cursor-img__wrap">
         <img src="/slush/680905cfdc4507383836496f_logo-brave.svg"
@@ -1323,8 +1323,8 @@ export const WEBFLOW_LANDING_HTML = `
                       </label>
                       <div class="w-embed w-script">
                         <div style="display: none;">
-                          
-                          
+
+
                         </div>
                       </div>
                     </form>
@@ -1542,21 +1542,21 @@ export const WEBFLOW_LANDING_HTML = `
       </footer>
     </main>
   </div>
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   <!-- mailchimp -->
-  
+
 
 `;

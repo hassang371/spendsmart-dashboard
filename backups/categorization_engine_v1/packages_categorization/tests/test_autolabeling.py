@@ -1,7 +1,6 @@
-from packages.categorization.hypcd import HypCDClassifier
 from packages.categorization.cleaner import clean_description
+from packages.categorization.hypcd import HypCDClassifier
 from packages.categorization.rules import KeywordMatcher
-import torch
 
 
 class TestAutoLabeling:
@@ -36,21 +35,23 @@ class TestAutoLabeling:
     def test_hypcd_integration_rules(self):
         """Test that HypCD classifier prioritizes rules."""
         from packages.categorization.backends.cloud import CloudBackend
+
         backend = CloudBackend()
         classifier = HypCDClassifier(backend=backend)
 
         # Should be caught by Rule Engine (Confidence 1.0)
         res = classifier.predict("Netflix")
-        assert res['category'] == "Entertainment"
-        assert res['confidence'] == 1.0
+        assert res["category"] == "Entertainment"
+        assert res["confidence"] == 1.0
 
         # Verify optimization: embedding should be returned
-        embedding = res['embedding']
+        embedding = res["embedding"]
         assert embedding is not None
 
     def test_hypcd_integration_cleaner(self):
         """Test that HypCD classifier cleans input before model prediction."""
         from packages.categorization.backends.cloud import CloudBackend
+
         backend = CloudBackend()
         classifier = HypCDClassifier(backend=backend)
 
@@ -72,5 +73,5 @@ class TestAutoLabeling:
         # unless we use pre-trained sentence-transformer which is deterministic.
 
         res = classifier.predict(raw_text)
-        assert res['category'] in classifier.labels
-        assert res['confidence'] < 1.0  # Should rely on model confidence, not 1.0 rule confidence
+        assert res["category"] in classifier.labels
+        assert res["confidence"] < 1.0  # Should rely on model confidence, not 1.0 rule confidence

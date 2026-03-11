@@ -2,17 +2,18 @@ import logging
 import sys
 import uuid
 from typing import Callable
-from fastapi import Request, Response
+
 import structlog
-from structlog.types import EventDict
+from fastapi import Request, Response
+
 
 def setup_logging(is_dev: bool = False) -> None:
     """Configures structlog for the application. JSON in prod, Console in dev."""
-    
+
     # We want to use structlog for everything, so intercept standard logging
     # and route it through structlog
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=logging.INFO)
-    
+
     processors = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
@@ -34,22 +35,23 @@ def setup_logging(is_dev: bool = False) -> None:
         cache_logger_on_first_use=True,
     )
 
+
 async def structlog_middleware(request: Request, call_next: Callable) -> Response:
     """
     Middleware that generates a unique request_id, adds it to the structlog context,
     and injects it into the response headers.
     """
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-    
+
     # Bind the request_id to all logs emitted during this request cycle
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(
         request_id=request_id,
         method=request.method,
         path=request.url.path,
-        client_ip=request.client.host if request.client else None
+        client_ip=request.client.host if request.client else None,
     )
-    
+
     # Store in state so exception handlers can extract it
     request.state.request_id = request_id
 
@@ -59,19 +61,20 @@ async def structlog_middleware(request: Request, call_next: Callable) -> Respons
 
     try:
         response = await call_next(request)
-        
+
         # Log request end
         logger.info(
             "request_finished",
             status_code=response.status_code,
         )
-        
+
         response.headers["X-Request-ID"] = request_id
         return response
-        
+
     except Exception as e:
         logger.exception("request_failed", error=str(e))
         raise
+
 
 def get_request_id_from_state(request: Request) -> str:
     """Helper to extract request_id safely."""

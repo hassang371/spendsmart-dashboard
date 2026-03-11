@@ -75,6 +75,7 @@ Follow this systematic approach for AWS cost optimization:
 **Frequency**: Run monthly (first week of each month)
 
 **Step 1: Find Unused Resources**
+
 ```bash
 # Scan for waste across all resources
 python3 scripts/find_unused_resources.py
@@ -90,6 +91,7 @@ python3 scripts/find_unused_resources.py
 ```
 
 **Step 2: Analyze Cost Anomalies**
+
 ```bash
 # Detect unusual spending patterns
 python3 scripts/cost_anomaly_detector.py --days 30
@@ -102,6 +104,7 @@ python3 scripts/cost_anomaly_detector.py --days 30
 ```
 
 **Step 3: Identify Rightsizing Opportunities**
+
 ```bash
 # Find oversized instances
 python3 scripts/rightsizing_analyzer.py --days 30
@@ -114,6 +117,7 @@ python3 scripts/rightsizing_analyzer.py --days 30
 ```
 
 **Step 4: Generate Monthly Report**
+
 ```bash
 # Use the template to compile findings
 cp assets/templates/monthly_cost_report.md reports/$(date +%Y-%m)-cost-report.md
@@ -137,6 +141,7 @@ cp assets/templates/monthly_cost_report.md reports/$(date +%Y-%m)-cost-report.md
 **When**: Quarterly or when usage patterns stabilize
 
 **Step 1: Analyze Current Usage**
+
 ```bash
 # Identify workloads suitable for commitments
 python3 scripts/analyze_ri_recommendations.py --days 60
@@ -150,6 +155,7 @@ python3 scripts/analyze_ri_recommendations.py --days 60
 **Step 2: Review Recommendations**
 
 Evaluate each recommendation:
+
 ```
 ✅ Good candidate if:
   - Running 24/7 for 60+ days
@@ -177,6 +183,7 @@ Evaluate each recommendation:
 - Best for: Variable workloads within constraints
 
 **Decision Matrix**:
+
 ```
 Known instance type, won't change → Standard RI
 May need to change types → Convertible RI or Compute SP
@@ -199,6 +206,7 @@ Maximum flexibility → Compute Savings Plan
 **When**: During architecture reviews or optimization sprints
 
 **Step 1: Detect Old Instances**
+
 ```bash
 # Find outdated instance generations
 python3 scripts/detect_old_generations.py
@@ -212,6 +220,7 @@ python3 scripts/detect_old_generations.py
 **Step 2: Prioritize Migrations**
 
 **Quick Wins (Low Risk)**:
+
 ```
 t2 → t3: Drop-in replacement, 10% savings
 m4 → m5: Better performance, 5% savings
@@ -219,6 +228,7 @@ gp2 → gp3: No downtime, 20% savings
 ```
 
 **Medium Effort (Test Required)**:
+
 ```
 x86 → Graviton (ARM64): 20% savings
 - Requires ARM64 compatibility testing
@@ -255,6 +265,7 @@ x86 → Graviton (ARM64): 20% savings
 **When**: For fault-tolerant workloads or Auto Scaling Groups
 
 **Step 1: Identify Candidates**
+
 ```bash
 # Analyze workloads for Spot suitability
 python3 scripts/spot_recommendations.py
@@ -284,6 +295,7 @@ python3 scripts/spot_recommendations.py
 **Step 3: Implementation Strategy**
 
 **Option 1: Fargate Spot (Easiest)**
+
 ```yaml
 # ECS task definition
 requiresCompatibilities:
@@ -296,6 +308,7 @@ capacityProviderStrategy:
 ```
 
 **Option 2: EC2 Auto Scaling with Spot**
+
 ```yaml
 # Mixed instances policy
 MixedInstancesPolicy:
@@ -311,12 +324,14 @@ MixedInstancesPolicy:
 ```
 
 **Option 3: EC2 Spot Fleet**
+
 ```bash
 # Create Spot Fleet with diverse instance types
 aws ec2 request-spot-fleet --spot-fleet-request-config file://spot-fleet.json
 ```
 
 **Step 4: Implement Interruption Handling**
+
 ```bash
 # Handle 2-minute termination notice
 # Instance metadata: /latest/meta-data/spot/instance-action
@@ -335,6 +350,7 @@ aws ec2 request-spot-fleet --spot-fleet-request-config file://spot-fleet.json
 ## Quick Reference: Cost Optimization Scripts
 
 ### All Scripts Location
+
 ```bash
 ls scripts/
 # find_unused_resources.py
@@ -348,6 +364,7 @@ ls scripts/
 ### Script Usage Patterns
 
 **Monthly Review (Run all)**:
+
 ```bash
 python3 scripts/find_unused_resources.py
 python3 scripts/cost_anomaly_detector.py --days 30
@@ -355,6 +372,7 @@ python3 scripts/rightsizing_analyzer.py --days 30
 ```
 
 **Quarterly Optimization**:
+
 ```bash
 python3 scripts/analyze_ri_recommendations.py --days 60
 python3 scripts/detect_old_generations.py
@@ -362,18 +380,21 @@ python3 scripts/spot_recommendations.py
 ```
 
 **Specific Region Only**:
+
 ```bash
 python3 scripts/find_unused_resources.py --region us-east-1
 python3 scripts/rightsizing_analyzer.py --region us-west-2
 ```
 
 **Named AWS Profile**:
+
 ```bash
 python3 scripts/find_unused_resources.py --profile production
 python3 scripts/cost_anomaly_detector.py --profile production --days 60
 ```
 
 ### Script Requirements
+
 ```bash
 # Install dependencies
 pip install boto3 tabulate
@@ -529,6 +550,7 @@ Need help choosing between services?
 ### "My bill suddenly increased"
 
 1. Run cost anomaly detection:
+
    ```bash
    python3 scripts/cost_anomaly_detector.py --days 30
    ```
@@ -550,6 +572,7 @@ Follow the optimization workflow:
 ### "How do I know if Reserved Instances make sense?"
 
 Run RI analysis:
+
 ```bash
 python3 scripts/analyze_ri_recommendations.py --days 60
 ```
@@ -562,6 +585,7 @@ Look for:
 ### "Which resources can I safely delete?"
 
 Run unused resource finder:
+
 ```bash
 python3 scripts/find_unused_resources.py
 ```
@@ -603,6 +627,6 @@ Always verify with resource owner before deletion!
 - All scripts in `scripts/` directory with `--help` for usage
 
 **AWS Documentation**:
-- AWS Cost Explorer: https://aws.amazon.com/aws-cost-management/aws-cost-explorer/
-- AWS Budgets: https://aws.amazon.com/aws-cost-management/aws-budgets/
-- FinOps Foundation: https://www.finops.org
+- AWS Cost Explorer: <https://aws.amazon.com/aws-cost-management/aws-cost-explorer/>
+- AWS Budgets: <https://aws.amazon.com/aws-cost-management/aws-budgets/>
+- FinOps Foundation: <https://www.finops.org>

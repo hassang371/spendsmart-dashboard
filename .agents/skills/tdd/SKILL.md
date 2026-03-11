@@ -87,6 +87,7 @@ test('retries failed operations 3 times', async () => {
   expect(result).toBe('success');
   expect(attempts).toBe(3);
 });
+
 ```
 Clear name, tests real behavior, one thing
 </Good>
@@ -102,6 +103,7 @@ test('retry works', async () => {
   expect(mock).toHaveBeenCalledTimes(3);
 });
 ```
+
 Vague name, tests mock not code
 </Bad>
 
@@ -292,6 +294,7 @@ Tests-first force edge case discovery before implementing. Tests-after verify yo
 **Bug:** Empty email accepted
 
 **RED**
+
 ```typescript
 test('rejects empty email', async () => {
   const result = await submitForm({ email: '' });
@@ -300,12 +303,14 @@ test('rejects empty email', async () => {
 ```
 
 **Verify RED**
+
 ```bash
 $ npm test
 FAIL: expected 'Email required', got undefined
 ```
 
 **GREEN**
+
 ```typescript
 function submitForm(data: FormData) {
   if (!data.email?.trim()) {
@@ -316,6 +321,7 @@ function submitForm(data: FormData) {
 ```
 
 **Verify GREEN**
+
 ```bash
 $ npm test
 PASS

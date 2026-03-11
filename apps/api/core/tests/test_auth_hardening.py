@@ -5,9 +5,10 @@ on Supabase to catch them later.
 """
 
 import asyncio
-import time
 import base64
 import json
+import time
+
 import pytest
 from fastapi import HTTPException
 

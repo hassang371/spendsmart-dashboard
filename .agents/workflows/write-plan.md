@@ -39,7 +39,7 @@ A single action (2-5 minutes):
 
 ## Plan Structure
 
-### In `implementation_plan.md`:
+### In `implementation_plan.md`
 
 ```markdown
 # [Feature Name]
@@ -65,7 +65,7 @@ A single action (2-5 minutes):
 - How to verify changes work
 ```
 
-### In `task.md` (Epic → Story → Task):
+### In `task.md` (Epic → Story → Task)
 
 ```markdown
 # [Epic Name]

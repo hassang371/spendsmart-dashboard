@@ -7,11 +7,11 @@ Orchestrates the full training flow:
 Used by the background worker (apps/worker/main.py).
 """
 
-import os
 import logging
+import os
 
-import pandas as pd
 import lightning.pytorch as pl
+import pandas as pd
 from pytorch_forecasting import TimeSeriesDataSet
 
 from packages.forecasting.dataset import (
@@ -32,9 +32,7 @@ MAX_ENCODER_LENGTH = 60
 # ---------------------------------------------------------------------------
 
 
-def detect_paydays(
-    daily_df: pd.DataFrame, threshold_percentile: float = 90
-) -> pd.Series:
+def detect_paydays(daily_df: pd.DataFrame, threshold_percentile: float = 90) -> pd.Series:
     """
     Detect payday pattern: days with income above the 90th-percentile
     that recur on a similar day_of_month across >=2 months.

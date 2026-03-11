@@ -45,21 +45,25 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Reduces tribal knowledge and repeated debates; improves onboarding and historical context.
 
 **Scope examples:**
+
 - Auth and tenant isolation model
 - Job orchestration architecture
 - Forecasting approach and model lifecycle
 - Ingestion parsing strategy and dedup semantics
 
 **Implementation notes:**
+
 - Use one-file ADR format: Context, Decision, Alternatives, Consequences.
 - Enforce ADR reference in PRs that change architecture.
 
 **Success metric:**
+
 - 100% of architecture-impacting PRs link an ADR within 60 days.
 
 ### Recommendation A2 — Formalize service boundaries
 
 **What:** Define strict boundary conventions:
+
 - Routers: HTTP concerns only
 - Services: business logic
 - Adapters/clients: data provider/database interactions
@@ -67,6 +71,7 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Prevents logic drift and duplicated behavior across endpoints.
 
 **Success metric:**
+
 - New feature PRs follow boundary pattern with shared utilities and reduced duplicated query logic.
 
 ---
@@ -80,10 +85,12 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Frontend can reliably parse and present actionable errors.
 
 **Implementation notes:**
+
 - Define fields: `type`, `title`, `status`, `detail`, `request_id`, optional `errors[]`.
 - Add helper factory in backend core layer.
 
 **Success metric:**
+
 - 100% non-2xx API responses conform to standard schema.
 
 ### Recommendation API-2 — Introduce idempotency for mutation endpoints
@@ -93,6 +100,7 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Makes retries safe and prevents duplicate writes under network or worker retries.
 
 **Success metric:**
+
 - Duplicate client retries do not create duplicate rows/jobs.
 
 ---
@@ -102,6 +110,7 @@ It complements the bug report by focusing on system-level improvements, standard
 ### Recommendation DB-1 — Migration preflight and rollback policy
 
 **What:** Add migration policy requiring:
+
 - lock-risk assessment
 - backup confirmation
 - rollback script
@@ -110,10 +119,12 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Prevents accidental blast radius from schema changes.
 
 **Implementation notes:**
+
 - Add checklist file and CI check that migration PRs include rollback notes.
 - Disallow destructive operations without explicit review label.
 
 **Success metric:**
+
 - 0 unplanned downtime incidents tied to migration lock/contention.
 
 ### Recommendation DB-2 — Data contract tests for critical tables
@@ -123,6 +134,7 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Catches schema or data-shape drift before deployment.
 
 **Success metric:**
+
 - Contract tests run in CI and fail fast on incompatible changes.
 
 ---
@@ -136,10 +148,12 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Prevents silent train/infer mismatch.
 
 **Implementation notes:**
+
 - Record: feature list, normalization version, training horizon/window, quantile config.
 - Block inference when schema mismatch detected.
 
 **Success metric:**
+
 - 0 runtime inference failures from schema mismatch after rollout.
 
 ### Recommendation ML-2 — Add quality regression gates
@@ -149,10 +163,12 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Current tests mostly validate code behavior, not output quality drift.
 
 **Metrics examples:**
+
 - Categorization: macro-F1 on fixed fixture
 - Forecasting: MAPE/MAE on fixed holdout
 
 **Success metric:**
+
 - Model-related PRs blocked when quality drops beyond agreed threshold.
 
 ### Recommendation ML-3 — Separate pipeline tests from model-behavior tests
@@ -168,6 +184,7 @@ It complements the bug report by focusing on system-level improvements, standard
 ### Recommendation FE-1 — Centralized cache policy and invalidation contract
 
 **What:** Define cache ownership rules:
+
 - key conventions
 - TTL strategy
 - invalidation triggers
@@ -176,6 +193,7 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Reduces stale state bugs and inconsistencies across pages.
 
 **Success metric:**
+
 - All cache operations use shared utility wrappers; no direct ad-hoc `localStorage` key deletions.
 
 ### Recommendation FE-2 — Progressive TypeScript strictness hardening
@@ -185,6 +203,7 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Improves maintainability and catches issues earlier.
 
 **Plan:**
+
 - Phase 1: eliminate lint errors
 - Phase 2: reduce `any` in core app paths
 - Phase 3: tighten tsconfig checks
@@ -206,6 +225,7 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Prevents state drift and ambiguous stuck-job behavior.
 
 **Implementation notes:**
+
 - Encode transition rules in one shared module.
 - Add transition guard tests.
 
@@ -216,6 +236,7 @@ It complements the bug report by focusing on system-level improvements, standard
 **Why:** Avoids over-retrying permanent failures and under-retrying transient faults.
 
 **Success metric:**
+
 - Reduced stuck jobs and lower manual intervention frequency.
 
 ### Recommendation WK-3 — Dead-letter and recovery visibility
@@ -259,6 +280,7 @@ It complements the bug report by focusing on system-level improvements, standard
 ### Recommendation OBS-2 — Define core SLIs/SLOs
 
 **What:** Start with practical indicators:
+
 - ingestion success rate
 - categorization latency
 - forecast endpoint availability/latency
@@ -336,21 +358,25 @@ It complements the bug report by focusing on system-level improvements, standard
 ## 6. Key Metrics to Track
 
 ### Reliability
+
 - API 5xx rate
 - Job stuck ratio (`processing` over SLA)
 - Import failure rate
 
 ### Quality
+
 - CI pass rate on first run
 - Escaped vulnerabilities in main branch
 - Lint/type debt trend
 
 ### Delivery
+
 - Lead time to merge
 - Rework rate after code review
 - Regression count by release
 
 ### ML
+
 - Categorization quality delta vs baseline
 - Forecasting quality delta vs baseline
 - Inference compatibility failures
@@ -359,13 +385,13 @@ It complements the bug report by focusing on system-level improvements, standard
 
 ## 7. Risks and Mitigations
 
-- **Risk:** Too many improvements at once can reduce feature throughput.  
+- **Risk:** Too many improvements at once can reduce feature throughput.
   **Mitigation:** Timebox each initiative and keep a strict P0/P1/P2 sequence.
 
-- **Risk:** New quality gates may initially increase CI failures.  
+- **Risk:** New quality gates may initially increase CI failures.
   **Mitigation:** Stage gates with baselines and explicit burn-down windows.
 
-- **Risk:** Ownership ambiguity stalls implementation.  
+- **Risk:** Ownership ambiguity stalls implementation.
   **Mitigation:** Assign single accountable owner per theme and track weekly.
 
 ---
@@ -402,6 +428,7 @@ This doc = strategic engineering improvements and operating model upgrades.
 ## 11. Scope
 
 ### In Scope
+
 - Code quality gates (linting, type checking, test coverage thresholds)
 - API contract hardening and auth failure paths
 - Database migration safety and index strategy
@@ -410,6 +437,7 @@ This doc = strategic engineering improvements and operating model upgrades.
 - Security hardening (dependency scanning, secret detection)
 
 ### Out of Scope
+
 - New product features
 - Vendor migration (database, cloud provider)
 - Frontend redesign

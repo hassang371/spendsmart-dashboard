@@ -1,4 +1,5 @@
 """Tests for hyperbolic clustering and hierarchy extraction."""
+
 import torch
 from geoopt import PoincareBall
 
@@ -58,8 +59,9 @@ def test_hyperbolic_kmeans_fit():
 
 def test_hierarchy_extractor_init():
     """HierarchyExtractor should initialize correctly."""
-    from packages.categorization.clustering import HierarchyExtractor
     from geoopt import PoincareBall
+
+    from packages.categorization.clustering import HierarchyExtractor
 
     manifold = PoincareBall(c=1.0)
     extractor = HierarchyExtractor(manifold)
@@ -69,8 +71,9 @@ def test_hierarchy_extractor_init():
 
 def test_compute_norm():
     """Norm should indicate depth in hierarchy."""
-    from packages.categorization.clustering import HierarchyExtractor
     from geoopt import PoincareBall
+
+    from packages.categorization.clustering import HierarchyExtractor
 
     manifold = PoincareBall(c=1.0)
     extractor = HierarchyExtractor(manifold)
@@ -88,8 +91,9 @@ def test_compute_norm():
 
 def test_categorize_depth():
     """Categorize centroids by depth."""
-    from packages.categorization.clustering import HierarchyExtractor
     from geoopt import PoincareBall
+
+    from packages.categorization.clustering import HierarchyExtractor
 
     manifold = PoincareBall(c=1.0)
     extractor = HierarchyExtractor(manifold)

@@ -6,12 +6,10 @@ not the full HypCD pipeline.
 """
 
 import logging
-import os
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from celery import shared_task
 from celery.exceptions import MaxRetriesExceededError
-
-from packages.categorization.backends.cloud import CloudBackend
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +24,7 @@ def _update_job_status(
     """Update training job status in Supabase using service-role client."""
     try:
         from apps.api.core.auth import get_service_client
+
         client = get_service_client()
 
         update_data: Dict = {"status": status}
@@ -62,6 +61,7 @@ def train_adapter_task(
         _update_job_status(job_id, "running")
 
         from apps.api.domains.categorization.service import get_classifier
+
         classifier = get_classifier()
 
         adapter = classifier.train_adapter(
@@ -72,15 +72,20 @@ def train_adapter_task(
         )
 
         # Save adapter checkpoint to Supabase Storage
-        from packages.categorization.model_registry import save_version
         from apps.api.core.auth import get_service_client
+        from packages.categorization.model_registry import save_version
+
         client = get_service_client()
-        
+
         version_record = save_version(
             client=client,
             user_id=user_id,
             adapter_state_dict=adapter.state_dict(),
-            metrics={"epochs": epochs, "learning_rate": learning_rate, "samples": len(texts)},
+            metrics={
+                "epochs": epochs,
+                "learning_rate": learning_rate,
+                "samples": len(texts),
+            },
         )
 
         logger.info(f"Adapter training job {job_id} completed successfully")
@@ -137,6 +142,7 @@ def classify_transaction_task(
     """
     try:
         from apps.api.domains.categorization.service import classify_single
+
         result = classify_single(text)
         return result
     except Exception as exc:

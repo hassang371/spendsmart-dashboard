@@ -37,11 +37,13 @@ User task → Is it static HTML?
 To start a server, run `--help` first, then use the helper:
 
 **Single server:**
+
 ```bash
 python scripts/with_server.py --server "npm run dev" --port 5173 -- python your_automation.py
 ```
 
 **Multiple servers (e.g., backend + frontend):**
+
 ```bash
 python scripts/with_server.py \
   --server "cd backend && python server.py" --port 3000 \
@@ -50,6 +52,7 @@ python scripts/with_server.py \
 ```
 
 To create an automation script, include only Playwright logic (servers are managed automatically):
+
 ```python
 from playwright.sync_api import sync_playwright
 
@@ -65,6 +68,7 @@ with sync_playwright() as p:
 ## Reconnaissance-Then-Action Pattern
 
 1. **Inspect rendered DOM**:
+
    ```python
    page.screenshot(path='/tmp/inspect.png', full_page=True)
    content = page.content()

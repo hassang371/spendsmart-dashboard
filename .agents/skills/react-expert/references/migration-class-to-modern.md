@@ -933,6 +933,7 @@ See reference: `react-expert/references/server-components.md`
 ### 1. Stale Closures
 
 **Problem:**
+
 ```tsx
 function Counter() {
   const [count, setCount] = useState(0);
@@ -951,6 +952,7 @@ function Counter() {
 ```
 
 **Solution:**
+
 ```tsx
 function Counter() {
   const [count, setCount] = useState(0);
@@ -971,6 +973,7 @@ function Counter() {
 ### 2. Missing Effect Dependencies
 
 **Problem:**
+
 ```tsx
 function UserSearch({ userId }: { userId: string }) {
   const [user, setUser] = useState(null);
@@ -984,6 +987,7 @@ function UserSearch({ userId }: { userId: string }) {
 ```
 
 **Solution:**
+
 ```tsx
 function UserSearch({ userId }: { userId: string }) {
   const [user, setUser] = useState<User | null>(null);
@@ -1010,6 +1014,7 @@ function UserSearch({ userId }: { userId: string }) {
 ### 3. Over-Memoization
 
 **Problem:**
+
 ```tsx
 function TodoList({ todos }: { todos: Todo[] }) {
   // Unnecessary - React is already fast
@@ -1033,6 +1038,7 @@ function TodoList({ todos }: { todos: Todo[] }) {
 ```
 
 **Solution:**
+
 ```tsx
 function TodoList({ todos }: { todos: Todo[] }) {
   // Only memoize expensive computations

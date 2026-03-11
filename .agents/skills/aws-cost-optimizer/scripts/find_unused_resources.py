@@ -18,20 +18,17 @@ Requirements:
 """
 
 import argparse
-import boto3
+import sys
 from datetime import datetime, timedelta
 from typing import List
+
+import boto3
 from tabulate import tabulate
-import sys
 
 
 class UnusedResourceFinder:
-    def __init__(
-        self, profile: str = None, region: str = None, snapshot_age_days: int = 90
-    ):
-        self.session = (
-            boto3.Session(profile_name=profile) if profile else boto3.Session()
-        )
+    def __init__(self, profile: str = None, region: str = None, snapshot_age_days: int = 90):
+        self.session = boto3.Session(profile_name=profile) if profile else boto3.Session()
         self.regions = [region] if region else self._get_all_regions()
         self.snapshot_age_days = snapshot_age_days
         self.findings = {
@@ -57,9 +54,7 @@ class UnusedResourceFinder:
         for region in self.regions:
             try:
                 ec2 = self.session.client("ec2", region_name=region)
-                volumes = ec2.describe_volumes(
-                    Filters=[{"Name": "status", "Values": ["available"]}]
-                )
+                volumes = ec2.describe_volumes(Filters=[{"Name": "status", "Values": ["available"]}])
 
                 for volume in volumes["Volumes"]:
                     # Rough cost estimate: gp3 $0.08/GB/month
@@ -83,13 +78,9 @@ class UnusedResourceFinder:
 
     def find_old_snapshots(self):
         """Find old EBS snapshots."""
-        print(
-            f"\n[2/6] Scanning for snapshots older than {self.snapshot_age_days} days..."
-        )
+        print(f"\n[2/6] Scanning for snapshots older than {self.snapshot_age_days} days...")
 
-        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(
-            days=self.snapshot_age_days
-        )
+        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=self.snapshot_age_days)
 
         for region in self.regions:
             try:
@@ -107,10 +98,7 @@ class UnusedResourceFinder:
                         monthly_cost = snapshot["VolumeSize"] * 0.05
                         self.total_cost_estimate += monthly_cost
 
-                        age_days = (
-                            datetime.now(datetime.now().astimezone().tzinfo)
-                            - snapshot["StartTime"]
-                        ).days
+                        age_days = (datetime.now(datetime.now().astimezone().tzinfo) - snapshot["StartTime"]).days
 
                         self.findings["snapshots"].append(
                             {
@@ -163,9 +151,7 @@ class UnusedResourceFinder:
         for region in self.regions:
             try:
                 ec2 = self.session.client("ec2", region_name=region)
-                nat_gateways = ec2.describe_nat_gateways(
-                    Filters=[{"Name": "state", "Values": ["available"]}]
-                )
+                nat_gateways = ec2.describe_nat_gateways(Filters=[{"Name": "state", "Values": ["available"]}])
 
                 cloudwatch = self.session.client("cloudwatch", region_name=region)
 
@@ -187,9 +173,7 @@ class UnusedResourceFinder:
                             Statistics=["Sum"],
                         )
 
-                        total_bytes = sum(
-                            [point["Sum"] for point in metrics["Datapoints"]]
-                        )
+                        total_bytes = sum([point["Sum"] for point in metrics["Datapoints"]])
                         avg_gb_per_day = (total_bytes / (1024**3)) / 7
 
                         # NAT Gateway: ~$32.85/month + data processing
@@ -235,9 +219,7 @@ class UnusedResourceFinder:
                 ec2 = self.session.client("ec2", region_name=region)
                 cloudwatch = self.session.client("cloudwatch", region_name=region)
 
-                instances = ec2.describe_instances(
-                    Filters=[{"Name": "instance-state-name", "Values": ["running"]}]
-                )
+                instances = ec2.describe_instances(Filters=[{"Name": "instance-state-name", "Values": ["running"]}])
 
                 for reservation in instances["Reservations"]:
                     for instance in reservation["Instances"]:
@@ -252,9 +234,7 @@ class UnusedResourceFinder:
                             metrics = cloudwatch.get_metric_statistics(
                                 Namespace="AWS/EC2",
                                 MetricName="CPUUtilization",
-                                Dimensions=[
-                                    {"Name": "InstanceId", "Value": instance_id}
-                                ],
+                                Dimensions=[{"Name": "InstanceId", "Value": instance_id}],
                                 StartTime=start_time,
                                 EndTime=end_time,
                                 Period=3600,  # 1 hour
@@ -262,34 +242,20 @@ class UnusedResourceFinder:
                             )
 
                             if metrics["Datapoints"]:
-                                avg_cpu = sum(
-                                    [
-                                        point["Average"]
-                                        for point in metrics["Datapoints"]
-                                    ]
-                                ) / len(metrics["Datapoints"])
-                                max_cpu = max(
-                                    [
-                                        point["Average"]
-                                        for point in metrics["Datapoints"]
-                                    ]
+                                avg_cpu = sum([point["Average"] for point in metrics["Datapoints"]]) / len(
+                                    metrics["Datapoints"]
                                 )
+                                max_cpu = max([point["Average"] for point in metrics["Datapoints"]])
 
                                 # Flag instances with avg CPU < 5% and max < 15%
                                 if avg_cpu < 5 and max_cpu < 15:
                                     # Rough cost estimate (varies by instance type)
                                     # This is approximate - you'd need pricing API for accuracy
-                                    monthly_cost = self._estimate_instance_cost(
-                                        instance_type
-                                    )
+                                    monthly_cost = self._estimate_instance_cost(instance_type)
                                     self.total_cost_estimate += monthly_cost
 
                                     name_tag = next(
-                                        (
-                                            tag["Value"]
-                                            for tag in instance.get("Tags", [])
-                                            if tag["Key"] == "Name"
-                                        ),
+                                        (tag["Value"] for tag in instance.get("Tags", []) if tag["Key"] == "Name"),
                                         "N/A",
                                     )
 
@@ -332,9 +298,7 @@ class UnusedResourceFinder:
 
                     has_healthy_targets = False
                     for tg in target_groups["TargetGroups"]:
-                        health = elbv2.describe_target_health(
-                            TargetGroupArn=tg["TargetGroupArn"]
-                        )
+                        health = elbv2.describe_target_health(TargetGroupArn=tg["TargetGroupArn"])
                         if any(
                             target["TargetHealth"]["State"] == "healthy"
                             for target in health["TargetHealthDescriptions"]

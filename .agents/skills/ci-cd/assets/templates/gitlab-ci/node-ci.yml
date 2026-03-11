@@ -323,12 +323,3 @@ workflow:
 # Additional optimizations
 .interruptible_template:
   interruptible: true
-
-lint:
-  extends: [.node_template, .interruptible_template]
-
-unit-test:
-  extends: [.node_template, .interruptible_template]
-
-integration-test:
-  extends: [.node_template, .interruptible_template]

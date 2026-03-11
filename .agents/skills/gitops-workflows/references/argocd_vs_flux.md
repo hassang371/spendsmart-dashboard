@@ -202,14 +202,14 @@ Both support:
 
 ## Recommendations by Use Case
 
-### Choose ArgoCD if:
+### Choose ArgoCD if
 - ✅ Developer teams need visibility (UI required)
 - ✅ Managing dozens of applications across teams
 - ✅ Multi-tenancy with Projects model
 - ✅ Fast onboarding is priority
 - ✅ Need built-in RBAC with fine-grained control
 
-### Choose Flux if:
+### Choose Flux if
 - ✅ Platform engineering focus
 - ✅ Infrastructure-as-code emphasis
 - ✅ Using OCI artifacts extensively
@@ -217,7 +217,7 @@ Both support:
 - ✅ Team comfortable with CLI tools
 - ✅ SOPS+age encryption requirement
 
-### Use Both if:
+### Use Both if
 - Different teams have different needs
 - ArgoCD for app teams, Flux for infrastructure
 - Separate concerns (apps vs infrastructure)

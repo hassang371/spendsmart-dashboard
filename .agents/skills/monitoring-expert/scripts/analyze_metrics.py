@@ -5,17 +5,15 @@ Supports: rate of change analysis, spike detection, trend analysis.
 """
 
 import argparse
+import statistics
 import sys
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
-import statistics
+from typing import Any, Dict, List, Optional
 
 try:
     import requests
 except ImportError:
-    print(
-        "⚠️  Warning: 'requests' library not found. Install with: pip install requests"
-    )
+    print("⚠️  Warning: 'requests' library not found. Install with: pip install requests")
     sys.exit(1)
 
 try:
@@ -25,9 +23,7 @@ except ImportError:
 
 
 class MetricAnalyzer:
-    def __init__(
-        self, source: str, endpoint: Optional[str] = None, region: str = "us-east-1"
-    ):
+    def __init__(self, source: str, endpoint: Optional[str] = None, region: str = "us-east-1"):
         self.source = source
         self.endpoint = endpoint
         self.region = region
@@ -55,9 +51,7 @@ class MetricAnalyzer:
                 "step": "5m",  # 5-minute resolution
             }
 
-            response = requests.get(
-                f"{self.endpoint}/api/v1/query_range", params=params, timeout=30
-            )
+            response = requests.get(f"{self.endpoint}/api/v1/query_range", params=params, timeout=30)
             response.raise_for_status()
 
             data = response.json()
@@ -102,9 +96,7 @@ class MetricAnalyzer:
             print(f"❌ Error querying CloudWatch: {e}")
             return []
 
-    def detect_anomalies(
-        self, values: List[float], sensitivity: float = 2.0
-    ) -> Dict[str, Any]:
+    def detect_anomalies(self, values: List[float], sensitivity: float = 2.0) -> Dict[str, Any]:
         """Detect anomalies using standard deviation method."""
         if len(values) < 10:
             return {
@@ -188,14 +180,10 @@ def print_results(results: Dict[str, Any]):
 
     # Trend analysis
     if "trend" in results:
-        trend_emoji = {"increasing": "📈", "decreasing": "📉", "stable": "➡️"}.get(
-            results["trend"]["trend"], "❓"
-        )
+        trend_emoji = {"increasing": "📈", "decreasing": "📉", "stable": "➡️"}.get(results["trend"]["trend"], "❓")
         print(f"\n{trend_emoji} Trend: {results['trend']['trend'].upper()}")
         if "rate_of_change" in results["trend"]:
-            print(
-                f"   Rate of Change: {results['trend']['rate_of_change']:.2f}% per interval"
-            )
+            print(f"   Rate of Change: {results['trend']['rate_of_change']:.2f}% per interval")
 
     # Anomaly detection
     if "anomalies" in results:
@@ -209,12 +197,8 @@ def print_results(results: Dict[str, Any]):
             )
 
             print("\n   Top Anomalies:")
-            for anomaly in sorted(
-                anomaly_data["anomalies"], key=lambda x: x["deviation"], reverse=True
-            )[:5]:
-                print(
-                    f"   • Index {anomaly['index']}: {anomaly['value']:.2f} ({anomaly['deviation']:.2f}σ)"
-                )
+            for anomaly in sorted(anomaly_data["anomalies"], key=lambda x: x["deviation"], reverse=True)[:5]:
+                print(f"   • Index {anomaly['index']}: {anomaly['value']:.2f} ({anomaly['deviation']:.2f}σ)")
         else:
             print("\n✅ No anomalies detected")
 
@@ -242,28 +226,20 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "source", choices=["prometheus", "cloudwatch"], help="Metric source"
-    )
+    parser.add_argument("source", choices=["prometheus", "cloudwatch"], help="Metric source")
     parser.add_argument("--endpoint", help="Prometheus endpoint URL")
     parser.add_argument("--query", help="PromQL query")
     parser.add_argument("--namespace", help="CloudWatch namespace")
     parser.add_argument("--metric", help="CloudWatch metric name")
-    parser.add_argument(
-        "--dimensions", help="CloudWatch dimensions (key=value,key2=value2)"
-    )
-    parser.add_argument(
-        "--hours", type=int, default=24, help="Hours of data to analyze (default: 24)"
-    )
+    parser.add_argument("--dimensions", help="CloudWatch dimensions (key=value,key2=value2)")
+    parser.add_argument("--hours", type=int, default=24, help="Hours of data to analyze (default: 24)")
     parser.add_argument(
         "--sensitivity",
         type=float,
         default=2.0,
         help="Anomaly detection sensitivity (std deviations, default: 2.0)",
     )
-    parser.add_argument(
-        "--region", default="us-east-1", help="AWS region (default: us-east-1)"
-    )
+    parser.add_argument("--region", default="us-east-1", help="AWS region (default: us-east-1)")
 
     args = parser.parse_args()
 
@@ -293,9 +269,7 @@ Examples:
         dims = dict(item.split("=") for item in args.dimensions.split(","))
 
         print(f"🔍 Querying CloudWatch: {args.namespace}/{args.metric}")
-        results = analyzer.query_cloudwatch(
-            args.namespace, args.metric, dims, args.hours
-        )
+        results = analyzer.query_cloudwatch(args.namespace, args.metric, dims, args.hours)
 
         if not results:
             print("❌ No data returned")

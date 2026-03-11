@@ -4,15 +4,16 @@ TDD: These tests define the expected behavior of core/pagination.py
 before it exists.
 """
 
-import pytest
 import base64
 import json
+
+import pytest
 
 from apps.api.core.pagination import (
     CursorPage,
     PaginationParams,
-    encode_cursor,
     decode_cursor,
+    encode_cursor,
 )
 
 

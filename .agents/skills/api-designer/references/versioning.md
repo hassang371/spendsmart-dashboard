@@ -48,6 +48,7 @@ GET /v2/users/123
 - Can lead to URI proliferation
 
 **Implementation:**
+
 ```
 /v1/users
 /v1/products
@@ -60,6 +61,7 @@ GET /v2/users/123
 Version specified in HTTP headers (Accept header or custom header).
 
 **Accept Header:**
+
 ```http
 GET /users/123
 Accept: application/vnd.myapi.v1+json
@@ -69,6 +71,7 @@ Accept: application/vnd.myapi.v2+json
 ```
 
 **Custom Header:**
+
 ```http
 GET /users/123
 API-Version: 1
@@ -152,6 +155,7 @@ Accept: application/vnd.myapi+json; version=2
 ### Major Versions Only
 
 Use simple major versions (v1, v2, v3) for public APIs:
+
 ```
 /v1/users
 /v2/users
@@ -165,6 +169,7 @@ Use simple major versions (v1, v2, v3) for public APIs:
 ### Date-Based Versions
 
 Some APIs use dates for versions:
+
 ```
 /2024-01-01/users
 /2024-06-15/users
@@ -186,6 +191,7 @@ Some APIs use dates for versions:
 ### 1. Introduction Phase
 
 New version is released alongside existing version:
+
 ```
 /v1/users  # Still supported
 /v2/users  # New version available
@@ -225,6 +231,7 @@ Link: </v2/users/123>; rel="successor-version"
 Old version is shut down on announced date.
 
 Return 410 Gone for deprecated endpoints:
+
 ```http
 GET /v1/users/123
 
@@ -277,6 +284,7 @@ Response: 410 Gone
 ```
 
 **v2:**
+
 ```json
 {
   "id": 123,
@@ -289,6 +297,7 @@ Response: 410 Gone
 **Migration:**
 - Split `name` field into `first_name` and `last_name`
 - Update client code to use new fields
+
 ```
 
 ### Offer Tools

@@ -4,13 +4,19 @@ v2: Uses TransactionClassifier (MiniLM + Cosine Similarity).
 """
 
 import io
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from apps.api.core.auth import (
+    CurrentUser,
+    get_current_user,
+    get_current_user_id,
+    get_user_client,
+)
 from apps.api.domains.ingestion.router import router
-from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 
 @pytest.fixture

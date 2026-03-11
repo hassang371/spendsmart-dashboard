@@ -58,6 +58,7 @@ spec:
 ## Using with HelmRelease
 
 **OCIRepository for Helm charts**:
+
 ```yaml
 apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: OCIRepository
@@ -85,6 +86,7 @@ spec:
 ## Publishing OCI Artifacts
 
 **Using flux CLI**:
+
 ```bash
 # Build and push Kustomize overlay
 flux push artifact oci://ghcr.io/org/app-config:v1.0.0 \
@@ -104,11 +106,13 @@ flux push artifact oci://ghcr.io/org/charts/myapp:1.0.0 \
 ### Using cosign
 
 **Sign artifact**:
+
 ```bash
 cosign sign ghcr.io/org/app-config:v1.0.0
 ```
 
 **Verify in Flux**:
+
 ```yaml
 spec:
   verify:
@@ -120,11 +124,13 @@ spec:
 ### Using notation
 
 **Sign artifact**:
+
 ```bash
 notation sign ghcr.io/org/app-config:v1.0.0
 ```
 
 **Verify in Flux**:
+
 ```yaml
 spec:
   verify:
@@ -138,6 +144,7 @@ spec:
 **Instead of static credentials, use cloud provider workload identity**:
 
 **AWS IRSA**:
+
 ```yaml
 spec:
   provider: aws
@@ -145,6 +152,7 @@ spec:
 ```
 
 **GCP Workload Identity**:
+
 ```yaml
 spec:
   provider: gcp
@@ -152,6 +160,7 @@ spec:
 ```
 
 **Azure Workload Identity**:
+
 ```yaml
 spec:
   provider: azure
@@ -161,17 +170,20 @@ spec:
 ## Best Practices (2025)
 
 1. **Use digest pinning** for production:
+
    ```yaml
    ref:
      digest: sha256:abc123...
    ```
 
 2. **Sign all artifacts**:
+
    ```bash
    flux push artifact ... | cosign sign
    ```
 
 3. **Use semver for automated updates**:
+
    ```yaml
    ref:
      semver: ">=1.0.0 <2.0.0"
@@ -213,6 +225,7 @@ Deploy to cluster
 ## Migration from Git to OCI
 
 **Before (Git)**:
+
 ```yaml
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
@@ -225,6 +238,7 @@ spec:
 ```
 
 **After (OCI)**:
+
 ```yaml
 apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: OCIRepository
@@ -251,6 +265,7 @@ spec:
 ## Troubleshooting
 
 **Artifact not found**:
+
 ```bash
 flux get sources oci
 kubectl describe ocirepository <name>
@@ -260,6 +275,7 @@ crane digest ghcr.io/org/app:v1.0.0
 ```
 
 **Authentication failures**:
+
 ```bash
 # Check secret
 kubectl get secret -n flux-system
@@ -269,6 +285,7 @@ crane manifest ghcr.io/org/app:v1.0.0
 ```
 
 **Signature verification fails**:
+
 ```bash
 # Verify locally
 cosign verify ghcr.io/org/app:v1.0.0

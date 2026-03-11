@@ -12,6 +12,7 @@ Guide for identifying service boundaries using domain-driven design principles.
 - **Subdomain Classification** - Core, supporting, generic domains
 
 **Bounded Context Indicators:**
+
 ```
 Strong Indicators:
 - Different teams own different parts
@@ -30,6 +31,7 @@ Warning Signs:
 ### Service Boundary Patterns
 
 **Database-Driven Decomposition:**
+
 ```
 1. Identify aggregates (entities with invariants)
 2. Each aggregate becomes a service candidate
@@ -38,6 +40,7 @@ Warning Signs:
 ```
 
 **Business Capability Decomposition:**
+
 ```
 Services organized by:
 - User Management (authentication, profiles, permissions)
@@ -48,6 +51,7 @@ Services organized by:
 ```
 
 **Strangler Fig Pattern:**
+
 ```
 Monolith Decomposition Strategy:
 1. Identify seams in existing codebase
@@ -68,6 +72,7 @@ Order of Extraction:
 ### Microservice Characteristics
 
 **Right-Sized Service:**
+
 ```
 Team Metrics:
 - 2-pizza team can own it (5-9 people)
@@ -84,6 +89,7 @@ Technical Metrics:
 ```
 
 **Too Small (Nano-service):**
+
 ```
 Warning Signs:
 - Services with 1-2 endpoints
@@ -94,6 +100,7 @@ Warning Signs:
 ```
 
 **Too Large (Distributed Monolith):**
+
 ```
 Warning Signs:
 - Multiple teams working on same service
@@ -108,6 +115,7 @@ Warning Signs:
 ### Team Structure and Service Design
 
 **Team Topologies:**
+
 ```
 Stream-Aligned Teams:
 - Own end-to-end service lifecycle
@@ -135,6 +143,7 @@ Complicated Subsystem Teams:
 ### Pre-Decomposition Analysis
 
 **Business Justification:**
+
 ```
 Check:
 - Independent scalability needed?
@@ -147,6 +156,7 @@ If mostly "no" → Consider modular monolith first
 ```
 
 **Technical Readiness:**
+
 ```
 Prerequisites:
 ✓ CI/CD pipelines automated
@@ -160,6 +170,7 @@ Prerequisites:
 ### Decomposition Steps
 
 **1. Identify Bounded Contexts:**
+
 ```
 Activities:
 - Event storming workshop
@@ -170,6 +181,7 @@ Activities:
 ```
 
 **2. Define Service Contracts:**
+
 ```
 For each service:
 - REST/gRPC API specification
@@ -180,6 +192,7 @@ For each service:
 ```
 
 **3. Plan Data Migration:**
+
 ```
 Data Strategy:
 - Identify shared data
@@ -190,6 +203,7 @@ Data Strategy:
 ```
 
 **4. Extract Service:**
+
 ```
 Implementation Order:
 1. Create new service skeleton
@@ -208,6 +222,7 @@ Implementation Order:
 ### Common Mistakes
 
 **Distributed Monolith:**
+
 ```
 Symptoms:
 - Services must deploy together
@@ -224,6 +239,7 @@ Solution:
 ```
 
 **Entity Services:**
+
 ```
 Anti-Pattern:
 UserService (CRUD on User entity)
@@ -239,6 +255,7 @@ ProductCatalog (search, recommendations, inventory)
 ```
 
 **Shared Libraries with Business Logic:**
+
 ```
 Anti-Pattern:
 common-lib (shared across all services with domain logic)
@@ -259,6 +276,7 @@ Better:
 ### Design Review Checklist
 
 **Service Independence:**
+
 ```
 Questions:
 - Can this service be deployed independently?
@@ -269,6 +287,7 @@ Questions:
 ```
 
 **Data Ownership:**
+
 ```
 Verify:
 - No shared database tables
@@ -279,6 +298,7 @@ Verify:
 ```
 
 **Operational Readiness:**
+
 ```
 Check:
 - Health check endpoint implemented
@@ -295,6 +315,7 @@ Check:
 ### Monolith to Microservices
 
 **Gradual Extraction:**
+
 ```
 Phase 1: Prepare
 - Add seams to monolith
@@ -321,6 +342,7 @@ Phase 5: Decompose Remaining Monolith
 ```
 
 **Parallel Run Pattern:**
+
 ```
 Strategy:
 1. Build new microservice

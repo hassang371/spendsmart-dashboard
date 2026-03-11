@@ -64,6 +64,7 @@ This guide helps you migrate from Datadog to a cost-effective open-source observ
 ### Step 1: Deploy Prometheus
 
 **Kubernetes** (recommended):
+
 ```yaml
 # prometheus-values.yaml
 prometheus:
@@ -84,12 +85,14 @@ prometheus:
 ```
 
 **Install**:
+
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 ```
 
 **Docker Compose**:
+
 ```yaml
 version: '3'
 services:
@@ -111,6 +114,7 @@ volumes:
 ### Step 2: Replace DogStatsD with Prometheus Exporters
 
 **Before (DogStatsD)**:
+
 ```python
 from datadog import statsd
 
@@ -120,6 +124,7 @@ statsd.gauge('active_users', 100)
 ```
 
 **After (Prometheus Python client)**:
+
 ```python
 from prometheus_client import Counter, Histogram, Gauge
 
@@ -217,6 +222,7 @@ for dashboard in dashboards['dashboards']:
 | Distribution | Histogram |
 
 **Automated Conversion** (basic example):
+
 ```python
 def convert_datadog_to_grafana(datadog_dashboard):
     grafana_dashboard = {
@@ -285,6 +291,7 @@ for monitor in monitors:
 ### Step 2: Convert to Prometheus Alert Rules
 
 **Datadog Monitor**:
+
 ```json
 {
   "name": "High CPU Usage",
@@ -295,6 +302,7 @@ for monitor in monitors:
 ```
 
 **Prometheus Alert**:
+
 ```yaml
 groups:
   - name: infrastructure
@@ -338,6 +346,7 @@ receivers:
 ### Step 1: Deploy Loki
 
 **Kubernetes**:
+
 ```bash
 helm repo add grafana https://grafana.github.io/helm-charts
 helm install loki grafana/loki-stack \
@@ -347,6 +356,7 @@ helm install loki grafana/loki-stack \
 ```
 
 **Docker Compose**:
+
 ```yaml
 version: '3'
 services:
@@ -371,6 +381,7 @@ volumes:
 ### Step 2: Replace Datadog Log Forwarder
 
 **Before (Datadog Agent)**:
+
 ```yaml
 # datadog.yaml
 logs_enabled: true
@@ -380,6 +391,7 @@ logs_config:
 ```
 
 **After (Promtail)**:
+
 ```yaml
 # promtail-config.yaml
 server:
@@ -404,16 +416,19 @@ scrape_configs:
 ### Step 3: Query Translation
 
 **Datadog Logs Query**:
+
 ```
 service:my-app status:error
 ```
 
 **Loki LogQL**:
+
 ```logql
 {job="my-app", level="error"}
 ```
 
 **More examples**:
+
 ```
 Datadog: service:api-gateway status:error @http.status_code:>=500
 Loki: {service="api-gateway", level="error"} | json | http_status_code >= 500
@@ -434,6 +449,7 @@ Loki: {source="nginx"} |= "404"
 ### Step 2: Replace Datadog Tracer with OpenTelemetry
 
 **Before (Datadog Python)**:
+
 ```python
 from ddtrace import tracer
 
@@ -443,6 +459,7 @@ def my_function():
 ```
 
 **After (OpenTelemetry)**:
+
 ```python
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -632,12 +649,12 @@ storage:
 
 ## Resources
 
-- **Prometheus**: https://prometheus.io/docs/
-- **Grafana**: https://grafana.com/docs/
-- **Loki**: https://grafana.com/docs/loki/
-- **Tempo**: https://grafana.com/docs/tempo/
-- **OpenTelemetry**: https://opentelemetry.io/
-- **Migration Tools**: https://github.com/grafana/dashboard-linter
+- **Prometheus**: <https://prometheus.io/docs/>
+- **Grafana**: <https://grafana.com/docs/>
+- **Loki**: <https://grafana.com/docs/loki/>
+- **Tempo**: <https://grafana.com/docs/tempo/>
+- **OpenTelemetry**: <https://opentelemetry.io/>
+- **Migration Tools**: <https://github.com/grafana/dashboard-linter>
 
 ---
 

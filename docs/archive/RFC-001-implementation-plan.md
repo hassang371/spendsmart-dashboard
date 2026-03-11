@@ -18,6 +18,7 @@
 ### Task 1: Restore missing files to design-docs skill
 
 **Files:**
+
 - Copy: `/tmp/design-doc-mermaid/references/guides/troubleshooting.md` → `.claude/skills/design-docs/references/troubleshooting.md`
 - Copy: `/tmp/design-doc-mermaid/references/guides/resilient-workflow.md` → `.claude/skills/design-docs/references/resilient-workflow.md`
 - Copy: `/tmp/design-doc-mermaid/scripts/resilient_diagram.py` → `.claude/skills/design-docs/scripts/resilient_diagram.py`
@@ -53,9 +54,11 @@ git commit -m "feat(skills): restore missing files to design-docs from upstream"
 ### Task 2: Rewrite design-docs SKILL.md with progressive disclosure
 
 **Files:**
+
 - Modify: `.claude/skills/design-docs/SKILL.md`
 
 **Step 1:** Rewrite SKILL.md merging original's decision tree with SCALE's doc workflow. Must include:
+
 - Progressive disclosure decision tree (routes to specific guides on demand)
 - Doc type detection (feature → LLD, bug → bug report, RFC → RFC, HLD sync)
 - SCALE-specific process (auto-numbering, HLD sync check, commit docs before code)
@@ -81,9 +84,11 @@ git commit -m "feat(skills): rewrite design-docs SKILL.md with progressive discl
 ### Task 3: Create `.claude/workflows/docs-driven-dev.md`
 
 **Files:**
+
 - Create: `.claude/workflows/docs-driven-dev.md`
 
 **Step 1:** Create the directory and file. Claude-native version of the master workflow:
+
 - Step 1: Brainstorm → `superpowers:brainstorming` (no round limit)
 - Step 2: Document → Read `.claude/skills/design-docs/` (LLD/HLD/bug/RFC)
 - Step 3: Plan → `superpowers:writing-plans`
@@ -111,6 +116,7 @@ git commit -m "feat(workflows): create Claude-native docs-driven-dev workflow"
 ### Task 4: Create `.claude/rules/` files
 
 **Files:**
+
 - Create: `.claude/rules/superpowers.md` (~60 lines)
 - Create: `.claude/rules/design-docs.md` (~10 lines)
 - Create: `.claude/rules/task-tracking.md` (~20 lines)
@@ -143,6 +149,7 @@ git commit -m "feat(rules): create modular rules for superpowers, tasks, commits
 ### Task 5: Create path-scoped rules
 
 **Files:**
+
 - Create: `.claude/rules/frontend/nextjs.md` (paths: `apps/web/**/*.{ts,tsx}`)
 - Create: `.claude/rules/backend/fastapi.md` (paths: `apps/api/**/*.py`, `apps/worker/**/*.py`, `packages/**/*.py`)
 
@@ -168,9 +175,11 @@ git commit -m "feat(rules): add path-scoped rules for Next.js and FastAPI"
 ### Task 6: Rewrite `.claude/CLAUDE.md`
 
 **Files:**
+
 - Modify: `.claude/CLAUDE.md`
 
 **Step 1:** Rewrite CLAUDE.md as thin master (~100-150 lines):
+
 - Identity (Principal Engineer on SCALE)
 - Startup Protocol (memory + TaskList + conversation type detection)
 - Tech Stack
@@ -202,9 +211,11 @@ git commit -m "feat: rewrite CLAUDE.md as thin master with modular rules"
 ### Task 7: Create starter MEMORY.md
 
 **Files:**
+
 - Create: `~/.claude/projects/-Users-hassangameryt-Documents-Antigravity-SCALE-APP/memory/MEMORY.md`
 
 **Step 1:** Seed with key decisions from this brainstorm session:
+
 - Installed plugins list
 - Skill mapping conventions
 - Artifact conventions

@@ -37,7 +37,11 @@
     "ci-cd@devops-skills": true,
     "gitops-workflows@devops-skills": true,
     "skill-creator@claude-plugins-official": true,
-    "fullstack-dev-skills@fullstack-dev-skills": false
+    "superpowers@superpowers-dev": true,
+    "fullstack-dev-skills@fullstack-dev-skills": true,
+    "aws-cost-optimization@devops-skills": false,
+    "iac-terraform@devops-skills": false,
+    "k8s-troubleshooter@devops-skills": false
   },
   "autoMemoryEnabled": true
 }

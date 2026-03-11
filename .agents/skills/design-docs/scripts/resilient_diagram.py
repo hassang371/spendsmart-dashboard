@@ -40,7 +40,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class DiagramType(Enum):
@@ -153,15 +153,11 @@ class TroubleshootingParser:
             title = header_match.group(2).strip()
 
             # Extract severity
-            severity_match = re.search(
-                r"\*\*Severity:\*\* (🔴|🟠|🟡|🟢) (\w+)", section
-            )
+            severity_match = re.search(r"\*\*Severity:\*\* (🔴|🟠|🟡|🟢) (\w+)", section)
             severity = severity_match.group(2) if severity_match else "Unknown"
 
             # Extract problem description
-            problem_match = re.search(
-                r"\*\*Problem:\*\* (.+?)(?:\n\n|\*\*)", section, re.DOTALL
-            )
+            problem_match = re.search(r"\*\*Problem:\*\* (.+?)(?:\n\n|\*\*)", section, re.DOTALL)
             problem = problem_match.group(1).strip() if problem_match else ""
 
             # Extract diagram types affected
@@ -185,9 +181,7 @@ class TroubleshootingParser:
 
             # Extract error messages
             error_messages = []
-            error_msg_match = re.search(
-                r"\*\*Error Message[s]?:\*\*\s*\n((?:- `.+`\n?)+)", section
-            )
+            error_msg_match = re.search(r"\*\*Error Message[s]?:\*\*\s*\n((?:- `.+`\n?)+)", section)
             if error_msg_match:
                 for line in error_msg_match.group(1).split("\n"):
                     msg_match = re.search(r"`(.+)`", line)
@@ -211,9 +205,7 @@ class TroubleshootingParser:
             )
             self.entries.append(entry)
 
-    def search(
-        self, error_message: str, diagram_type: DiagramType
-    ) -> List[TroubleshootingMatch]:
+    def search(self, error_message: str, diagram_type: DiagramType) -> List[TroubleshootingMatch]:
         """
         Search for matching troubleshooting entries.
 
@@ -317,14 +309,8 @@ class ResilientDiagramGenerator:
         Args:
             troubleshooting_path: Path to troubleshooting.md guide (auto-detected if not provided)
         """
-        self.troubleshooting_path = (
-            troubleshooting_path or self._find_troubleshooting_guide()
-        )
-        self.troubleshooting = (
-            TroubleshootingParser(self.troubleshooting_path)
-            if self.troubleshooting_path
-            else None
-        )
+        self.troubleshooting_path = troubleshooting_path or self._find_troubleshooting_guide()
+        self.troubleshooting = TroubleshootingParser(self.troubleshooting_path) if self.troubleshooting_path else None
 
     def _find_troubleshooting_guide(self) -> Optional[Path]:
         """Find troubleshooting.md relative to script location."""
@@ -358,9 +344,7 @@ class ResilientDiagramGenerator:
 
         return DiagramType.UNKNOWN
 
-    def generate_filename(
-        self, markdown_file: str, diagram_num: int, diagram_type: str, title: str
-    ) -> str:
+    def generate_filename(self, markdown_file: str, diagram_num: int, diagram_type: str, title: str) -> str:
         """
         Generate filename following convention:
         <markdown_file_name>_<diagram_num>_<image_type>_<title>
@@ -386,9 +370,7 @@ class ResilientDiagramGenerator:
 
         return f"{safe_md}_{diagram_num:02d}_{diagram_type}_{safe_title}"
 
-    def save_mmd_file(
-        self, mermaid_code: str, output_dir: Path, base_filename: str
-    ) -> Path:
+    def save_mmd_file(self, mermaid_code: str, output_dir: Path, base_filename: str) -> Path:
         """
         Save diagram to .mmd file.
 
@@ -407,9 +389,7 @@ class ResilientDiagramGenerator:
 
         return mmd_path
 
-    def render_image(
-        self, mmd_path: Path, image_format: str = "png"
-    ) -> Tuple[bool, Optional[Path], Optional[str]]:
+    def render_image(self, mmd_path: Path, image_format: str = "png") -> Tuple[bool, Optional[Path], Optional[str]]:
         """
         Render diagram to image using mmdc.
 
@@ -447,11 +427,7 @@ class ResilientDiagramGenerator:
             )
 
             if result.returncode != 0:
-                error_msg = (
-                    result.stderr.strip()
-                    or result.stdout.strip()
-                    or "Unknown rendering error"
-                )
+                error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown rendering error"
                 return False, None, error_msg
 
             if not image_path.exists():
@@ -471,16 +447,12 @@ class ResilientDiagramGenerator:
     def _check_mmdc_installed() -> bool:
         """Check if mermaid-cli (mmdc) is installed."""
         try:
-            result = subprocess.run(
-                ["mmdc", "--version"], capture_output=True, timeout=5
-            )
+            result = subprocess.run(["mmdc", "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
-    def get_search_recommendation(
-        self, error_message: str, diagram_type: DiagramType
-    ) -> str:
+    def get_search_recommendation(self, error_message: str, diagram_type: DiagramType) -> str:
         """
         Generate search query for external tools when troubleshooting fails.
 
@@ -526,9 +498,7 @@ class ResilientDiagramGenerator:
         diagram_type = self.detect_diagram_type(mermaid_code)
 
         # Step 2: Generate filename
-        base_filename = self.generate_filename(
-            markdown_file, diagram_num, diagram_type.value, title
-        )
+        base_filename = self.generate_filename(markdown_file, diagram_num, diagram_type.value, title)
 
         # Step 3: Save .mmd file
         mmd_path = self.save_mmd_file(mermaid_code, output_dir, base_filename)
@@ -619,12 +589,8 @@ Error Recovery:
     # Input options (mutually exclusive)
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--code", "-c", type=str, help="Mermaid code string")
-    input_group.add_argument(
-        "--mmd-file", "-i", type=Path, help="Path to existing .mmd file"
-    )
-    input_group.add_argument(
-        "--stdin", action="store_true", help="Read Mermaid code from stdin"
-    )
+    input_group.add_argument("--mmd-file", "-i", type=Path, help="Path to existing .mmd file")
+    input_group.add_argument("--stdin", action="store_true", help="Read Mermaid code from stdin")
 
     # Output options
     parser.add_argument(
@@ -641,12 +607,8 @@ Error Recovery:
         default="diagram",
         help="Source markdown filename for naming convention",
     )
-    parser.add_argument(
-        "--diagram-num", "-n", type=int, default=1, help="Diagram number (default: 1)"
-    )
-    parser.add_argument(
-        "--title", "-t", type=str, default="diagram", help="Diagram title for filename"
-    )
+    parser.add_argument("--diagram-num", "-n", type=int, default=1, help="Diagram number (default: 1)")
+    parser.add_argument("--title", "-t", type=str, default="diagram", help="Diagram title for filename")
     parser.add_argument(
         "--format",
         "-f",
@@ -715,18 +677,12 @@ Error Recovery:
             print(f"  Type:     {result.diagram_type}")
 
             if result.troubleshooting_matches:
-                print(
-                    f"\nTroubleshooting matches found ({len(result.troubleshooting_matches)}):"
-                )
+                print(f"\nTroubleshooting matches found ({len(result.troubleshooting_matches)}):")
                 for match in result.troubleshooting_matches[:3]:
-                    print(
-                        f"  - Error {match['error_number']}: {match['title']} ({match['severity']})"
-                    )
+                    print(f"  - Error {match['error_number']}: {match['title']} ({match['severity']})")
 
                 if result.suggested_fix:
-                    print(
-                        f"\nSuggested fix (from Error {result.troubleshooting_matches[0]['error_number']}):"
-                    )
+                    print(f"\nSuggested fix (from Error {result.troubleshooting_matches[0]['error_number']}):")
                     print("```mermaid")
                     print(result.suggested_fix)
                     print("```")

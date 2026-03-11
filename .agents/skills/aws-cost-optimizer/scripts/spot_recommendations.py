@@ -16,18 +16,17 @@ Requirements:
 """
 
 import argparse
-import boto3
-from datetime import datetime
-from typing import List, Dict
-from tabulate import tabulate
 import sys
+from datetime import datetime
+from typing import Dict, List
+
+import boto3
+from tabulate import tabulate
 
 
 class SpotRecommendationAnalyzer:
     def __init__(self, profile: str = None, region: str = None):
-        self.session = (
-            boto3.Session(profile_name=profile) if profile else boto3.Session()
-        )
+        self.session = boto3.Session(profile_name=profile) if profile else boto3.Session()
         self.regions = [region] if region else self._get_all_regions()
         self.recommendations = []
         self.total_savings = 0.0
@@ -157,9 +156,7 @@ class SpotRecommendationAnalyzer:
                         asg_member = instance_id in asg_instances
 
                         # Calculate suitability
-                        score, reasons = self._calculate_suitability_score(
-                            instance, asg_member
-                        )
+                        score, reasons = self._calculate_suitability_score(instance, asg_member)
 
                         # Calculate savings
                         hourly_cost = self._estimate_hourly_cost(instance_type)
@@ -170,11 +167,7 @@ class SpotRecommendationAnalyzer:
 
                         # Get instance name
                         name_tag = next(
-                            (
-                                tag["Value"]
-                                for tag in instance.get("Tags", [])
-                                if tag["Key"] == "Name"
-                            ),
+                            (tag["Value"] for tag in instance.get("Tags", []) if tag["Key"] == "Name"),
                             "N/A",
                         )
 

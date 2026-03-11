@@ -22,16 +22,16 @@ sequenceDiagram
 
     C->>TLS: HTTPS Request
     TLS->>MW: Decrypted Request
-    
+
     Note over MW: Request ID → CORS → Rate Limit → Auth → Logging
-    
+
     MW->>R: Validated Request (user_id extracted)
     R->>DB: Query/Insert
     DB-->>R: Result
     R-->>MW: Response
-    
+
     Note over MW: Security Headers + Access Log
-    
+
     MW-->>C: JSON Response + X-Request-ID
 ```
 
@@ -94,12 +94,12 @@ sequenceDiagram
 
     C->>S: Login (Google OAuth)
     S-->>C: JWT (access + refresh token)
-    
+
     C->>A: API call + Bearer JWT
     A->>A: Validate JWT, extract user_id
     A->>A: Check token expiry
     A-->>C: Response (with user data)
-    
+
     Note over C,A: JWT is stateless — no server sessions
 ```
 

@@ -26,13 +26,13 @@ Requirements:
 """
 
 import argparse
+import hashlib
 import re
-import sys
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Dict
-import hashlib
+from typing import Dict, List, Optional
 
 
 class MermaidDiagram:
@@ -71,9 +71,7 @@ class MermaidExtractor:
     def _extract_diagrams(self):
         """Extract all Mermaid diagrams from the Markdown content."""
         line_number = 1
-        for index, match in enumerate(
-            self.MERMAID_PATTERN.finditer(self.content), start=1
-        ):
+        for index, match in enumerate(self.MERMAID_PATTERN.finditer(self.content), start=1):
             diagram_content = match.group(1)
             # Count newlines before this match to get line number
             lines_before = self.content[: match.start()].count("\n")
@@ -109,9 +107,7 @@ class MermaidExtractor:
             print("No Mermaid diagrams found.")
             return
 
-        print(
-            f"\nFound {len(self.diagrams)} Mermaid diagram(s) in {self.markdown_file}:\n"
-        )
+        print(f"\nFound {len(self.diagrams)} Mermaid diagram(s) in {self.markdown_file}:\n")
         for diagram in self.diagrams:
             print(f"  #{diagram.index} (Line {diagram.line_number}):")
             print(f"    First line: {diagram.get_first_line()}")
@@ -128,9 +124,7 @@ class MermaidExtractor:
         """
         if not self._check_mmdc_installed():
             print("ERROR: mermaid-cli (mmdc) not found.", file=sys.stderr)
-            print(
-                "Install with: npm install -g @mermaid-js/mermaid-cli", file=sys.stderr
-            )
+            print("Install with: npm install -g @mermaid-js/mermaid-cli", file=sys.stderr)
             sys.exit(1)
 
         results = {}
@@ -149,9 +143,7 @@ class MermaidExtractor:
 
         # Summary
         failed_count = sum(1 for err in results.values() if err)
-        print(
-            f"\nValidation complete: {len(self.diagrams) - failed_count}/{len(self.diagrams)} passed"
-        )
+        print(f"\nValidation complete: {len(self.diagrams) - failed_count}/{len(self.diagrams)} passed")
 
         return results
 
@@ -194,9 +186,7 @@ class MermaidExtractor:
             except Exception as e:
                 return str(e)
 
-    def replace_with_images(
-        self, image_format: str = "png", image_dir: str = "diagrams"
-    ) -> str:
+    def replace_with_images(self, image_format: str = "png", image_dir: str = "diagrams") -> str:
         """
         Replace Mermaid code blocks with image references.
 
@@ -224,9 +214,7 @@ class MermaidExtractor:
     def _check_mmdc_installed() -> bool:
         """Check if mermaid-cli (mmdc) is installed."""
         try:
-            result = subprocess.run(
-                ["mmdc", "--version"], capture_output=True, timeout=5
-            )
+            result = subprocess.run(["mmdc", "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
@@ -253,9 +241,7 @@ Examples:
     )
 
     parser.add_argument("markdown_file", type=Path, help="Input Markdown file")
-    parser.add_argument(
-        "--output-dir", "-o", type=Path, help="Output directory for extracted diagrams"
-    )
+    parser.add_argument("--output-dir", "-o", type=Path, help="Output directory for extracted diagrams")
     parser.add_argument(
         "--prefix",
         default="diagram",
@@ -267,9 +253,7 @@ Examples:
         action="store_true",
         help="List diagrams without extracting",
     )
-    parser.add_argument(
-        "--validate", "-v", action="store_true", help="Validate diagrams with mmdc"
-    )
+    parser.add_argument("--validate", "-v", action="store_true", help="Validate diagrams with mmdc")
     parser.add_argument(
         "--replace-with-images",
         "-r",
@@ -323,9 +307,7 @@ Examples:
             sys.exit(1)
 
     elif args.replace_with_images:
-        modified_content = extractor.replace_with_images(
-            image_format=args.image_format, image_dir=args.image_dir
-        )
+        modified_content = extractor.replace_with_images(image_format=args.image_format, image_dir=args.image_dir)
 
         if args.output_markdown:
             args.output_markdown.write_text(modified_content, encoding="utf-8")
@@ -335,9 +317,7 @@ Examples:
             print(modified_content)
 
     elif args.output_dir:
-        print(
-            f"\nExtracting {len(extractor.diagrams)} diagram(s) to {args.output_dir}/:\n"
-        )
+        print(f"\nExtracting {len(extractor.diagrams)} diagram(s) to {args.output_dir}/:\n")
         saved_files = extractor.save_diagrams(args.output_dir, prefix=args.prefix)
         print(f"\n✓ Extracted {len(saved_files)} diagram(s)")
 
