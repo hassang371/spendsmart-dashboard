@@ -47,6 +47,7 @@ import {
   type TransactionCountsResponse,
   type UncategorizedTransaction,
 } from '../../../lib/api/client';
+import { getCachedData, setCachedData, removeCachedData } from '../../../lib/utils/cache';
 
 type TransactionRow = {
   id: string;
@@ -382,30 +383,15 @@ export default function TransactionsPage() {
     }
 
     const cacheKey = `transactions-cache:${user.id}`;
-    const cachedRaw = localStorage.getItem(cacheKey);
-    if (cachedRaw) {
-      try {
-        const cached = JSON.parse(cachedRaw) as {
-          timestamp: number;
-          rows: TransactionRow[];
-          nextCursor?: string;
-          hasMore?: boolean;
-          counts?: TransactionCountsResponse;
-        };
-        if (
-          Date.now() - cached.timestamp < TRANSACTIONS_CACHE_TTL_MS &&
-          Array.isArray(cached.rows)
-        ) {
-          setTransactions(cached.rows);
-          setNextCursor(cached.nextCursor);
-          setHasMore(cached.hasMore ?? false);
-          if (cached.counts) setServerCounts(cached.counts);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // ignore JSON parse error
-      }
+    type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
+    const cached = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
+    if (cached && Array.isArray(cached.rows)) {
+      setTransactions(cached.rows);
+      setNextCursor(cached.nextCursor);
+      setHasMore(cached.hasMore ?? false);
+      if (cached.counts) setServerCounts(cached.counts);
+      setLoading(false);
+      return;
     }
 
     // Fetch first page only — user loads more on demand
@@ -417,15 +403,11 @@ export default function TransactionsPage() {
     setTransactions(rows);
     setNextCursor(response.next_cursor ?? undefined);
     setHasMore(response.has_more);
-    localStorage.setItem(
-      cacheKey,
-      JSON.stringify({
-        timestamp: Date.now(),
-        rows,
-        nextCursor: response.next_cursor ?? undefined,
-        hasMore: response.has_more,
-      })
-    );
+    setCachedData<TxCache>(cacheKey, {
+      rows,
+      nextCursor: response.next_cursor ?? undefined,
+      hasMore: response.has_more,
+    });
   }, [router]);
 
   const fetchMoreTransactions = useCallback(async () => {
@@ -448,24 +430,15 @@ export default function TransactionsPage() {
         const combined = [...prev, ...newRows];
         if (userId) {
           const ck = `transactions-cache:${userId}`;
+          type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
           // Preserve existing cached counts so they survive Load More rewrites
-          let existingCounts: TransactionCountsResponse | undefined;
-          try {
-            const ex = localStorage.getItem(ck);
-            if (ex) existingCounts = (JSON.parse(ex) as any).counts;
-          } catch {
-            /* ignore */
-          }
-          localStorage.setItem(
-            ck,
-            JSON.stringify({
-              timestamp: Date.now(),
-              rows: combined,
-              nextCursor: response.next_cursor ?? undefined,
-              hasMore: response.has_more,
-              ...(existingCounts ? { counts: existingCounts } : {}),
-            })
-          );
+          const existingCache = getCachedData<TxCache>(ck, TRANSACTIONS_CACHE_TTL_MS);
+          setCachedData<TxCache>(ck, {
+            rows: combined,
+            nextCursor: response.next_cursor ?? undefined,
+            hasMore: response.has_more,
+            ...(existingCache?.counts ? { counts: existingCache.counts } : {}),
+          });
         }
         return combined;
       });
@@ -487,35 +460,22 @@ export default function TransactionsPage() {
     if (!session?.access_token) return;
 
     const cacheKey = `transactions-cache:${user.id}`;
+    type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
 
     // Use cached counts if still within TTL
-    const cachedRaw = localStorage.getItem(cacheKey);
-    if (cachedRaw) {
-      try {
-        const cached = JSON.parse(cachedRaw) as {
-          timestamp: number;
-          counts?: TransactionCountsResponse;
-        };
-        if (Date.now() - cached.timestamp < TRANSACTIONS_CACHE_TTL_MS && cached.counts) {
-          setServerCounts(cached.counts);
-          return;
-        }
-      } catch {
-        /* ignore */
-      }
+    const cachedForCounts = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
+    if (cachedForCounts?.counts) {
+      setServerCounts(cachedForCounts.counts);
+      return;
     }
 
     try {
       const counts = await accountsApi.getTransactionCounts(session.access_token);
       setServerCounts(counts);
       // Merge counts into the existing cache entry so the next navigation is free
-      const existing = localStorage.getItem(cacheKey);
+      const existing = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
       if (existing) {
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({ ...JSON.parse(existing), counts }));
-        } catch {
-          /* ignore */
-        }
+        setCachedData<TxCache>(cacheKey, { ...existing, counts });
       }
     } catch {
       // non-critical — tab headers fall back to local counts
@@ -529,27 +489,18 @@ export default function TransactionsPage() {
     if (!session?.access_token) return;
 
     const cacheKey = `uncategorized-cache:${session.user.id}`;
-    const cachedRaw = localStorage.getItem(cacheKey);
-    if (cachedRaw) {
-      try {
-        const cached = JSON.parse(cachedRaw) as {
-          timestamp: number;
-          items: UncategorizedTransaction[];
-        };
-        if (Date.now() - cached.timestamp < UNCATEGORIZED_CACHE_TTL_MS) {
-          setUncategorized(cached.items);
-          return;
-        }
-      } catch {
-        /* ignore */
-      }
+    type UncategorizedCache = { items: UncategorizedTransaction[] };
+    const cachedUncat = getCachedData<UncategorizedCache>(cacheKey, UNCATEGORIZED_CACHE_TTL_MS);
+    if (cachedUncat) {
+      setUncategorized(cachedUncat.items);
+      return;
     }
 
     setLoadingUncategorized(true);
     try {
       const res = await accountsApi.getUncategorized(session.access_token, 200);
       setUncategorized(res.items);
-      localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items: res.items }));
+      setCachedData<UncategorizedCache>(cacheKey, { items: res.items });
     } catch {
       // silently ignore
     } finally {
@@ -592,8 +543,8 @@ export default function TransactionsPage() {
       setMessage('Category saved.');
       // Invalidate caches so next navigation picks up server state
       if (userId) {
-        localStorage.removeItem(`transactions-cache:${userId}`);
-        localStorage.removeItem(`uncategorized-cache:${userId}`);
+        removeCachedData(`transactions-cache:${userId}`);
+        removeCachedData(`uncategorized-cache:${userId}`);
       }
       fetchTransactions();
     } catch (e) {
@@ -611,8 +562,9 @@ export default function TransactionsPage() {
     [4000, 10000].forEach(delay =>
       setTimeout(() => {
         if (userId) {
-          localStorage.removeItem(`transactions-cache:${userId}`);
-          localStorage.removeItem(`uncategorized-cache:${userId}`);
+          removeCachedData(`transactions-cache:${userId}`);
+          removeCachedData(`uncategorized-cache:${userId}`);
+          removeCachedData(`overview-cache:${userId}`);
         }
         fetchTransactions();
         fetchTotalCounts(); // also refresh Review badge count after classification
@@ -906,7 +858,7 @@ export default function TransactionsPage() {
       await accountsApi.updateTransaction(txId, updates, accessToken);
       setMessage('Category updated.');
       // Invalidate cache so fetchTransactions fetches fresh data (not cached stale rows)
-      if (userId) localStorage.removeItem(`transactions-cache:${userId}`);
+      if (userId) removeCachedData(`transactions-cache:${userId}`);
       // Refresh in background to sync any additional batch updates from server
       fetchTransactions();
 
@@ -974,8 +926,8 @@ export default function TransactionsPage() {
     const result = await ingestionApi.importFile(file, accessToken, password);
 
     // Clear local caches so that immediately subsequent UI fetch requests retrieve fresh data
-    localStorage.removeItem(`transactions-cache:${userId}`);
-    localStorage.removeItem(`uncategorized-cache:${userId}`);
+    removeCachedData(`transactions-cache:${userId}`);
+    removeCachedData(`uncategorized-cache:${userId}`);
 
     setImportProgress(100);
     return result.inserted;

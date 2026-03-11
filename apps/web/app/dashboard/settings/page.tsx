@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase/client';
-import { removeCachedData } from '../../../lib/utils/cache';
+import { clearAppCache } from '../../../lib/utils/cache';
 import { useTheme } from 'next-themes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -69,24 +69,7 @@ export default function SettingsPage() {
   // Toast States
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const clearAppCacheFull = () => {
-    try {
-      if (typeof window !== 'undefined') {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < window.localStorage.length; i++) {
-          const k = window.localStorage.key(i);
-          if (k && (k.startsWith('dev:') || k.startsWith('prod:'))) {
-            keysToRemove.push(k);
-          }
-        }
-        keysToRemove.forEach((k) => window.localStorage.removeItem(k));
-      }
-    } catch(err) {
-      console.warn(err);
-    }
-  }
-
-  useEffect(() => {
+useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 5000);
       return () => clearTimeout(timer);
@@ -288,15 +271,8 @@ export default function SettingsPage() {
         .eq('user_id', user.id);
       if (deleteError) throw deleteError;
 
-      const cacheKeys = [
-        'overview-cache',
-        'transactions-cache',
-        'uncategorized-cache',
-        'analytics-cache',
-        'safe-to-spend-cache',
-        'training-job-cache',
-      ];
-      cacheKeys.forEach((key) => removeCachedData(`${key}:${user.id}`));
+      // Clear all app-owned cache entries (sessionStorage in dev, localStorage in prod)
+      clearAppCache();
 
       setToast({
         type: 'success',

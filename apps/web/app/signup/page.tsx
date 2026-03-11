@@ -85,30 +85,24 @@ export default function SignupPage() {
       <div className="hidden md:flex w-1/2 bg-brand-blue items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
 
-        {/* Floating Assets */}
-        <motion.div
-          animate={{ y: [-10, 10, -10], rotate: [0, 5, 0] }}
-          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-[10%] left-[10%] w-48 pointer-events-none opacity-90"
-        >
+        {/* Floating Assets — CSS float animation (GPU) instead of JS keyframes */}
+        <div className="absolute top-[10%] left-[10%] w-48 pointer-events-none opacity-90 animate-float">
           <Lottie animationData={rocketAnimation} loop={true} />
-        </motion.div>
+        </div>
 
-        <motion.div
-          animate={{ y: [10, -10, 10], rotate: [0, -10, 0] }}
-          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute bottom-[15%] right-[10%] w-48 pointer-events-none opacity-90"
+        <div
+          className="absolute bottom-[15%] right-[10%] w-48 pointer-events-none opacity-90 animate-float"
+          style={{ animationDuration: '7s', animationDelay: '0.5s' }}
         >
           <Lottie animationData={coinAnimation} loop={true} />
-        </motion.div>
+        </div>
 
-        <motion.div
-          animate={{ y: [0, 20, 0] }}
-          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-[40%] right-[15%] w-32 pointer-events-none opacity-80"
+        <div
+          className="absolute top-[40%] right-[15%] w-32 pointer-events-none opacity-80 animate-float"
+          style={{ animationDuration: '5s', animationDelay: '1s' }}
         >
           <Lottie animationData={walletAnimation} loop={true} />
-        </motion.div>
+        </div>
 
         <motion.div
           initial={{ opacity: 0, x: -50 }}

@@ -365,7 +365,7 @@ export default function OverviewPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="flex flex-col gap-6 p-1 transition-colors duration-300"
+      className="flex flex-col gap-6 p-1 transition-colors duration-300 h-full"
     >
       <motion.div
         variants={itemVariants}

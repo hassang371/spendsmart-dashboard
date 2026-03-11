@@ -26,6 +26,7 @@ import {
   type TrainingUploadResponse,
 } from '../../../lib/api/client';
 import { getBrowserSupabaseClient } from '../../../lib/supabase/client';
+import { getCachedData, setCachedData, removeCachedData } from '../../../lib/utils/cache';
 import SafeToSpendCard from '../../../components/dashboard/SafeToSpendCard';
 import TrainingJobCard from '../../../components/dashboard/TrainingJobCard';
 
@@ -106,19 +107,12 @@ export default function AIInsightsPage() {
 
   const checkGateway = useCallback(async () => {
     // Use cached status if fresh — avoids re-check on every navigation
-    const cachedRaw = localStorage.getItem('health-cache');
-    if (cachedRaw) {
-      try {
-        const cached = JSON.parse(cachedRaw) as { timestamp: number; data: HealthResponse };
-        if (Date.now() - cached.timestamp < HEALTH_CACHE_TTL_MS) {
-          setHealthData(cached.data);
-          setGatewayOnline(true);
-          setCheckingHealth(false);
-          return;
-        }
-      } catch {
-        /* ignore */
-      }
+    const cachedHealth = getCachedData<HealthResponse>('health-cache', HEALTH_CACHE_TTL_MS);
+    if (cachedHealth) {
+      setHealthData(cachedHealth);
+      setGatewayOnline(true);
+      setCheckingHealth(false);
+      return;
     }
 
     setCheckingHealth(true);
@@ -126,11 +120,11 @@ export default function AIInsightsPage() {
       const data = await healthApi.check();
       setHealthData(data);
       setGatewayOnline(true);
-      localStorage.setItem('health-cache', JSON.stringify({ timestamp: Date.now(), data }));
+      setCachedData<HealthResponse>('health-cache', data);
     } catch {
       setGatewayOnline(false);
       setHealthData(null);
-      localStorage.removeItem('health-cache');
+      removeCachedData('health-cache');
     } finally {
       setCheckingHealth(false);
     }
