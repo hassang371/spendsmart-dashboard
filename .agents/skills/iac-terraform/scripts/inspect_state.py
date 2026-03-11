@@ -7,16 +7,14 @@ Analyzes Terraform state and detects configuration drift
 import json
 import subprocess
 import sys
-from typing import Dict, List, Any
 from datetime import datetime
+from typing import Any, Dict, List
 
 
 def run_command(cmd: List[str], cwd: str = ".") -> Dict[str, Any]:
     """Run a command and return the result"""
     try:
-        result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
         return {"success": True, "stdout": result.stdout, "stderr": result.stderr}
     except subprocess.CalledProcessError as e:
         return {
@@ -49,9 +47,7 @@ def detect_drift(working_dir: str) -> Dict[str, Any]:
     """Run terraform plan to detect drift"""
     print("🔄 Detecting configuration drift...\n")
 
-    result = run_command(
-        ["terraform", "plan", "-detailed-exitcode", "-no-color"], working_dir
-    )
+    result = run_command(["terraform", "plan", "-detailed-exitcode", "-no-color"], working_dir)
 
     # Exit codes: 0 = no changes, 1 = error, 2 = changes detected
     if result["returncode"] == 0:
@@ -229,9 +225,7 @@ def main():
     if state_health["resource_count"] == 0:
         print("   • No resources in state - consider running 'terraform apply'")
     if backend.get("backend_type") == "local":
-        print(
-            "   • Using local backend - consider remote backend for team collaboration"
-        )
+        print("   • Using local backend - consider remote backend for team collaboration")
     if not check_drift_flag:
         print("   • Run with --check-drift flag to detect configuration drift")
 

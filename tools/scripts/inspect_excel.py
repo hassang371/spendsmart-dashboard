@@ -1,7 +1,8 @@
-import pandas as pd
-import msoffcrypto
 import io
 import os
+
+import msoffcrypto
+import pandas as pd
 
 file_path = "tests/fixtures/statement.xlsx"
 password = os.getenv("STATEMENT_PASSWORD")
@@ -28,8 +29,7 @@ try:
     potential_cols = [
         c
         for c in df.columns
-        if isinstance(c, str)
-        and any(x in c.lower() for x in ["desc", "detail", "narration", "particular"])
+        if isinstance(c, str) and any(x in c.lower() for x in ["desc", "detail", "narration", "particular"])
     ]
     print(f"Potential Description Columns: {potential_cols}")
 

@@ -27,6 +27,7 @@ Design pipelines to provide feedback quickly:
 5. Deployment (varies)
 
 **Fail fast pattern:**
+
 ```yaml
 # GitHub Actions
 jobs:
@@ -50,6 +51,7 @@ jobs:
 Run independent jobs concurrently:
 
 **GitHub Actions:**
+
 ```yaml
 jobs:
   lint:
@@ -65,6 +67,7 @@ jobs:
 ```
 
 **GitLab CI:**
+
 ```yaml
 stages:
   - validate
@@ -85,6 +88,7 @@ e2e-test:
 ### Monorepo Strategies
 
 **Path-based triggers (GitHub):**
+
 ```yaml
 on:
   push:
@@ -100,6 +104,7 @@ jobs:
 ```
 
 **GitLab rules:**
+
 ```yaml
 api-test:
   rules:
@@ -119,6 +124,7 @@ frontend-test:
 Test across multiple versions/platforms:
 
 **GitHub Actions:**
+
 ```yaml
 strategy:
   matrix:
@@ -135,6 +141,7 @@ strategy:
 ```
 
 **GitLab parallel:**
+
 ```yaml
 test:
   parallel:
@@ -162,6 +169,7 @@ Maintain proper test distribution:
 ```
 
 **Implementation:**
+
 ```yaml
 jobs:
   unit-test:
@@ -188,6 +196,7 @@ jobs:
 Split large test suites:
 
 **GitHub Actions:**
+
 ```yaml
 strategy:
   matrix:
@@ -197,6 +206,7 @@ steps:
 ```
 
 **Playwright example:**
+
 ```yaml
 strategy:
   matrix:
@@ -209,6 +219,7 @@ steps:
 ### Code Coverage
 
 **Track coverage trends:**
+
 ```yaml
 - name: Run tests with coverage
   run: npm test -- --coverage
@@ -231,6 +242,7 @@ steps:
 ### Test Environment Management
 
 **Docker Compose for services:**
+
 ```yaml
 jobs:
   integration-test:
@@ -252,6 +264,7 @@ jobs:
 ```
 
 **GitLab services:**
+
 ```yaml
 integration-test:
   services:
@@ -271,6 +284,7 @@ integration-test:
 ### Deployment Patterns
 
 **1. Direct Deployment (Simple)**
+
 ```yaml
 deploy:
   if: github.ref == 'refs/heads/main'
@@ -281,6 +295,7 @@ deploy:
 ```
 
 **2. Blue-Green Deployment**
+
 ```yaml
 deploy:
   steps:
@@ -304,6 +319,7 @@ deploy:
 ```
 
 **3. Canary Deployment**
+
 ```yaml
 deploy-canary:
   steps:
@@ -316,6 +332,7 @@ deploy-canary:
 ### Environment Management
 
 **GitHub Environments:**
+
 ```yaml
 jobs:
   deploy-staging:
@@ -340,6 +357,7 @@ jobs:
 - Add deployment delay
 
 **GitLab environments:**
+
 ```yaml
 deploy:staging:
   stage: deploy
@@ -363,6 +381,7 @@ deploy:production:
 ### Deployment Gates
 
 **Pre-deployment checks:**
+
 ```yaml
 pre-deploy-checks:
   steps:
@@ -377,6 +396,7 @@ pre-deploy-checks:
 ```
 
 **Post-deployment validation:**
+
 ```yaml
 post-deploy-validation:
   needs: deploy
@@ -408,6 +428,7 @@ post-deploy-validation:
 - `poetry.lock` (Python)
 
 **Use deterministic install commands:**
+
 ```bash
 # Good - uses lock file
 npm ci           # Not npm install
@@ -432,6 +453,7 @@ Quick reference:
 ### Security Scanning
 
 **Automated vulnerability checks:**
+
 ```yaml
 security-scan:
   steps:
@@ -455,6 +477,7 @@ security-scan:
 - GitLab Dependency Scanning
 
 **Configuration example (Dependabot):**
+
 ```yaml
 # .github/dependabot.yml
 version: 2
@@ -476,6 +499,7 @@ updates:
 ### Artifact Strategy
 
 **Build once, deploy many:**
+
 ```yaml
 build:
   steps:
@@ -506,6 +530,7 @@ deploy-production:
 ### Container Image Management
 
 **Multi-stage builds:**
+
 ```dockerfile
 # Build stage
 FROM node:20-alpine AS builder
@@ -525,6 +550,7 @@ CMD ["node", "dist/server.js"]
 ```
 
 **Image tagging strategy:**
+
 ```yaml
 - name: Build and tag images
   run: |
@@ -536,6 +562,7 @@ CMD ["node", "dist/server.js"]
 ### Release Automation
 
 **Semantic versioning:**
+
 ```yaml
 release:
   if: startsWith(github.ref, 'refs/tags/v')
@@ -550,6 +577,7 @@ release:
 ```
 
 **Changelog generation:**
+
 ```yaml
 - name: Generate changelog
   run: |
@@ -564,6 +592,7 @@ release:
 ### GitHub Actions
 
 **Reusable workflows:**
+
 ```yaml
 # .github/workflows/reusable-test.yml
 on:
@@ -584,6 +613,7 @@ jobs:
 ```
 
 **Composite actions:**
+
 ```yaml
 # .github/actions/setup-app/action.yml
 name: Setup Application
@@ -600,6 +630,7 @@ runs:
 ### GitLab CI
 
 **Templates & extends:**
+
 ```yaml
 .test_template:
   image: node:20
@@ -620,6 +651,7 @@ integration-test:
 ```
 
 **Dynamic child pipelines:**
+
 ```yaml
 generate-pipeline:
   script:

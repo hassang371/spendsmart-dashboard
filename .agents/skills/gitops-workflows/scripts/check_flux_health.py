@@ -5,17 +5,15 @@ Supports Flux v2.7+ with OCI artifacts, image automation, and source-watcher.
 """
 
 import argparse
-import sys
 import json
-from typing import Dict, List, Any, Optional
+import sys
+from typing import Any, Dict, List, Optional
 
 try:
     from kubernetes import client, config
     from kubernetes.client.rest import ApiException
 except ImportError:
-    print(
-        "⚠️  Warning: 'kubernetes' library not found. Install with: pip install kubernetes"
-    )
+    print("⚠️  Warning: 'kubernetes' library not found. Install with: pip install kubernetes")
     sys.exit(1)
 
 try:
@@ -25,9 +23,7 @@ except ImportError:
 
 
 class FluxHealthChecker:
-    def __init__(
-        self, namespace: str = "flux-system", kubeconfig: Optional[str] = None
-    ):
+    def __init__(self, namespace: str = "flux-system", kubeconfig: Optional[str] = None):
         self.namespace = namespace
 
         # Load kubeconfig
@@ -47,9 +43,7 @@ class FluxHealthChecker:
         self.custom_api = client.CustomObjectsApi(self.api)
         self.core_api = client.CoreV1Api(self.api)
 
-    def get_flux_resources(
-        self, resource_type: str, namespace: Optional[str] = None
-    ) -> List[Dict]:
+    def get_flux_resources(self, resource_type: str, namespace: Optional[str] = None) -> List[Dict]:
         """Get Flux custom resources."""
         ns = namespace or self.namespace
 
@@ -92,9 +86,7 @@ class FluxHealthChecker:
             print(f"⚠️  Warning: Failed to get {resource_type}: {e}")
             return []
 
-    def check_resource_health(
-        self, resource: Dict, resource_type: str
-    ) -> Dict[str, Any]:
+    def check_resource_health(self, resource: Dict, resource_type: str) -> Dict[str, Any]:
         """Check resource health and reconciliation status."""
         name = resource["metadata"]["name"]
         namespace = resource["metadata"]["namespace"]
@@ -108,9 +100,7 @@ class FluxHealthChecker:
             "type": resource_type,
             "name": name,
             "namespace": namespace,
-            "ready": ready_condition.get("status", "Unknown")
-            if ready_condition
-            else "Unknown",
+            "ready": ready_condition.get("status", "Unknown") if ready_condition else "Unknown",
             "message": ready_condition.get("message", "") if ready_condition else "",
             "last_reconcile": status.get("lastHandledReconcileAt", "N/A"),
             "issues": [],
@@ -145,19 +135,12 @@ class FluxHealthChecker:
         if not status.get("artifact"):
             result["issues"].append("No artifact available")
             result["recommendations"].append("Check repository URL and credentials")
-            result["recommendations"].append(
-                f"flux reconcile source git {result['name']} -n {result['namespace']}"
-            )
+            result["recommendations"].append(f"flux reconcile source git {result['name']} -n {result['namespace']}")
 
         # Check for auth errors
-        if (
-            "authentication" in result["message"].lower()
-            or "credentials" in result["message"].lower()
-        ):
+        if "authentication" in result["message"].lower() or "credentials" in result["message"].lower():
             result["recommendations"].append("Check Git credentials secret")
-            result["recommendations"].append(
-                f"kubectl get secret -n {result['namespace']}"
-            )
+            result["recommendations"].append(f"kubectl get secret -n {result['namespace']}")
 
     def _check_oci_repository(self, resource: Dict, result: Dict):
         """Check OCIRepository-specific issues (Flux v2.6+ feature)."""
@@ -174,12 +157,8 @@ class FluxHealthChecker:
         if spec.get("verify"):
             verify_status = status.get("observedGeneration")
             if not verify_status:
-                result["issues"].append(
-                    "Signature verification configured but not completed"
-                )
-                result["recommendations"].append(
-                    "Check cosign or notation configuration"
-                )
+                result["issues"].append("Signature verification configured but not completed")
+                result["recommendations"].append("Check cosign or notation configuration")
 
     def _check_kustomization(self, resource: Dict, result: Dict):
         """Check Kustomization-specific issues."""
@@ -212,23 +191,17 @@ class FluxHealthChecker:
 
         if install_failures > 0:
             result["issues"].append(f"Install failed {install_failures} times")
-            result["recommendations"].append(
-                "Check Helm values and chart compatibility"
-            )
+            result["recommendations"].append("Check Helm values and chart compatibility")
 
         if upgrade_failures > 0:
             result["issues"].append(f"Upgrade failed {upgrade_failures} times")
             result["recommendations"].append("Review Helm upgrade logs")
-            result["recommendations"].append(
-                f"kubectl logs -n {result['namespace']} -l app=helm-controller"
-            )
+            result["recommendations"].append(f"kubectl logs -n {result['namespace']} -l app=helm-controller")
 
         # Check for timeout issues
         if "timeout" in result["message"].lower():
             result["recommendations"].append("Increase timeout in HelmRelease spec")
-            result["recommendations"].append(
-                "Check pod startup times and readiness probes"
-            )
+            result["recommendations"].append("Check pod startup times and readiness probes")
 
     def _check_image_automation(self, resource: Dict, result: Dict):
         """Check ImageUpdateAutomation-specific issues (Flux v2.7+ GA)."""
@@ -255,9 +228,7 @@ class FluxHealthChecker:
 
         for controller in controller_labels:
             try:
-                pods = self.core_api.list_namespaced_pod(
-                    namespace=self.namespace, label_selector=f"app={controller}"
-                )
+                pods = self.core_api.list_namespaced_pod(namespace=self.namespace, label_selector=f"app={controller}")
 
                 if not pods.items:
                     results.append(
@@ -281,25 +252,15 @@ class FluxHealthChecker:
                 }
 
                 if pod_status != "Running":
-                    result["issues"].append(
-                        f"Controller not running (status: {pod_status})"
-                    )
-                    result["recommendations"].append(
-                        f"kubectl describe pod -n {self.namespace} -l app={controller}"
-                    )
-                    result["recommendations"].append(
-                        f"kubectl logs -n {self.namespace} -l app={controller}"
-                    )
+                    result["issues"].append(f"Controller not running (status: {pod_status})")
+                    result["recommendations"].append(f"kubectl describe pod -n {self.namespace} -l app={controller}")
+                    result["recommendations"].append(f"kubectl logs -n {self.namespace} -l app={controller}")
 
                 # Check container restarts
                 for container_status in pod.status.container_statuses or []:
                     if container_status.restart_count > 5:
-                        result["issues"].append(
-                            f"High restart count: {container_status.restart_count}"
-                        )
-                        result["recommendations"].append(
-                            "Check controller logs for crash loops"
-                        )
+                        result["issues"].append(f"High restart count: {container_status.restart_count}")
+                        result["recommendations"].append("Check controller logs for crash loops")
 
                 results.append(result)
 
@@ -315,9 +276,7 @@ class FluxHealthChecker:
 
         return results
 
-    def print_summary(
-        self, resource_results: List[Dict], controller_results: List[Dict]
-    ):
+    def print_summary(self, resource_results: List[Dict], controller_results: List[Dict]):
         """Print summary of Flux health."""
         # Controller health
         print("\n🎛️  Flux Controllers:\n")
@@ -325,12 +284,8 @@ class FluxHealthChecker:
         if tabulate:
             controller_table = []
             for r in controller_results:
-                status_icon = (
-                    "✅" if r["status"] == "Running" and not r["issues"] else "❌"
-                )
-                controller_table.append(
-                    [status_icon, r["controller"], r["status"], len(r["issues"])]
-                )
+                status_icon = "✅" if r["status"] == "Running" and not r["issues"] else "❌"
+                controller_table.append([status_icon, r["controller"], r["status"], len(r["issues"])])
             print(
                 tabulate(
                     controller_table,
@@ -340,12 +295,8 @@ class FluxHealthChecker:
             )
         else:
             for r in controller_results:
-                status_icon = (
-                    "✅" if r["status"] == "Running" and not r["issues"] else "❌"
-                )
-                print(
-                    f"{status_icon} {r['controller']}: {r['status']} ({len(r['issues'])} issues)"
-                )
+                status_icon = "✅" if r["status"] == "Running" and not r["issues"] else "❌"
+                print(f"{status_icon} {r['controller']}: {r['status']} ({len(r['issues'])} issues)")
 
         # Resource health
         if resource_results:
@@ -354,9 +305,7 @@ class FluxHealthChecker:
             if tabulate:
                 resource_table = []
                 for r in resource_results:
-                    status_icon = (
-                        "✅" if r["ready"] == "True" and not r["issues"] else "❌"
-                    )
+                    status_icon = "✅" if r["ready"] == "True" and not r["issues"] else "❌"
                     resource_table.append(
                         [
                             status_icon,
@@ -376,12 +325,8 @@ class FluxHealthChecker:
                 )
             else:
                 for r in resource_results:
-                    status_icon = (
-                        "✅" if r["ready"] == "True" and not r["issues"] else "❌"
-                    )
-                    print(
-                        f"{status_icon} {r['type']}/{r['name']}: {r['ready']} ({len(r['issues'])} issues)"
-                    )
+                    status_icon = "✅" if r["ready"] == "True" and not r["issues"] else "❌"
+                    print(f"{status_icon} {r['type']}/{r['name']}: {r['ready']} ({len(r['issues'])} issues)")
 
         # Detailed issues
         all_results = controller_results + resource_results
@@ -443,9 +388,7 @@ Flux v2.7+ Features:
     args = parser.parse_args()
 
     try:
-        checker = FluxHealthChecker(
-            namespace=args.namespace, kubeconfig=args.kubeconfig
-        )
+        checker = FluxHealthChecker(namespace=args.namespace, kubeconfig=args.kubeconfig)
 
         # Check controllers
         controller_results = checker.check_flux_controllers()

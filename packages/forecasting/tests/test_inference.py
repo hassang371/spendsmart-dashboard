@@ -1,14 +1,16 @@
-import pytest
-import pandas as pd
-import numpy as np
-import torch
 from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pandas as pd
+import pytest
+import torch
+
 from packages.forecasting.inference import (
+    _MODEL_CACHE,
     get_latest_checkpoint_path,
+    invalidate_cache,
     load_model,
     predict_with_tft,
-    invalidate_cache,
-    _MODEL_CACHE,
 )
 
 
@@ -27,9 +29,7 @@ def test_get_latest_checkpoint_path(mock_supabase):
     assert path == "checkpoints/u1/job1/tft.ckpt"
 
     # Test empty
-    mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
-        []
-    )
+    mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = []
     path = get_latest_checkpoint_path(mock_supabase, "u1")
     assert path is None
 
@@ -39,15 +39,11 @@ def test_load_model(mock_tft_cls, mock_supabase):
     user_id = "u1"
 
     # Mock get_latest_checkpoint_path
-    with patch(
-        "packages.forecasting.inference.get_latest_checkpoint_path"
-    ) as mock_get_path:
+    with patch("packages.forecasting.inference.get_latest_checkpoint_path") as mock_get_path:
         mock_get_path.return_value = "path/to/ckpt"
 
         # Mock storage download
-        mock_supabase.storage.from_.return_value.download.return_value = (
-            b"fake-model-bytes"
-        )
+        mock_supabase.storage.from_.return_value.download.return_value = b"fake-model-bytes"
 
         # Mock load_from_checkpoint
         mock_model = MagicMock()
@@ -121,8 +117,7 @@ def test_predict_with_tft():
         call_args = mock_ts_cls.from_dataset.call_args
         first_arg = call_args[0][0]
         assert first_arg is mock_reference_ds, (
-            "BUG-004: from_dataset must receive a TimeSeriesDataSet instance, "
-            f"got {type(first_arg)}"
+            "BUG-004: from_dataset must receive a TimeSeriesDataSet instance, " f"got {type(first_arg)}"
         )
 
         assert "forecast" in result
@@ -140,9 +135,7 @@ def test_predict_with_tft_dataset_construction_failure():
     mock_model.dataset_parameters = {}
 
     dates = pd.date_range("2025-01-01", periods=100, freq="D")
-    df = pd.DataFrame(
-        {"date": dates, "amount": np.random.uniform(-100, 100, 100)}
-    )
+    df = pd.DataFrame({"date": dates, "amount": np.random.uniform(-100, 100, 100)})
 
     with patch(
         "packages.forecasting.inference.create_timeseries_dataset",
@@ -152,4 +145,3 @@ def test_predict_with_tft_dataset_construction_failure():
 
     assert "error" in result
     assert "Inference dataset construction failed" in result["error"]
-

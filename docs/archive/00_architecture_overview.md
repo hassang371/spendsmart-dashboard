@@ -139,8 +139,8 @@ When you need GPUs for Ray Serve and dedicated infra:
    └─────────┘ └─────────┘ └──────────┘
 ```
 
-**Pros**: Simplest ops, single container, free-tier compatible, all audit bugs fixed  
-**Cons**: Single process limits GPU inference (needs worker handoff)  
+**Pros**: Simplest ops, single container, free-tier compatible, all audit bugs fixed
+**Cons**: Single process limits GPU inference (needs worker handoff)
 **Migration**: Each domain folder → its own microservice when needed
 
 ---
@@ -165,8 +165,8 @@ When you need GPUs for Ray Serve and dedicated infra:
                             └──────────────┘
 ```
 
-**Pros**: ML doesn't block API, can give worker GPU later  
-**Cons**: Two containers to deploy (slightly more cost), coordination overhead  
+**Pros**: ML doesn't block API, can give worker GPU later
+**Cons**: Two containers to deploy (slightly more cost), coordination overhead
 **Migration**: Worker → Ray Serve cluster, API → API Gateway
 
 ---
@@ -185,8 +185,8 @@ When you need GPUs for Ray Serve and dedicated infra:
 └──────────────┘
 ```
 
-**Pros**: Next.js handles web auth/SSR naturally, mobile hits FastAPI directly  
-**Cons**: Extra hop for web requests, BFF adds complexity, more Next.js API code to maintain  
+**Pros**: Next.js handles web auth/SSR naturally, mobile hits FastAPI directly
+**Cons**: Extra hop for web requests, BFF adds complexity, more Next.js API code to maintain
 **Migration**: Drop BFF when mobile is primary
 
 ---

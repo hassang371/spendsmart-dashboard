@@ -115,12 +115,14 @@ Monitor and iterate on optimization strategies based on measured effectiveness.
 ## Examples
 
 **Example 1: Compaction Trigger**
+
 ```python
 if context_tokens / context_limit > 0.8:
     context = compact_context(context)
 ```
 
 **Example 2: Observation Masking**
+
 ```python
 if len(observation) > max_length:
     ref_id = store_observation(observation)
@@ -128,6 +130,7 @@ if len(observation) > max_length:
 ```
 
 **Example 3: Cache-Friendly Ordering**
+
 ```python
 # Stable content first
 context = [system_prompt, tool_definitions]  # Cacheable

@@ -24,6 +24,7 @@ Comprehensive guide for troubleshooting Helm releases, charts, and deployments.
 - `helm list` shows release but resources not created
 
 **Diagnostic Commands:**
+
 ```bash
 # Check release status
 helm list -n <namespace>
@@ -73,6 +74,7 @@ kubectl delete secret -n <namespace> -l owner=helm,name=<release-name>
 - Resources partially created
 
 **Investigation:**
+
 ```bash
 # Get manifest from release
 helm get manifest <release-name> -n <namespace>
@@ -88,6 +90,7 @@ kubectl get events -n <namespace> --sort-by='.lastTimestamp' | tail -20
 ```
 
 **Resolution:**
+
 ```bash
 # Reapply the release
 helm upgrade <release-name> <chart> -n <namespace> --reuse-values
@@ -103,11 +106,13 @@ helm upgrade <release-name> <chart> -n <namespace> --force
 ### "Release Already Exists" Error
 
 **Symptoms:**
+
 ```
 Error: INSTALLATION FAILED: cannot re-use a name that is still in use
 ```
 
 **Resolution:**
+
 ```bash
 # Check existing releases
 helm list -n <namespace> --all
@@ -125,11 +130,13 @@ helm install <new-release-name> <chart> -n <namespace>
 ### "Invalid Chart" Error
 
 **Symptoms:**
+
 ```
 Error: INSTALLATION FAILED: chart requires kubeVersion: >=1.20.0 which is incompatible with Kubernetes v1.19.0
 ```
 
 **Investigation:**
+
 ```bash
 # Check chart requirements
 helm show chart <chart-name>
@@ -150,6 +157,7 @@ cat <chart>/Chart.yaml
 ### Template Rendering Errors
 
 **Symptoms:**
+
 ```
 Error: INSTALLATION FAILED: template: <chart>/templates/deployment.yaml:10:4:
 executing "<chart>/templates/deployment.yaml" at <.Values.invalid.path>:
@@ -157,6 +165,7 @@ nil pointer evaluating interface {}.path
 ```
 
 **Investigation:**
+
 ```bash
 # Render templates locally
 helm template <release-name> <chart> -n <namespace>
@@ -188,11 +197,13 @@ helm lint <chart-directory> -f values.yaml
 ### Upgrade Fails with "Rendered Manifests Contain Errors"
 
 **Symptoms:**
+
 ```
 Error: UPGRADE FAILED: unable to build kubernetes objects from release manifest
 ```
 
 **Investigation:**
+
 ```bash
 # Dry run upgrade
 helm upgrade <release-name> <chart> -n <namespace> --dry-run --debug
@@ -202,6 +213,7 @@ helm diff upgrade <release-name> <chart> -n <namespace>  # requires helm-diff pl
 ```
 
 **Resolution:**
+
 ```bash
 # Fix values.yaml and retry
 helm upgrade <release-name> <chart> -n <namespace> -f fixed-values.yaml
@@ -216,11 +228,13 @@ helm upgrade <release-name> <chart> -n <namespace> --force
 ### Rollback Fails
 
 **Symptoms:**
+
 ```
 Error: ROLLBACK FAILED: release <release-name> failed, and has been rolled back due to atomic being set
 ```
 
 **Investigation:**
+
 ```bash
 # Check release history
 helm history <release-name> -n <namespace>
@@ -230,6 +244,7 @@ helm get manifest <release-name> --revision <revision-number> -n <namespace>
 ```
 
 **Resolution:**
+
 ```bash
 # Rollback to specific working revision
 helm rollback <release-name> <revision-number> -n <namespace>
@@ -246,6 +261,7 @@ kubectl delete secret <secret-name> -n <namespace>
 ### "Immutable Field" Error During Upgrade
 
 **Symptoms:**
+
 ```
 Error: UPGRADE FAILED: Service "myapp" is invalid: spec.clusterIP: Invalid value: "": field is immutable
 ```
@@ -256,6 +272,7 @@ Error: UPGRADE FAILED: Service "myapp" is invalid: spec.clusterIP: Invalid value
 - PVC `storageClassName`
 
 **Resolution:**
+
 ```bash
 # Option 1: Delete and recreate resource
 kubectl delete service <service-name> -n <namespace>
@@ -280,6 +297,7 @@ kubectl patch service <service-name> -n <namespace> --type='json' \
 - Default chart values used instead of custom values
 
 **Investigation:**
+
 ```bash
 # Check what values were used in deployment
 helm get values <release-name> -n <namespace>
@@ -292,6 +310,7 @@ helm template <release-name> <chart> -f values.yaml -n <namespace> | less
 ```
 
 **Resolution:**
+
 ```bash
 # Ensure values file is specified correctly
 helm upgrade <release-name> <chart> -n <namespace> -f values.yaml
@@ -310,11 +329,13 @@ helm upgrade <release-name> <chart> -n <namespace> \
 ### Values File Parsing Errors
 
 **Symptoms:**
+
 ```
 Error: INSTALLATION FAILED: YAML parse error
 ```
 
 **Investigation:**
+
 ```bash
 # Validate YAML syntax
 yamllint values.yaml
@@ -339,6 +360,7 @@ cat -A values.yaml | grep $'\t'
 - Base64 encoding issues
 
 **Investigation:**
+
 ```bash
 # Check secret in manifest
 helm get manifest <release-name> -n <namespace> | grep -A 10 "kind: Secret"
@@ -349,6 +371,7 @@ kubectl get secret <secret-name> -n <namespace> -o json | \
 ```
 
 **Resolution:**
+
 ```yaml
 # Use proper secret format in values.yaml
 secrets:
@@ -366,11 +389,13 @@ secrets:
 ### Dependency Update Fails
 
 **Symptoms:**
+
 ```
 Error: An error occurred while checking for chart dependencies
 ```
 
 **Investigation:**
+
 ```bash
 # Check Chart.yaml dependencies
 cat Chart.yaml
@@ -384,6 +409,7 @@ helm repo update
 ```
 
 **Resolution:**
+
 ```bash
 # Update dependencies
 helm dependency update <chart-directory>
@@ -399,11 +425,13 @@ helm repo update
 ### Dependency Version Conflicts
 
 **Symptoms:**
+
 ```
 Error: found in Chart.yaml, but missing in charts/ directory
 ```
 
 **Resolution:**
+
 ```bash
 # Clean dependencies
 rm -rf <chart-directory>/charts/*
@@ -419,6 +447,7 @@ helm dependency list <chart-directory>
 ### Subchart Values Not Applied
 
 **Investigation:**
+
 ```bash
 # Check subchart values in parent chart
 cat values.yaml | grep -A 20 <subchart-name>
@@ -428,6 +457,7 @@ helm template <release-name> <chart> -f values.yaml | grep -A 50 "# Source: <sub
 ```
 
 **Resolution:**
+
 ```yaml
 # In parent chart's values.yaml, nest subchart values under subchart name:
 postgresql:  # Subchart name
@@ -454,6 +484,7 @@ postgresql:  # Subchart name
 - Release stuck in pending state
 
 **Investigation:**
+
 ```bash
 # List hooks
 kubectl get jobs -n <namespace> -l "helm.sh/hook"
@@ -467,6 +498,7 @@ kubectl logs -n <namespace> -l "helm.sh/hook=post-install"
 ```
 
 **Resolution:**
+
 ```bash
 # Delete failed hooks
 kubectl delete job -n <namespace> -l "helm.sh/hook"
@@ -485,6 +517,7 @@ helm install <release-name> <chart> -n <namespace> --no-hooks
 - Accumulating failed hook jobs
 
 **Investigation:**
+
 ```bash
 # Check hook deletion policy
 helm get manifest <release-name> -n <namespace> | grep -B 5 "helm.sh/hook-delete-policy"
@@ -494,6 +527,7 @@ kubectl get all -n <namespace> -l "helm.sh/hook"
 ```
 
 **Resolution:**
+
 ```bash
 # Manual cleanup
 kubectl delete jobs,pods -n <namespace> -l "helm.sh/hook"
@@ -512,11 +546,13 @@ kubectl delete jobs,pods -n <namespace> -l "helm.sh/hook"
 ### Unable to Get Chart from Repository
 
 **Symptoms:**
+
 ```
 Error: failed to download "<chart-name>"
 ```
 
 **Investigation:**
+
 ```bash
 # Check repository configuration
 helm repo list
@@ -532,6 +568,7 @@ curl -I <repo-url>/index.yaml
 ```
 
 **Resolution:**
+
 ```bash
 # Remove and re-add repository
 helm repo remove <repo-name>
@@ -550,11 +587,13 @@ helm pull oci://registry.example.com/charts/<chart-name> --version 1.0.0
 ### Chart Version Not Found
 
 **Symptoms:**
+
 ```
 Error: chart "<chart-name>" version "1.2.3" not found
 ```
 
 **Investigation:**
+
 ```bash
 # List available versions
 helm search repo <chart-name> --versions
@@ -564,6 +603,7 @@ helm show chart <repo-name>/<chart-name> --version 1.2.3
 ```
 
 **Resolution:**
+
 ```bash
 # Use available version
 helm install <release-name> <repo-name>/<chart-name> --version <available-version>
@@ -618,6 +658,7 @@ helm secrets install <release-name> <chart> -f secrets.yaml -n <namespace>
 ### Helm Environment Issues
 
 **Check Helm configuration:**
+
 ```bash
 # Helm version
 helm version

@@ -5,6 +5,7 @@ classifier to instantly resolve known merchants/patterns.
 """
 
 import re
+
 from packages.categorization.constants import Category
 
 
@@ -37,151 +38,395 @@ class KeywordMatcher:
         """
         return [
             # ── Food & Dining ────────────────────────────────────────────
-            (Category.GROCERIES.value, [
-                "blinkit", "zepto", "bigbasket", "jiomart",
-                "instamart", "grocery", "swiggy instamart", "dunzo grocery",
-                "dmart", "reliance fresh", "more supermarket", "nature basket",
-            ]),
-            (Category.COFFEE_SNACKS.value, [
-                "starbucks", "cafe coffee", "third wave", "chaayos",
-                "blue tokai", "barista", "bakery", "pastry", "chai point",
-            ]),
-            (Category.FOOD.value, [
-                "swiggy", "zomato", "food", "restaurant", "dining",
-                "dunzo food", "eatfit", "dominos", "domino",
-                "kfc", "burger king", "mcdonalds", "mcdonald",
-                "pizza hut", "subway", "haldiram", "barbeque nation",
-                "box8", "faasos", "behrouz",
-            ]),
-
+            (
+                Category.GROCERIES.value,
+                [
+                    "blinkit",
+                    "zepto",
+                    "bigbasket",
+                    "jiomart",
+                    "instamart",
+                    "grocery",
+                    "swiggy instamart",
+                    "dunzo grocery",
+                    "dmart",
+                    "reliance fresh",
+                    "more supermarket",
+                    "nature basket",
+                ],
+            ),
+            (
+                Category.COFFEE_SNACKS.value,
+                [
+                    "starbucks",
+                    "cafe coffee",
+                    "third wave",
+                    "chaayos",
+                    "blue tokai",
+                    "barista",
+                    "bakery",
+                    "pastry",
+                    "chai point",
+                ],
+            ),
+            (
+                Category.FOOD.value,
+                [
+                    "swiggy",
+                    "zomato",
+                    "food",
+                    "restaurant",
+                    "dining",
+                    "dunzo food",
+                    "eatfit",
+                    "dominos",
+                    "domino",
+                    "kfc",
+                    "burger king",
+                    "mcdonalds",
+                    "mcdonald",
+                    "pizza hut",
+                    "subway",
+                    "haldiram",
+                    "barbeque nation",
+                    "box8",
+                    "faasos",
+                    "behrouz",
+                ],
+            ),
             # ── Transport ────────────────────────────────────────────────
-            (Category.TAXI_RIDESHARE.value, [
-                "uber", "ola", "rapido", "bluesmart",
-            ]),
-            (Category.PUBLIC_TRANSIT.value, [
-                "metro", "irctc", "redbus", "train ticket", "bus ticket",
-                "railway", "smartcard",
-            ]),
-            (Category.FLIGHTS.value, [
-                "indigo", "spicejet", "air india", "vistara", "goair",
-                "akasa", "airline", "flight",
-            ]),
-            (Category.FUEL.value, [
-                "petrol", "diesel", "hpcl", "iocl", "bpcl",
-                "fuel", "fastag", "toll", "indian oil", "bharat petroleum",
-            ]),
-
+            (
+                Category.TAXI_RIDESHARE.value,
+                [
+                    "uber",
+                    "ola",
+                    "rapido",
+                    "bluesmart",
+                ],
+            ),
+            (
+                Category.PUBLIC_TRANSIT.value,
+                [
+                    "metro",
+                    "irctc",
+                    "redbus",
+                    "train ticket",
+                    "bus ticket",
+                    "railway",
+                    "smartcard",
+                ],
+            ),
+            (
+                Category.FLIGHTS.value,
+                [
+                    "indigo",
+                    "spicejet",
+                    "air india",
+                    "vistara",
+                    "goair",
+                    "akasa",
+                    "airline",
+                    "flight",
+                ],
+            ),
+            (
+                Category.FUEL.value,
+                [
+                    "petrol",
+                    "diesel",
+                    "hpcl",
+                    "iocl",
+                    "bpcl",
+                    "fuel",
+                    "fastag",
+                    "toll",
+                    "indian oil",
+                    "bharat petroleum",
+                ],
+            ),
             # ── Housing & Utilities ──────────────────────────────────────
-            (Category.RENT_MORTGAGE.value, [
-                "rent", "mortgage", "landlord", "housing society",
-                "nobroker", "nestaway",
-            ]),
-            (Category.ELECTRICITY_WATER.value, [
-                "electric", "bescom", "tata power", "bwssb",
-                "water bill", "gas cylinder", "lpg",
-            ]),
-            (Category.INTERNET_PHONE.value, [
-                "airtel", "jio", "vodafone", "vi recharge", "vi prepaid", "vi postpaid",
-                "bsnl", "act fibernet", "broadband", "recharge",
-            ]),
-            (Category.HOME_MAINTENANCE.value, [
-                "plumber", "electrician", "carpenter",
-                "home repair", "pest control", "urban company", "urbanclap",
-            ]),
-
+            (
+                Category.RENT_MORTGAGE.value,
+                [
+                    "rent",
+                    "mortgage",
+                    "landlord",
+                    "housing society",
+                    "nobroker",
+                    "nestaway",
+                ],
+            ),
+            (
+                Category.ELECTRICITY_WATER.value,
+                [
+                    "electric",
+                    "bescom",
+                    "tata power",
+                    "bwssb",
+                    "water bill",
+                    "gas cylinder",
+                    "lpg",
+                ],
+            ),
+            (
+                Category.INTERNET_PHONE.value,
+                [
+                    "airtel",
+                    "jio",
+                    "vodafone",
+                    "vi recharge",
+                    "vi prepaid",
+                    "vi postpaid",
+                    "bsnl",
+                    "act fibernet",
+                    "broadband",
+                    "recharge",
+                ],
+            ),
+            (
+                Category.HOME_MAINTENANCE.value,
+                [
+                    "plumber",
+                    "electrician",
+                    "carpenter",
+                    "home repair",
+                    "pest control",
+                    "urban company",
+                    "urbanclap",
+                ],
+            ),
             # ── Shopping ─────────────────────────────────────────────────
-            (Category.CLOTHING_FASHION.value, [
-                "myntra", "ajio", "meesho fashion", "nykaa",
-                "h&m", "zara", "westside", "pantaloons",
-                "shoppers stop", "lifestyle", "max fashion",
-            ]),
-            (Category.ELECTRONICS.value, [
-                "croma", "reliance digital", "laptop", "computer",
-                "electronic", "gadget", "smartwatch",
-            ]),
-            (Category.GENERAL_RETAIL.value, [
-                "amazon", "flipkart", "meesho",
-                "decathlon", "online shopping",
-            ]),
-
+            (
+                Category.CLOTHING_FASHION.value,
+                [
+                    "myntra",
+                    "ajio",
+                    "meesho fashion",
+                    "nykaa",
+                    "h&m",
+                    "zara",
+                    "westside",
+                    "pantaloons",
+                    "shoppers stop",
+                    "lifestyle",
+                    "max fashion",
+                ],
+            ),
+            (
+                Category.ELECTRONICS.value,
+                [
+                    "croma",
+                    "reliance digital",
+                    "laptop",
+                    "computer",
+                    "electronic",
+                    "gadget",
+                    "smartwatch",
+                ],
+            ),
+            (
+                Category.GENERAL_RETAIL.value,
+                [
+                    "amazon",
+                    "flipkart",
+                    "meesho",
+                    "decathlon",
+                    "online shopping",
+                ],
+            ),
             # ── Entertainment ────────────────────────────────────────────
-            (Category.SUBSCRIPTIONS.value, [
-                "netflix", "spotify", "jiocinema", "sonyliv",
-                "hotstar", "youtube", "play pass",
-                "apple music", "subscription", "prime video",
-            ]),
-            (Category.MOVIES_EVENTS.value, [
-                "bookmyshow", "pvr", "inox", "cinema",
-                "concert", "event", "theater",
-            ]),
-            (Category.GAMING.value, [
-                "dream11", "steam", "playstation", "xbox",
-                "game pass", "in-app purchase", "mpl",
-            ]),
-
+            (
+                Category.SUBSCRIPTIONS.value,
+                [
+                    "netflix",
+                    "spotify",
+                    "jiocinema",
+                    "sonyliv",
+                    "hotstar",
+                    "youtube",
+                    "play pass",
+                    "apple music",
+                    "subscription",
+                    "prime video",
+                ],
+            ),
+            (
+                Category.MOVIES_EVENTS.value,
+                [
+                    "bookmyshow",
+                    "pvr",
+                    "inox",
+                    "cinema",
+                    "concert",
+                    "event",
+                    "theater",
+                ],
+            ),
+            (
+                Category.GAMING.value,
+                [
+                    "dream11",
+                    "steam",
+                    "playstation",
+                    "xbox",
+                    "game pass",
+                    "in-app purchase",
+                    "mpl",
+                ],
+            ),
             # ── Health ───────────────────────────────────────────────────
-            (Category.MEDICAL.value, [
-                "hospital", "doctor", "clinic", "diagnostic",
-                "health checkup", "apollo clinic", "fortis",
-                "max healthcare", "practo",
-            ]),
-            (Category.PHARMACY.value, [
-                "pharmacy", "1mg", "netmeds", "pharmeasy",
-                "apollo pharmacy", "medicine",
-            ]),
-            (Category.FITNESS.value, [
-                "cultfit", "cult.fit", "gym", "yoga",
-                "fitness", "healthifyme", "gold gym",
-            ]),
-
+            (
+                Category.MEDICAL.value,
+                [
+                    "hospital",
+                    "doctor",
+                    "clinic",
+                    "diagnostic",
+                    "health checkup",
+                    "apollo clinic",
+                    "fortis",
+                    "max healthcare",
+                    "practo",
+                ],
+            ),
+            (
+                Category.PHARMACY.value,
+                [
+                    "pharmacy",
+                    "1mg",
+                    "netmeds",
+                    "pharmeasy",
+                    "apollo pharmacy",
+                    "medicine",
+                ],
+            ),
+            (
+                Category.FITNESS.value,
+                [
+                    "cultfit",
+                    "cult.fit",
+                    "gym",
+                    "yoga",
+                    "fitness",
+                    "healthifyme",
+                    "gold gym",
+                ],
+            ),
             # ── Finance ──────────────────────────────────────────────────
-            (Category.INVESTMENTS.value, [
-                "zerodha", "groww", "upstox", "mutual fund",
-                "sip", "investment",
-            ]),
-            (Category.INSURANCE.value, [
-                "insurance", "policy premium", "bajaj allianz",
-                "lic premium", "hdfc life",
-            ]),
-            (Category.LOAN_EMI.value, [
-                "loan", "emi", "bajaj finance", "installment",
-            ]),
-            (Category.TAXES.value, [
-                "income tax", "gst payment", "property tax",
-                "tax challan", "tds",
-            ]),
-            (Category.BANK_FEES.value, [
-                "bank charge", "processing fee", "convenience fee",
-                "maintenance charge", "sms alert charge",
-                "atm surcharge", "penalty fee",
-            ]),
-
+            (
+                Category.INVESTMENTS.value,
+                [
+                    "zerodha",
+                    "groww",
+                    "upstox",
+                    "mutual fund",
+                    "sip",
+                    "investment",
+                ],
+            ),
+            (
+                Category.INSURANCE.value,
+                [
+                    "insurance",
+                    "policy premium",
+                    "bajaj allianz",
+                    "lic premium",
+                    "hdfc life",
+                ],
+            ),
+            (
+                Category.LOAN_EMI.value,
+                [
+                    "loan",
+                    "emi",
+                    "bajaj finance",
+                    "installment",
+                ],
+            ),
+            (
+                Category.TAXES.value,
+                [
+                    "income tax",
+                    "gst payment",
+                    "property tax",
+                    "tax challan",
+                    "tds",
+                ],
+            ),
+            (
+                Category.BANK_FEES.value,
+                [
+                    "bank charge",
+                    "processing fee",
+                    "convenience fee",
+                    "maintenance charge",
+                    "sms alert charge",
+                    "atm surcharge",
+                    "penalty fee",
+                ],
+            ),
             # ── Travel & Lodging ─────────────────────────────────────────
-            (Category.HOTELS_STAYS.value, [
-                "airbnb", "oyo", "treebo", "fabhotel",
-                "hotel", "resort", "homestay", "booking.com",
-                "goibibo hotel", "trivago",
-            ]),
-            (Category.TRAVEL_BOOKING.value, [
-                "makemytrip", "ixigo", "cleartrip", "yatra",
-                "goibibo", "travel", "trip",
-            ]),
-
+            (
+                Category.HOTELS_STAYS.value,
+                [
+                    "airbnb",
+                    "oyo",
+                    "treebo",
+                    "fabhotel",
+                    "hotel",
+                    "resort",
+                    "homestay",
+                    "booking.com",
+                    "goibibo hotel",
+                    "trivago",
+                ],
+            ),
+            (
+                Category.TRAVEL_BOOKING.value,
+                [
+                    "makemytrip",
+                    "ixigo",
+                    "cleartrip",
+                    "yatra",
+                    "goibibo",
+                    "travel",
+                    "trip",
+                ],
+            ),
             # ── Income ───────────────────────────────────────────────────
-            (Category.SALARY.value, [
-                "salary", "payroll", "stipend", "wages",
-            ]),
-            (Category.REFUNDS.value, [
-                "refund", "cashback", "reversal", "return order",
-            ]),
-            (Category.INTEREST.value, [
-                "interest credit", "fd maturity", "interest earned",
-            ]),
-
+            (
+                Category.SALARY.value,
+                [
+                    "salary",
+                    "payroll",
+                    "stipend",
+                    "wages",
+                ],
+            ),
+            (
+                Category.REFUNDS.value,
+                [
+                    "refund",
+                    "cashback",
+                    "reversal",
+                    "return order",
+                ],
+            ),
+            (
+                Category.INTEREST.value,
+                [
+                    "interest credit",
+                    "fd maturity",
+                    "interest earned",
+                ],
+            ),
             # ── Finance (CRED) ───────────────────────────────────────────
-            (Category.BANK_FEES.value, [
-                "cred",
-            ]),
+            (
+                Category.BANK_FEES.value,
+                [
+                    "cred",
+                ],
+            ),
         ]
 
     def predict(self, text: str) -> dict | None:

@@ -20,6 +20,7 @@ Strategies for optimizing cloud infrastructure costs when using Terraform.
 ### Compute Resources
 
 **Start small, scale up:**
+
 ```hcl
 variable "instance_type" {
   type        = string
@@ -34,6 +35,7 @@ variable "instance_type" {
 ```
 
 **Use auto-scaling instead of over-provisioning:**
+
 ```hcl
 resource "aws_autoscaling_group" "app" {
   min_size         = 2   # Minimum for HA
@@ -54,6 +56,7 @@ resource "aws_autoscaling_group" "app" {
 ### Database Right-Sizing
 
 **Start with appropriate size:**
+
 ```hcl
 resource "aws_db_instance" "main" {
   instance_class = var.environment == "prod" ? "db.t3.medium" : "db.t3.micro"
@@ -74,6 +77,7 @@ resource "aws_db_instance" "main" {
 ### Spot Instances for Non-Critical Workloads
 
 **Launch Template for Spot:**
+
 ```hcl
 resource "aws_launch_template" "spot" {
   name_prefix   = "spot-"
@@ -140,6 +144,7 @@ Terraform shouldn't manage reservations directly, but should:
 - Monitor usage patterns to inform reservation purchases
 
 **Tagging for reservation analysis:**
+
 ```hcl
 locals {
   reservation_tags = {
@@ -157,6 +162,7 @@ locals {
 ### S3 Lifecycle Policies
 
 **Automatic tiering:**
+
 ```hcl
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   bucket = aws_s3_bucket.logs.id
@@ -188,6 +194,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 ```
 
 **Intelligent tiering for variable access:**
+
 ```hcl
 resource "aws_s3_bucket_intelligent_tiering_configuration" "assets" {
   bucket = aws_s3_bucket.assets.id
@@ -208,6 +215,7 @@ resource "aws_s3_bucket_intelligent_tiering_configuration" "assets" {
 ### EBS Volume Optimization
 
 **Use appropriate volume types:**
+
 ```hcl
 resource "aws_instance" "app" {
   ami           = data.aws_ami.amazon_linux.id
@@ -231,6 +239,7 @@ resource "aws_instance" "app" {
 ```
 
 **Snapshot lifecycle:**
+
 ```hcl
 resource "aws_dlm_lifecycle_policy" "snapshots" {
   description        = "EBS snapshot lifecycle"
@@ -270,6 +279,7 @@ resource "aws_dlm_lifecycle_policy" "snapshots" {
 ### Minimize Data Transfer
 
 **Use VPC endpoints to avoid NAT charges:**
+
 ```hcl
 resource "aws_vpc_endpoint" "s3" {
   vpc_id       = aws_vpc.main.id
@@ -294,6 +304,7 @@ resource "aws_vpc_endpoint" "dynamodb" {
 ```
 
 **Interface endpoints for AWS services:**
+
 ```hcl
 resource "aws_vpc_endpoint" "ecr_api" {
   vpc_id              = aws_vpc.main.id
@@ -313,6 +324,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
 ### Regional Optimization
 
 **Co-locate resources in same region/AZ:**
+
 ```hcl
 # Bad - cross-region data transfer is expensive
 resource "aws_instance" "app" {
@@ -340,6 +352,7 @@ resource "aws_rds_cluster" "main" {
 ### Scheduled Shutdown for Non-Production
 
 **Lambda to stop/start instances:**
+
 ```hcl
 resource "aws_lambda_function" "scheduler" {
   filename      = "scheduler.zip"
@@ -382,6 +395,7 @@ resource "aws_cloudwatch_event_rule" "start_instances" {
 ```
 
 **Tag instances for scheduling:**
+
 ```hcl
 resource "aws_instance" "dev" {
   ami           = data.aws_ami.amazon_linux.id
@@ -399,6 +413,7 @@ resource "aws_instance" "dev" {
 ### Cleanup Old Resources
 
 **S3 lifecycle for temporary data:**
+
 ```hcl
 resource "aws_s3_bucket_lifecycle_configuration" "temp" {
   bucket = aws_s3_bucket.temp.id
@@ -429,6 +444,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "temp" {
 ### Comprehensive Tagging Strategy
 
 **Define tagging locals:**
+
 ```hcl
 locals {
   common_tags = {
@@ -464,6 +480,7 @@ resource "aws_instance" "app" {
 ```
 
 **Enforce tagging with AWS Config:**
+
 ```hcl
 resource "aws_config_config_rule" "required_tags" {
   name = "required-tags"
@@ -490,6 +507,7 @@ resource "aws_config_config_rule" "required_tags" {
 ### Budget Alerts
 
 **AWS Budgets with Terraform:**
+
 ```hcl
 resource "aws_budgets_budget" "monthly" {
   name              = "${var.environment}-monthly-budget"
@@ -563,6 +581,7 @@ resource "aws_ce_anomaly_subscription" "alerts" {
 ### Azure Cost Optimization
 
 **Use Azure Hybrid Benefit:**
+
 ```hcl
 resource "azurerm_linux_virtual_machine" "main" {
   # ... configuration ...
@@ -579,6 +598,7 @@ resource "azurerm_linux_virtual_machine" "main" {
 ### GCP Cost Optimization
 
 **Use committed use discounts:**
+
 ```hcl
 resource "google_compute_instance" "main" {
   # ... configuration ...
@@ -593,6 +613,7 @@ resource "google_compute_instance" "main" {
 ```
 
 **GCP Preemptible VMs:**
+
 ```hcl
 resource "google_compute_instance_template" "preemptible" {
   machine_type = "n1-standard-1"
@@ -658,8 +679,8 @@ Enable in Terraform Cloud workspace settings for automatic cost estimates on eve
 
 ## Additional Resources
 
-- AWS Cost Optimization: https://aws.amazon.com/pricing/cost-optimization/
-- Azure Cost Management: https://azure.microsoft.com/en-us/products/cost-management/
-- GCP Cost Management: https://cloud.google.com/cost-management
-- Infracost: https://www.infracost.io/
+- AWS Cost Optimization: <https://aws.amazon.com/pricing/cost-optimization/>
+- Azure Cost Management: <https://azure.microsoft.com/en-us/products/cost-management/>
+- GCP Cost Management: <https://cloud.google.com/cost-management>
+- Infracost: <https://www.infracost.io/>
 - Cloud Cost Optimization Tools: Kubecost, CloudHealth, CloudCheckr

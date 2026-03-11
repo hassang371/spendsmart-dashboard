@@ -7,6 +7,7 @@ Comprehensive guide for designing communication between microservices.
 ### Synchronous Communication
 
 **REST APIs:**
+
 ```
 When to Use:
 - Request/response pattern needed
@@ -30,6 +31,7 @@ PATCH  /api/v1/orders/{orderId}/status
 ```
 
 **gRPC:**
+
 ```
 When to Use:
 - Low-latency requirements
@@ -64,6 +66,7 @@ message OrderResponse {
 ```
 
 **GraphQL:**
+
 ```
 When to Use:
 - Frontend-driven data requirements
@@ -95,6 +98,7 @@ extend type User @key(fields: "id") {
 ### Asynchronous Communication
 
 **Message Queues (Point-to-Point):**
+
 ```
 When to Use:
 - Task distribution
@@ -121,6 +125,7 @@ Use Cases:
 ```
 
 **Event Streaming (Pub/Sub):**
+
 ```
 When to Use:
 - Multiple consumers need same event
@@ -148,6 +153,7 @@ Each consumer processes independently
 ```
 
 **Event-Driven Architecture:**
+
 ```
 Event Types:
 
@@ -195,6 +201,7 @@ Event Schema Example:
 ### Request/Response
 
 **Synchronous Request/Response:**
+
 ```
 Pattern:
 Client → Service A → Service B → Response
@@ -218,6 +225,7 @@ Use When:
 ```
 
 **Asynchronous Request/Response:**
+
 ```
 Pattern:
 1. Client sends request to Service A
@@ -246,6 +254,7 @@ Alternative: WebSocket notification when ready
 ### Fire and Forget
 
 **Pattern:**
+
 ```
 Client → Message Queue → Consumer
 
@@ -279,6 +288,7 @@ Cons:
 ### Event Choreography
 
 **Pattern:**
+
 ```
 Distributed workflow via events (no central orchestrator)
 
@@ -304,6 +314,7 @@ Cons:
 ### Saga Orchestration
 
 **Pattern:**
+
 ```
 Central orchestrator manages distributed transaction
 
@@ -342,6 +353,7 @@ Cons:
 ### Decision Matrix
 
 **REST vs gRPC:**
+
 ```
 Use REST when:
 - Public API (external clients)
@@ -359,6 +371,7 @@ Use gRPC when:
 ```
 
 **Synchronous vs Asynchronous:**
+
 ```
 Use Synchronous when:
 - User waiting for response
@@ -376,6 +389,7 @@ Use Asynchronous when:
 ```
 
 **Message Queue vs Event Stream:**
+
 ```
 Use Message Queue (RabbitMQ, SQS) when:
 - Single consumer per message
@@ -396,6 +410,7 @@ Use Event Stream (Kafka) when:
 ### RESTful API Design
 
 **URL Structure:**
+
 ```
 Good:
 GET    /api/v1/customers/{customerId}/orders
@@ -408,6 +423,7 @@ POST   /api/v1/createOrder
 ```
 
 **Versioning Strategies:**
+
 ```
 1. URL Versioning:
    /api/v1/orders
@@ -429,6 +445,7 @@ Recommendation: URL versioning for simplicity
 ```
 
 **Pagination:**
+
 ```
 Cursor-Based (Recommended):
 GET /api/v1/orders?cursor=abc123&limit=20
@@ -447,6 +464,7 @@ Problem: Results change if data inserted
 ### gRPC Best Practices
 
 **Error Handling:**
+
 ```
 Use standard gRPC status codes:
 - OK (0)
@@ -467,6 +485,7 @@ Error details in metadata for rich context
 ```
 
 **Streaming Patterns:**
+
 ```
 1. Server Streaming:
    rpc ListOrders(ListRequest) returns (stream Order);

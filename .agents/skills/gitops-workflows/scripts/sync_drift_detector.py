@@ -5,9 +5,9 @@ Supports both ArgoCD and Flux CD deployments.
 """
 
 import argparse
-import sys
-import subprocess
 import json
+import subprocess
+import sys
 from typing import List, Optional
 
 try:

@@ -5,10 +5,10 @@ Validates Terraform modules against best practices
 """
 
 import os
-import sys
 import re
+import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class ModuleValidator:
@@ -54,9 +54,7 @@ class ModuleValidator:
         content = vars_file.read_text()
 
         # Check for variable descriptions
-        variable_blocks = re.findall(
-            r'variable\s+"([^"]+)"\s*{([^}]+)}', content, re.DOTALL
-        )
+        variable_blocks = re.findall(r'variable\s+"([^"]+)"\s*{([^}]+)}', content, re.DOTALL)
 
         for var_name, var_content in variable_blocks:
             if "description" not in var_content:
@@ -66,17 +64,9 @@ class ModuleValidator:
                 self.warnings.append(f"Variable '{var_name}' missing type constraint")
 
             # Check for sensitive variables without sensitive flag
-            if any(
-                keyword in var_name.lower()
-                for keyword in ["password", "secret", "key", "token"]
-            ):
-                if (
-                    "sensitive" not in var_content
-                    or "sensitive = true" not in var_content
-                ):
-                    self.warnings.append(
-                        f"Variable '{var_name}' appears sensitive but not marked as sensitive"
-                    )
+            if any(keyword in var_name.lower() for keyword in ["password", "secret", "key", "token"]):
+                if "sensitive" not in var_content or "sensitive = true" not in var_content:
+                    self.warnings.append(f"Variable '{var_name}' appears sensitive but not marked as sensitive")
 
     def check_outputs_file(self):
         """Check outputs.tf for best practices"""
@@ -87,31 +77,19 @@ class ModuleValidator:
         content = outputs_file.read_text()
 
         # Check for output descriptions
-        output_blocks = re.findall(
-            r'output\s+"([^"]+)"\s*{([^}]+)}', content, re.DOTALL
-        )
+        output_blocks = re.findall(r'output\s+"([^"]+)"\s*{([^}]+)}', content, re.DOTALL)
 
         if len(output_blocks) == 0:
-            self.suggestions.append(
-                "Consider adding outputs to expose useful resource attributes"
-            )
+            self.suggestions.append("Consider adding outputs to expose useful resource attributes")
 
         for output_name, output_content in output_blocks:
             if "description" not in output_content:
                 self.warnings.append(f"Output '{output_name}' missing description")
 
             # Check for sensitive outputs
-            if any(
-                keyword in output_name.lower()
-                for keyword in ["password", "secret", "key", "token"]
-            ):
-                if (
-                    "sensitive" not in output_content
-                    or "sensitive = true" not in output_content
-                ):
-                    self.warnings.append(
-                        f"Output '{output_name}' appears sensitive but not marked as sensitive"
-                    )
+            if any(keyword in output_name.lower() for keyword in ["password", "secret", "key", "token"]):
+                if "sensitive" not in output_content or "sensitive = true" not in output_content:
+                    self.warnings.append(f"Output '{output_name}' appears sensitive but not marked as sensitive")
 
     def check_readme(self):
         """Check for README documentation"""
@@ -152,37 +130,27 @@ class ModuleValidator:
             if "required_version" not in content:
                 self.warnings.append("versions.tf should specify required_version")
             if "required_providers" not in content:
-                self.warnings.append(
-                    "versions.tf should specify required_providers with versions"
-                )
+                self.warnings.append("versions.tf should specify required_providers with versions")
         else:
             # Check main.tf for terraform block
             main_file = self.module_path / "main.tf"
             if main_file.exists():
                 content = main_file.read_text()
                 if "terraform" not in content or "required_version" not in content:
-                    self.warnings.append(
-                        "Module should specify Terraform version requirements"
-                    )
+                    self.warnings.append("Module should specify Terraform version requirements")
             else:
-                self.warnings.append(
-                    "Consider creating versions.tf to specify version constraints"
-                )
+                self.warnings.append("Consider creating versions.tf to specify version constraints")
 
     def check_examples(self):
         """Check for example usage"""
         examples_dir = self.module_path / "examples"
 
         if not examples_dir.exists():
-            self.suggestions.append(
-                "Consider adding 'examples/' directory with usage examples"
-            )
+            self.suggestions.append("Consider adding 'examples/' directory with usage examples")
         elif examples_dir.is_dir():
             example_subdirs = [d for d in examples_dir.iterdir() if d.is_dir()]
             if len(example_subdirs) == 0:
-                self.suggestions.append(
-                    "examples/ directory is empty - add example configurations"
-                )
+                self.suggestions.append("examples/ directory is empty - add example configurations")
 
     def check_naming_conventions(self):
         """Check file and resource naming conventions"""
@@ -191,9 +159,7 @@ class ModuleValidator:
         for tf_file in tf_files:
             # Check for snake_case file names
             if not re.match(r"^[a-z0-9_]+\.tf$", tf_file.name):
-                self.warnings.append(
-                    f"File '{tf_file.name}' should use snake_case naming"
-                )
+                self.warnings.append(f"File '{tf_file.name}' should use snake_case naming")
 
             # Check file content for naming
             content = tf_file.read_text()
@@ -202,15 +168,11 @@ class ModuleValidator:
             resources = re.findall(r'resource\s+"[^"]+"\s+"([^"]+)"', content)
             for resource_name in resources:
                 if not re.match(r"^[a-z0-9_]+$", resource_name):
-                    self.warnings.append(
-                        f"Resource name '{resource_name}' should use snake_case"
-                    )
+                    self.warnings.append(f"Resource name '{resource_name}' should use snake_case")
 
             # Check for hard-coded values that should be variables
             if re.search(r'= "us-east-1"', content):
-                self.suggestions.append(
-                    "Consider making region configurable via variable"
-                )
+                self.suggestions.append("Consider making region configurable via variable")
 
 
 def main():
@@ -259,9 +221,7 @@ def main():
             print("   No issues, warnings, or suggestions - excellent work!")
     else:
         print("❌ Module validation FAILED!")
-        print(
-            f"   {len(result['issues'])} issues must be fixed before using this module"
-        )
+        print(f"   {len(result['issues'])} issues must be fixed before using this module")
     print("=" * 70)
 
     sys.exit(0 if result["valid"] else 1)

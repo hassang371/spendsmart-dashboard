@@ -56,6 +56,7 @@ This review covered the application backend, frontend, shared packages, ingestio
 ### Critical
 
 #### BUG-001 — Deploy workflow does not truly gate on CI status
+
 - Severity: **Critical**
 - File: `.github/workflows/deploy.yml:17`
 - Category: CI/CD, release safety
@@ -72,6 +73,7 @@ This review covered the application backend, frontend, shared packages, ingestio
 ### High
 
 #### BUG-002 — Cross-tenant data exposure risk in safe-to-spend query
+
 - Severity: **High**
 - File: `apps/api/domains/forecasting/router.py:123`
 - Category: Security, multi-tenancy
@@ -84,6 +86,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Add regression test proving only authenticated user rows are returned.
 
 #### BUG-003 — JWT `exp` type handling can crash auth path
+
 - Severity: **High**
 - File: `apps/api/core/auth.py:103`
 - Category: Auth, error handling
@@ -99,6 +102,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Add tests for string/non-numeric `exp` claims.
 
 #### BUG-004 — Forecast inference dataset API misuse
+
 - Severity: **High**
 - File: `packages/forecasting/inference.py:189`
 - Category: Runtime correctness
@@ -112,6 +116,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Add integration test using real `TimeSeriesDataSet` path (not mocked API contract).
 
 #### BUG-005 — Forecast horizon loop can index out of bounds
+
 - Severity: **High**
 - File: `packages/forecasting/inference.py:219`
 - Category: Runtime correctness
@@ -123,6 +128,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Clamp by predicted length or validate horizon against model configuration.
 
 #### BUG-006 — Personalization adapter training not applied at inference
+
 - Severity: **High**
 - File: `packages/categorization/classifier.py:215`
 - Category: ML logic correctness
@@ -135,6 +141,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Add tests proving corrections change predicted label.
 
 #### BUG-007 — Hard dependency import blocks plain Excel parsing
+
 - Severity: **High**
 - File: `packages/ingestion_engine/excel_parser.py:2`
 - Category: Dependency robustness
@@ -146,6 +153,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Lazy import only for encrypted-path handling; raise actionable error only when decryption is needed.
 
 #### BUG-008 — Security scan failure is downgraded to warning
+
 - Severity: **High**
 - File: `.github/workflows/ci.yml:53`
 - Category: CI security
@@ -157,6 +165,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Remove fallback suppression and fail on findings; maintain temporary allowlist with expiry if needed.
 
 #### BUG-009 — Floating action refs in security-sensitive CI steps
+
 - Severity: **High**
 - Files:
   - `.github/workflows/ci.yml:34` (`trufflesecurity/trufflehog@main`)
@@ -170,6 +179,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Pin each third-party action to immutable commit SHA.
 
 #### BUG-010 — Storage quota fallback clears entire origin storage
+
 - Severity: **High**
 - File: `apps/web/lib/utils/cache.ts:77`
 - Category: Frontend data integrity
@@ -181,6 +191,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Implement prefix-based targeted eviction for app-owned cache keys.
 
 #### BUG-011 — Login social button can accidentally submit form
+
 - Severity: **High**
 - File: `apps/web/app/login/page.tsx:238`
 - Category: UX logic correctness
@@ -192,6 +203,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Set `type="button"` and keep explicit click handler.
 
 #### BUG-012 — Destructive migration uses `CASCADE` drop
+
 - Severity: **High**
 - File: `supabase/migrations/20260305000000_drop_deprecated_v1_tables.sql:4`
 - Category: Data safety, migrations
@@ -204,6 +216,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Run pre-migration backup and include tested rollback script.
 
 #### BUG-013 — Operational exposure in local infra defaults (Redis/Flower)
+
 - Severity: **High**
 - File: `docker-compose.yml:5` and `docker-compose.yml:82`
 - Category: DevOps security
@@ -218,6 +231,7 @@ This review covered the application backend, frontend, shared packages, ingestio
 ### Medium
 
 #### BUG-014 — Invalid cursor likely returns 500 instead of 400
+
 - Severity: **Medium**
 - File: `apps/api/domains/accounts/service.py:48`
 - Category: API error handling
@@ -229,6 +243,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Catch decode errors and raise `HTTPException(400, "Invalid cursor")`.
 
 #### BUG-015 — Duplicate marker inserted before parse completion
+
 - Severity: **Medium**
 - File: `apps/api/domains/forecasting/router.py:52`
 - Category: Ingestion/retry semantics
@@ -240,6 +255,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Record marker after successful parse/validation or rollback marker on failure.
 
 #### BUG-016 — Unhandled `Content-Length` parse failure path
+
 - Severity: **Medium**
 - File: `apps/api/main.py:66`
 - Category: Request robustness
@@ -251,6 +267,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Guard parse and return 400 with problem details.
 
 #### BUG-017 — Cleanup task references mismatched job table
+
 - Severity: **Medium**
 - File: `apps/api/core/tasks/maintenance_tasks.py:32`
 - Category: Background operations
@@ -262,6 +279,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Align naming/schema and update tests/scheduler mappings.
 
 #### BUG-018 — Worker failure path can leave jobs stuck in processing
+
 - Severity: **Medium**
 - File: `apps/worker/main.py:155`
 - Category: Reliability
@@ -273,6 +291,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Wrap failure-status update in nested try/except and add retry/backoff.
 
 #### BUG-019 — Batch transaction update semantics diverge from single update
+
 - Severity: **Medium**
 - File: `apps/api/domains/accounts/router.py:253`
 - Category: Data consistency
@@ -284,6 +303,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Reuse a common update payload builder shared by single and batch operations.
 
 #### BUG-020 — Potential duplicate canonical column names in parser
+
 - Severity: **Medium**
 - File: `packages/ingestion_engine/parser.py:567`
 - Category: Parser correctness
@@ -295,6 +315,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Deterministic de-duplication/priority rules for canonical columns.
 
 #### BUG-021 — Amount parsing misses common DR/CR text formats
+
 - Severity: **Medium**
 - File: `packages/ingestion_engine/parser.py:639`
 - Category: Parser correctness
@@ -306,6 +327,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Normalize suffix/prefix credit/debit patterns before numeric conversion.
 
 #### BUG-022 — Signed amount derivation can ignore debit/credit columns
+
 - Severity: **Medium**
 - File: `packages/ingestion_engine/parser.py:656`
 - Category: Parser business logic
@@ -317,6 +339,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Prefer debit/credit inference when both columns are present.
 
 #### BUG-023 — CSV decoding path is UTF-8 only
+
 - Severity: **Medium**
 - File: `packages/ingestion_engine/import_transactions.py:235`
 - Category: Input compatibility
@@ -328,6 +351,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Add fallback encoding strategy (e.g., latin-1/cp1252) with safe logging.
 
 #### BUG-024 — Settings page cache invalidation bypasses cache key scheme
+
 - Severity: **Medium**
 - File: `apps/web/app/dashboard/settings/page.tsx:263`
 - Related file: `apps/web/lib/utils/cache.ts:7`
@@ -340,6 +364,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Use `removeCachedData` helper consistently for all cache keys.
 
 #### BUG-025 — API client assumes all successful responses contain JSON
+
 - Severity: **Medium**
 - File: `apps/web/lib/api/client.ts:209`
 - Category: Frontend API robustness
@@ -351,6 +376,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Handle empty-body/204 separately before JSON parsing.
 
 #### BUG-026 — Client-side data fetch limits can silently truncate analytics
+
 - Severity: **Medium**
 - Files:
   - `apps/web/app/dashboard/page.tsx:87`
@@ -364,6 +390,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Cursor-pagination aggregation or backend aggregate endpoints; show truncation warning if capped.
 
 #### BUG-027 — CSV export formula injection risk
+
 - Severity: **Medium**
 - File: `apps/web/app/dashboard/settings/page.tsx:156`
 - Category: Security (output handling)
@@ -375,6 +402,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Prefix dangerous-leading values with `'` before CSV serialization.
 
 #### BUG-028 — Performance workflow readiness check is time-based and flaky
+
 - Severity: **Medium**
 - File: `.github/workflows/performance.yml:29`
 - Category: CI reliability
@@ -386,6 +414,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Poll health endpoint with timeout/retry before starting k6.
 
 #### BUG-029 — Index migration may lock writes on large tables
+
 - Severity: **Medium**
 - File: `supabase/migrations/20260228_add_m2_indexes.sql:5`
 - Category: DB operations
@@ -397,6 +426,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Use `CREATE INDEX CONCURRENTLY` in non-transactional migration.
 
 #### BUG-030 — Bulk import is non-idempotent and partially durable
+
 - Severity: **Medium**
 - File: `tools/scripts/import_transactions.py:113`
 - Category: Data integrity
@@ -410,6 +440,7 @@ This review covered the application backend, frontend, shared packages, ingestio
 ### Low
 
 #### BUG-031 — Rate limiter identity key may collide
+
 - Severity: **Low**
 - File: `apps/api/core/rate_limiter.py:27`
 - Category: Reliability
@@ -421,6 +452,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Key from verified subject (`sub`) or secure hash of full stable identity.
 
 #### BUG-032 — Anomaly route shape encourages insecure usage pattern
+
 - Severity: **Low**
 - File: `apps/api/domains/anomaly/router.py:8`
 - Category: API design
@@ -432,6 +464,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Remove path user id and derive from authenticated context.
 
 #### BUG-033 — Worker tests are mostly structural, not behavioral
+
 - Severity: **Low**
 - File: `apps/worker/tests/test_worker_jobs.py:14`
 - Category: Test quality
@@ -443,6 +476,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Add behavior tests for claim race, success transition, and failure-to-failed-status path.
 
 #### BUG-034 — Frontend lint has hard errors in transactions page
+
 - Severity: **Low** (build quality), can become **Medium** if CI blocks merges
 - File: `apps/web/app/dashboard/transactions/page.tsx`
 - Category: Maintainability
@@ -454,6 +488,7 @@ This review covered the application backend, frontend, shared packages, ingestio
   - Remove unused symbols, enforce strict comparisons, and tighten types.
 
 #### BUG-035 — CI workflow lacks explicit least-privilege permissions
+
 - Severity: **Low**
 - File: `.github/workflows/ci.yml:1`
 - Category: CI hardening

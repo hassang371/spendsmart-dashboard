@@ -3,6 +3,7 @@
 ## ArgoCD ApplicationSets
 
 **Cluster Generator** (auto-discover clusters):
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -24,6 +25,7 @@ spec:
 ```
 
 **Matrix Generator** (Cluster x Apps):
+
 ```yaml
 generators:
 - matrix:
@@ -39,18 +41,21 @@ generators:
 ## Flux Multi-Cluster
 
 **Option 1: Flux Per Cluster**
+
 ```
 cluster-1/ → Flux instance 1
 cluster-2/ → Flux instance 2
 ```
 
 **Option 2: Hub-and-Spoke**
+
 ```
 management-cluster/
 └── flux manages → cluster-1, cluster-2
 ```
 
 **Setup**:
+
 ```bash
 flux bootstrap github --owner=org --repository=fleet \
   --path=clusters/production --context=prod-cluster

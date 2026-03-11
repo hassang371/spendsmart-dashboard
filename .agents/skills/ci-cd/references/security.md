@@ -30,6 +30,7 @@ Comprehensive guide to securing CI/CD pipelines, secrets management, and supply 
 ### Platform Secret Stores
 
 **GitHub Secrets:**
+
 ```yaml
 # Repository, Environment, or Organization secrets
 steps:
@@ -46,6 +47,7 @@ steps:
 3. Organization secrets (lowest priority)
 
 **GitLab CI/CD Variables:**
+
 ```yaml
 # Project > Settings > CI/CD > Variables
 deploy:
@@ -64,6 +66,7 @@ deploy:
 ### External Secret Management
 
 **HashiCorp Vault:**
+
 ```yaml
 # GitHub Actions
 - uses: hashicorp/vault-action@v3
@@ -77,6 +80,7 @@ deploy:
 ```
 
 **AWS Secrets Manager:**
+
 ```yaml
 - name: Get secrets
   run: |
@@ -88,6 +92,7 @@ deploy:
 ```
 
 **Azure Key Vault:**
+
 ```yaml
 - uses: Azure/get-keyvault-secrets@v1
   with:
@@ -98,6 +103,7 @@ deploy:
 ### Secret Rotation
 
 **Implement rotation policies:**
+
 ```yaml
 check-secret-age:
   steps:
@@ -134,6 +140,7 @@ check-secret-age:
 ### GitHub Actions OIDC
 
 **AWS example:**
+
 ```yaml
 permissions:
   id-token: write  # Required for OIDC
@@ -151,6 +158,7 @@ jobs:
 ```
 
 **AWS IAM Trust Policy:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -171,6 +179,7 @@ jobs:
 ```
 
 **GCP example:**
+
 ```yaml
 - uses: google-github-actions/auth@v2
   with:
@@ -181,6 +190,7 @@ jobs:
 ```
 
 **Azure example:**
+
 ```yaml
 - uses: azure/login@v2
   with:
@@ -194,6 +204,7 @@ jobs:
 ### GitLab OIDC
 
 **Configure ID token:**
+
 ```yaml
 deploy:
   id_tokens:
@@ -209,6 +220,7 @@ deploy:
 ```
 
 **Vault integration:**
+
 ```yaml
 deploy:
   id_tokens:
@@ -230,6 +242,7 @@ deploy:
 - Enable `--frozen-lockfile` (Yarn) or `--frozen-lockfile` (pnpm)
 
 **Checksum verification:**
+
 ```yaml
 - name: Verify dependencies
   run: |
@@ -238,6 +251,7 @@ deploy:
 ```
 
 **SBOM generation:**
+
 ```yaml
 - name: Generate SBOM
   run: |
@@ -252,6 +266,7 @@ deploy:
 ### Action/Workflow Security
 
 **Pin to commit SHA (GitHub):**
+
 ```yaml
 # Bad - mutable tag
 - uses: actions/checkout@v4
@@ -270,6 +285,7 @@ deploy:
 - Use verified creators when possible
 
 **GitLab include verification:**
+
 ```yaml
 include:
   - project: 'security/ci-templates'
@@ -280,6 +296,7 @@ include:
 ### Container Image Security
 
 **Use specific tags:**
+
 ```yaml
 # Bad
 image: node:latest
@@ -292,6 +309,7 @@ image: node:20.11.0-alpine@sha256:abc123...
 ```
 
 **Minimal base images:**
+
 ```dockerfile
 # Prefer distroless or alpine
 FROM gcr.io/distroless/node20-debian12
@@ -301,6 +319,7 @@ FROM node:20-alpine
 ```
 
 **Image scanning:**
+
 ```yaml
 - name: Build image
   run: docker build -t myapp:${{ github.sha }} .
@@ -314,12 +333,14 @@ FROM node:20-alpine
 ### Code Signing
 
 **Sign commits:**
+
 ```bash
 git config --global user.signingkey <key-id>
 git config --global commit.gpgsign true
 ```
 
 **Verify signed commits (GitHub):**
+
 ```yaml
 - name: Verify signatures
   run: |
@@ -327,6 +348,7 @@ git config --global commit.gpgsign true
 ```
 
 **Sign artifacts:**
+
 ```yaml
 - name: Sign release
   run: |
@@ -340,6 +362,7 @@ git config --global commit.gpgsign true
 ### Principle of Least Privilege
 
 **GitHub permissions:**
+
 ```yaml
 # Minimal permissions
 permissions:
@@ -369,6 +392,7 @@ jobs:
 - Restrict who can push
 
 **GitLab merge request approval rules:**
+
 ```yaml
 # .gitlab/CODEOWNERS
 *       @senior-devs
@@ -385,6 +409,7 @@ jobs:
 - Custom deployment protection rules
 
 **GitLab deployment protection:**
+
 ```yaml
 production:
   environment:
@@ -416,6 +441,7 @@ production:
 ### Isolate Untrusted Code
 
 **Separate test from deploy:**
+
 ```yaml
 test:
   # Runs on PRs from forks
@@ -431,6 +457,7 @@ deploy:
 ```
 
 **GitLab fork protection:**
+
 ```yaml
 deploy:
   rules:
@@ -441,6 +468,7 @@ deploy:
 ### Sanitize Inputs
 
 **Avoid command injection:**
+
 ```yaml
 # Bad - command injection risk
 - run: echo "Title: ${{ github.event.issue.title }}"
@@ -452,6 +480,7 @@ deploy:
 ```
 
 **Validate inputs:**
+
 ```yaml
 - name: Validate version
   run: |
@@ -464,6 +493,7 @@ deploy:
 ### Network Restrictions
 
 **Limit egress:**
+
 ```yaml
 # GitHub Actions with StepSecurity
 - uses: step-security/harden-runner@v2
@@ -475,6 +505,7 @@ deploy:
 ```
 
 **GitLab network policy:**
+
 ```yaml
 # Kubernetes NetworkPolicy for GitLab Runner pods
 apiVersion: networking.k8s.io/v1
@@ -502,11 +533,13 @@ spec:
 ### Dependency Scanning
 
 **npm audit:**
+
 ```yaml
 - run: npm audit --audit-level=high
 ```
 
 **Snyk:**
+
 ```yaml
 - uses: snyk/actions/node@master
   env:
@@ -516,6 +549,7 @@ spec:
 ```
 
 **GitLab Dependency Scanning:**
+
 ```yaml
 include:
   - template: Security/Dependency-Scanning.gitlab-ci.yml
@@ -524,6 +558,7 @@ include:
 ### Static Application Security Testing (SAST)
 
 **CodeQL (GitHub):**
+
 ```yaml
 - uses: github/codeql-action/init@v3
   with:
@@ -535,6 +570,7 @@ include:
 ```
 
 **SonarQube:**
+
 ```yaml
 - uses: sonarsource/sonarqube-scan-action@master
   env:
@@ -544,6 +580,7 @@ include:
 ### Container Scanning
 
 **Trivy:**
+
 ```yaml
 - run: |
     docker build -t myapp .
@@ -551,6 +588,7 @@ include:
 ```
 
 **Grype:**
+
 ```yaml
 - uses: anchore/scan-action@v3
   with:
@@ -562,6 +600,7 @@ include:
 ### Dynamic Application Security Testing (DAST)
 
 **OWASP ZAP:**
+
 ```yaml
 dast:
   stage: test

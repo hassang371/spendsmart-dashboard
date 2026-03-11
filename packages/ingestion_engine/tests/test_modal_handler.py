@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 import pandas as pd
 
 # We'll import the handler function we are about to create
@@ -20,9 +21,7 @@ def test_process_upload_logic():
     # The Beta plan says "pushes the clean data to Supabase".
     # For this unit test, we'll verify it calls the logic and returns structured data.
 
-    with patch(
-        "packages.ingestion_engine.import_transactions.parse_csv_content"
-    ) as mock_parse:
+    with patch("packages.ingestion_engine.import_transactions.parse_csv_content") as mock_parse:
         # Mock what the parse function returns (we proved it works in other tests)
         mock_df = pd.DataFrame(
             [

@@ -6,10 +6,9 @@ helper functions for batch/single classification.
 
 from typing import Optional
 
-from supabase import Client
-
 from packages.categorization.classifier import LinearAdapter, TransactionClassifier
 from packages.categorization.model_registry import load_latest
+from supabase import Client
 
 _classifier: TransactionClassifier | None = None
 
@@ -22,9 +21,7 @@ def get_classifier() -> TransactionClassifier:
     return _classifier
 
 
-def _load_user_adapter(
-    clf: TransactionClassifier, client: Client, user_id: str
-) -> Optional[LinearAdapter]:
+def _load_user_adapter(clf: TransactionClassifier, client: Client, user_id: str) -> Optional[LinearAdapter]:
     state_dict = load_latest(client, user_id)
     if not state_dict:
         return None

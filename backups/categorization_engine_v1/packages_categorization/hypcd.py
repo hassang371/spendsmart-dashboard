@@ -1,8 +1,9 @@
+from typing import Dict, List, Optional
+
+import structlog
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import structlog
-from typing import Dict, List, Optional
 from geoopt import PoincareBall
 
 from .cleaner import clean_description
@@ -127,9 +128,9 @@ class HyperbolicEmbedder:
         self.proj_dim = proj_dim
 
         # Initialize hyperbolic projector
-        self.projector = HyperbolicProjector(
-            input_dim=backend.dim, hidden_dim=256, output_dim=proj_dim
-        ).to(backend.device)
+        self.projector = HyperbolicProjector(input_dim=backend.dim, hidden_dim=256, output_dim=proj_dim).to(
+            backend.device
+        )
 
     @property
     def device(self):
@@ -292,6 +293,7 @@ class HypCDClassifier:
         # Initialize backend (mobile deferred to mobile phase)
         if backend is None:
             from .backends.cloud import CloudBackend
+
             backend = CloudBackend()
 
         self.backend = backend
@@ -303,9 +305,7 @@ class HypCDClassifier:
         self.embedder = HyperbolicEmbedder(backend=backend, proj_dim=proj_dim)
 
         # Initialize classifier (HypFFN)
-        self.classifier = HypFFN(
-            dim=proj_dim, num_classes=num_classes, manifold=self.manifold
-        ).to(backend.device)
+        self.classifier = HypFFN(dim=proj_dim, num_classes=num_classes, manifold=self.manifold).to(backend.device)
 
         # Category labels
         self.labels = [
@@ -338,6 +338,7 @@ class HypCDClassifier:
           4. Silent skip (random init — first run)
         """
         import os
+
         from packages.categorization.adapter_manager import AdapterManager
 
         explicit = os.getenv("HYPCD_CHECKPOINT_PATH")
@@ -395,72 +396,120 @@ class HypCDClassifier:
     def _initialize_anchors(self) -> Dict[str, torch.Tensor]:
         seed_phrases = {
             "Food": [
-                "swiggy order", "zomato payment", "restaurant bill",
-                "blinkit grocery delivery", "zepto quick delivery",
-                "bigbasket grocery order", "dunzo delivery",
-                "eatfit healthy meal", "dominos pizza order",
+                "swiggy order",
+                "zomato payment",
+                "restaurant bill",
+                "blinkit grocery delivery",
+                "zepto quick delivery",
+                "bigbasket grocery order",
+                "dunzo delivery",
+                "eatfit healthy meal",
+                "dominos pizza order",
                 "cafe coffee purchase",
             ],
             "Transport": [
-                "uber ride payment", "ola cab trip", "rapido bike taxi",
-                "metro card recharge", "irctc train ticket",
-                "indigo flight booking", "petrol pump payment",
-                "fastag toll recharge", "makemytrip travel booking",
+                "uber ride payment",
+                "ola cab trip",
+                "rapido bike taxi",
+                "metro card recharge",
+                "irctc train ticket",
+                "indigo flight booking",
+                "petrol pump payment",
+                "fastag toll recharge",
+                "makemytrip travel booking",
                 "redbus bus ticket",
             ],
             "Utilities": [
-                "electricity bill payment", "water bill payment",
-                "airtel mobile recharge", "jio prepaid recharge",
-                "act fibernet broadband", "tata power electricity",
-                "vodafone postpaid bill", "bwssb water payment",
-                "gas cylinder booking", "broadband monthly bill",
+                "electricity bill payment",
+                "water bill payment",
+                "airtel mobile recharge",
+                "jio prepaid recharge",
+                "act fibernet broadband",
+                "tata power electricity",
+                "vodafone postpaid bill",
+                "bwssb water payment",
+                "gas cylinder booking",
+                "broadband monthly bill",
             ],
             "Salary": [
-                "salary credited account", "monthly payroll credit",
-                "salary transfer neft", "payroll deposit",
-                "stipend payment credited", "wages monthly income",
-                "salary for the month", "income transfer received",
+                "salary credited account",
+                "monthly payroll credit",
+                "salary transfer neft",
+                "payroll deposit",
+                "stipend payment credited",
+                "wages monthly income",
+                "salary for the month",
+                "income transfer received",
             ],
             "Shopping": [
-                "amazon purchase order", "flipkart product order",
-                "myntra fashion purchase", "nykaa beauty products",
-                "meesho clothing order", "croma electronics",
-                "decathlon sports equipment", "ajio fashion sale",
-                "retail store purchase", "online shopping payment",
+                "amazon purchase order",
+                "flipkart product order",
+                "myntra fashion purchase",
+                "nykaa beauty products",
+                "meesho clothing order",
+                "croma electronics",
+                "decathlon sports equipment",
+                "ajio fashion sale",
+                "retail store purchase",
+                "online shopping payment",
             ],
             "Entertainment": [
-                "netflix monthly subscription", "spotify premium",
-                "jiocinema subscription plan", "sonyliv monthly",
-                "hotstar disney subscription", "youtube premium",
-                "bookmyshow movie ticket", "play pass monthly",
-                "music streaming subscription", "movie rental payment",
+                "netflix monthly subscription",
+                "spotify premium",
+                "jiocinema subscription plan",
+                "sonyliv monthly",
+                "hotstar disney subscription",
+                "youtube premium",
+                "bookmyshow movie ticket",
+                "play pass monthly",
+                "music streaming subscription",
+                "movie rental payment",
             ],
             "Health": [
-                "pharmacy medicine purchase", "hospital bill payment",
-                "clinic doctor consultation", "1mg medicine order",
-                "netmeds pharmacy delivery", "cult.fit gym membership",
-                "healthifyme subscription", "apollo pharmacy",
-                "lab test diagnostics", "medical expense payment",
+                "pharmacy medicine purchase",
+                "hospital bill payment",
+                "clinic doctor consultation",
+                "1mg medicine order",
+                "netmeds pharmacy delivery",
+                "cult.fit gym membership",
+                "healthifyme subscription",
+                "apollo pharmacy",
+                "lab test diagnostics",
+                "medical expense payment",
             ],
             "Education": [
-                "udemy online course", "unacademy subscription",
-                "byju learning app payment", "coursera course fee",
-                "tuition fee payment", "college exam fee",
-                "physics wallah subscription", "upgrad course",
-                "book purchase education", "simplilearn certification",
+                "udemy online course",
+                "unacademy subscription",
+                "byju learning app payment",
+                "coursera course fee",
+                "tuition fee payment",
+                "college exam fee",
+                "physics wallah subscription",
+                "upgrad course",
+                "book purchase education",
+                "simplilearn certification",
             ],
             "Finance": [
-                "loan emi debit", "insurance premium payment",
-                "mutual fund sip", "zerodha brokerage",
-                "groww investment", "cred credit card",
-                "bajaj finance emi", "tax payment",
-                "upstox trading", "fd deposit bank",
+                "loan emi debit",
+                "insurance premium payment",
+                "mutual fund sip",
+                "zerodha brokerage",
+                "groww investment",
+                "cred credit card",
+                "bajaj finance emi",
+                "tax payment",
+                "upstox trading",
+                "fd deposit bank",
             ],
             "People": [
-                "transfer to friend", "sent money family",
-                "upi transfer personal", "gift payment friend",
-                "reimbursement colleague", "money sent contact",
-                "personal payment received", "family expense split",
+                "transfer to friend",
+                "sent money family",
+                "upi transfer personal",
+                "gift payment friend",
+                "reimbursement colleague",
+                "money sent contact",
+                "personal payment received",
+                "family expense split",
             ],
         }
 
@@ -488,6 +537,7 @@ class HypCDClassifier:
         Finds nearest anchor by hyperbolic distance.
         """
         from .clustering import HierarchyExtractor
+
         extractor = HierarchyExtractor(self.manifold)
         norm_val = extractor.compute_norm(embedding).item()
 
@@ -505,9 +555,9 @@ class HypCDClassifier:
         confidence = torch.exp(-dists[min_idx]).item()
 
         return {
-            "category":   anchor_keys[min_idx],
+            "category": anchor_keys[min_idx],
             "confidence": max(confidence, 0.05),
-            "norm":       norm_val,
+            "norm": norm_val,
         }
 
     def predict(self, text: str) -> dict:
@@ -543,16 +593,17 @@ class HypCDClassifier:
             if rule_category:
                 embedding = self.embedder.embed_batch([candidate])[0]
                 from .clustering import HierarchyExtractor
+
                 _extractor = HierarchyExtractor(self.manifold)
                 norm_val = _extractor.compute_norm(embedding).item()
                 results[i] = {
-                    "category":  rule_category,
+                    "category": rule_category,
                     "confidence": 1.0,
                     "embedding": embedding,
-                    "is_novel":  False,
-                    "depth":     "macro" if norm_val < 0.5 else "micro",
-                    "norm":      norm_val,
-                    "path":      "keyword_rule",
+                    "is_novel": False,
+                    "depth": "macro" if norm_val < 0.5 else "micro",
+                    "norm": norm_val,
+                    "path": "keyword_rule",
                 }
             else:
                 model_texts.append(candidate)
@@ -568,13 +619,13 @@ class HypCDClassifier:
         if not isinstance(embeddings, torch.Tensor):
             for model_i, target_i in enumerate(model_indices):
                 results[target_i] = {
-                    "category":   "Misc",
+                    "category": "Misc",
                     "confidence": 0.0,
-                    "embedding":  embeddings,
-                    "is_novel":   False,
-                    "depth":      "macro",
-                    "norm":       0.0,
-                    "path":       "hypffn",
+                    "embedding": embeddings,
+                    "is_novel": False,
+                    "depth": "macro",
+                    "norm": 0.0,
+                    "path": "hypffn",
                 }
             return results
 
@@ -599,6 +650,7 @@ class HypCDClassifier:
 
         # Import hierarchy extractor once for all results
         from .clustering import HierarchyExtractor
+
         _extractor = HierarchyExtractor(self.manifold)
 
         # Build results
@@ -611,13 +663,13 @@ class HypCDClassifier:
             if conf.item() < CONFIDENCE_THRESHOLD:
                 novel = self._classify_novel(embedding)
                 results[target_i] = {
-                    "category":   novel["category"],
+                    "category": novel["category"],
                     "confidence": novel["confidence"],
-                    "embedding":  embedding,
-                    "is_novel":   True,
-                    "depth":      "boundary",
-                    "norm":       novel["norm"],
-                    "path":       "novel_cluster",
+                    "embedding": embedding,
+                    "is_novel": True,
+                    "depth": "boundary",
+                    "norm": novel["norm"],
+                    "path": "novel_cluster",
                 }
                 continue
 
@@ -634,20 +686,18 @@ class HypCDClassifier:
             depth = "macro" if norm_val < 0.5 else "micro"
 
             results[target_i] = {
-                "category":   predicted,
+                "category": predicted,
                 "confidence": conf.item(),
-                "embedding":  embedding,
-                "is_novel":   False,
-                "depth":      depth,
-                "norm":       norm_val,
-                "path":       "hypffn",
+                "embedding": embedding,
+                "is_novel": False,
+                "depth": depth,
+                "norm": norm_val,
+                "path": "hypffn",
             }
 
         return results
 
-    def discover_categories(
-        self, texts: list, n_clusters: int = 5, confidence_threshold: float = 0.7
-    ) -> list:
+    def discover_categories(self, texts: list, n_clusters: int = 5, confidence_threshold: float = 0.7) -> list:
         """
         Discover novel categories using GCD.
 
@@ -669,9 +719,7 @@ class HypCDClassifier:
         kmeans.fit(embeddings)
 
         # Get labels and confidence
-        labels, confidence, is_known = kmeans.predict(
-            embeddings, confidence_threshold=confidence_threshold
-        )
+        labels, confidence, is_known = kmeans.predict(embeddings, confidence_threshold=confidence_threshold)
 
         # Build results
         discovered = []
@@ -707,9 +755,7 @@ class HypCDClassifier:
             # Get second layer weights
             weights = self.classifier.fc2.weight  # (num_classes, dim//2)
             # Project to full dimension
-            centroids = self.classifier.fc1.manifold.expmap0(
-                torch.matmul(weights, self.classifier.fc1.weight)
-            )
+            centroids = self.classifier.fc1.manifold.expmap0(torch.matmul(weights, self.classifier.fc1.weight))
 
         extractor = HierarchyExtractor(self.manifold)
         taxonomy = extractor.build_taxonomy(centroids, self.labels)

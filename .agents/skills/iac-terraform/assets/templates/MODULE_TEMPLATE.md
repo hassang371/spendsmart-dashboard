@@ -21,6 +21,7 @@ module-name/
 ## Template Files
 
 ### main.tf
+
 ```hcl
 # Main resource definitions
 terraform {
@@ -48,6 +49,7 @@ locals {
 ```
 
 ### variables.tf
+
 ```hcl
 variable "name" {
   description = "Name to be used on all resources as prefix"
@@ -107,6 +109,7 @@ variable "subnets" {
 ```
 
 ### outputs.tf
+
 ```hcl
 output "vpc_id" {
   description = "The ID of the VPC"
@@ -145,6 +148,7 @@ output "subnet_details" {
 ```
 
 ### versions.tf
+
 ```hcl
 terraform {
   required_version = ">= 1.3.0"
@@ -159,6 +163,7 @@ terraform {
 ```
 
 ### README.md Template
+
 ```markdown
 # Module Name
 
@@ -238,6 +243,7 @@ module "vpc" {
 ```
 
 ### examples/complete/outputs.tf
+
 ```hcl
 output "vpc_id" {
   description = "The ID of the VPC"
@@ -246,6 +252,7 @@ output "vpc_id" {
 ```
 
 ### examples/complete/variables.tf
+
 ```hcl
 variable "region" {
   description = "AWS region"
@@ -257,6 +264,7 @@ variable "region" {
 ## Terragrunt Configuration Template
 
 ### terragrunt.hcl (root)
+
 ```hcl
 # Root terragrunt.hcl
 locals {
@@ -337,6 +345,7 @@ inputs = {
 ```
 
 ### terragrunt.hcl (module level)
+
 ```hcl
 # Include root configuration
 include "root" {

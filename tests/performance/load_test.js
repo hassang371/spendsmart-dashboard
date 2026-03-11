@@ -45,7 +45,7 @@ export default function () {
     };
 
     const classifyRes = http.post(`${BASE_URL}/api/v1/categories/classify`, payload, params);
-    
+
     // We expect 401 Unauthorized if auth is enforced, or 200/429.
     // We'll relax the check just to ensure it's not a 500 server error since
     // auth tokens aren't passed in this basic script yet.

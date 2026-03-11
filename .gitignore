@@ -35,15 +35,15 @@ __pycache__/
 .DS_Store
 *.pem
 .worktrees/
-#.agents/
-#.gemini/
+.agents/
+.gemini/
 .vscode/
-#/references/
+/references/
 /misc/
 /tools/csvs/
 
 # Claude Code (track config, not local settings)
-#.claude/settings.local.json
+.claude/settings.local.json
 
 # Debug
 npm-debug.log*

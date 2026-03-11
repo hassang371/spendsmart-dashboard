@@ -34,19 +34,18 @@ Requirements:
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
-import tempfile
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class DiagramType(Enum):
     """Supported Mermaid diagram types."""
+
     FLOWCHART = "flowchart"
     SEQUENCE = "sequence"
     CLASS = "class"
@@ -66,6 +65,7 @@ class DiagramType(Enum):
 @dataclass
 class TroubleshootingMatch:
     """A matching entry from troubleshooting guide."""
+
     error_number: int
     title: str
     severity: str
@@ -82,13 +82,14 @@ class TroubleshootingMatch:
             "severity": self.severity,
             "diagram_types": self.diagram_types,
             "problem": self.problem,
-            "correct_example": self.correct_example
+            "correct_example": self.correct_example,
         }
 
 
 @dataclass
 class DiagramResult:
     """Result of diagram generation attempt."""
+
     success: bool
     mmd_path: Optional[str]
     image_path: Optional[str]
@@ -107,7 +108,7 @@ class DiagramResult:
             "error_message": self.error_message,
             "troubleshooting_matches": self.troubleshooting_matches,
             "suggested_fix": self.suggested_fix,
-            "search_recommendation": self.search_recommendation
+            "search_recommendation": self.search_recommendation,
         }
 
 
@@ -116,15 +117,14 @@ class TroubleshootingParser:
 
     # Pattern to match error sections
     ERROR_PATTERN = re.compile(
-        r'### ❌ Error (\d+): (.+?)\n+'
-        r'\*\*Severity:\*\* (🔴|🟠|🟡|🟢) (\w+)',
-        re.MULTILINE
+        r"### ❌ Error (\d+): (.+?)\n+" r"\*\*Severity:\*\* (🔴|🟠|🟡|🟢) (\w+)",
+        re.MULTILINE,
     )
 
     # Pattern to find incorrect/correct code blocks
     CODE_BLOCK_PATTERN = re.compile(
-        r'\*\*(Incorrect|Correct)(?:\s+Solutions?)?:\*\*\s*```mermaid\s*\n(.*?)```',
-        re.DOTALL
+        r"\*\*(Incorrect|Correct)(?:\s+Solutions?)?:\*\*\s*```mermaid\s*\n(.*?)```",
+        re.DOTALL,
     )
 
     def __init__(self, troubleshooting_path: Path):
@@ -135,17 +135,17 @@ class TroubleshootingParser:
 
     def _parse(self):
         """Parse the troubleshooting.md file."""
-        content = self.path.read_text(encoding='utf-8')
+        content = self.path.read_text(encoding="utf-8")
 
         # Split by error sections
-        sections = re.split(r'(?=### ❌ Error \d+:)', content)
+        sections = re.split(r"(?=### ❌ Error \d+:)", content)
 
         for section in sections:
-            if not section.strip() or '### ❌ Error' not in section:
+            if not section.strip() or "### ❌ Error" not in section:
                 continue
 
             # Extract error number and title
-            header_match = re.search(r'### ❌ Error (\d+): (.+)', section)
+            header_match = re.search(r"### ❌ Error (\d+): (.+)", section)
             if not header_match:
                 continue
 
@@ -153,20 +153,20 @@ class TroubleshootingParser:
             title = header_match.group(2).strip()
 
             # Extract severity
-            severity_match = re.search(r'\*\*Severity:\*\* (🔴|🟠|🟡|🟢) (\w+)', section)
+            severity_match = re.search(r"\*\*Severity:\*\* (🔴|🟠|🟡|🟢) (\w+)", section)
             severity = severity_match.group(2) if severity_match else "Unknown"
 
             # Extract problem description
-            problem_match = re.search(r'\*\*Problem:\*\* (.+?)(?:\n\n|\*\*)', section, re.DOTALL)
+            problem_match = re.search(r"\*\*Problem:\*\* (.+?)(?:\n\n|\*\*)", section, re.DOTALL)
             problem = problem_match.group(1).strip() if problem_match else ""
 
             # Extract diagram types affected
-            types_match = re.search(r'\*\*Diagram Types Affected:\*\* (.+)', section)
+            types_match = re.search(r"\*\*Diagram Types Affected:\*\* (.+)", section)
             diagram_types = []
             if types_match:
                 types_text = types_match.group(1)
                 # Parse types like "All diagrams", "Flowcharts, state diagrams"
-                diagram_types = [t.strip().lower() for t in types_text.split(',')]
+                diagram_types = [t.strip().lower() for t in types_text.split(",")]
 
             # Extract incorrect/correct examples
             incorrect = ""
@@ -181,17 +181,17 @@ class TroubleshootingParser:
 
             # Extract error messages
             error_messages = []
-            error_msg_match = re.search(r'\*\*Error Message[s]?:\*\*\s*\n((?:- `.+`\n?)+)', section)
+            error_msg_match = re.search(r"\*\*Error Message[s]?:\*\*\s*\n((?:- `.+`\n?)+)", section)
             if error_msg_match:
-                for line in error_msg_match.group(1).split('\n'):
-                    msg_match = re.search(r'`(.+)`', line)
+                for line in error_msg_match.group(1).split("\n"):
+                    msg_match = re.search(r"`(.+)`", line)
                     if msg_match:
                         error_messages.append(msg_match.group(1))
 
             # Also look for inline error messages
-            inline_msg = re.search(r'\*\*Error Message:\*\*\s*`?(.+?)`?\n', section)
+            inline_msg = re.search(r"\*\*Error Message:\*\*\s*`?(.+?)`?\n", section)
             if inline_msg and not error_messages:
-                error_messages.append(inline_msg.group(1).strip('`'))
+                error_messages.append(inline_msg.group(1).strip("`"))
 
             entry = TroubleshootingMatch(
                 error_number=error_num,
@@ -201,7 +201,7 @@ class TroubleshootingParser:
                 problem=problem,
                 incorrect_example=incorrect,
                 correct_example=correct,
-                error_messages=error_messages
+                error_messages=error_messages,
             )
             self.entries.append(entry)
 
@@ -231,14 +231,21 @@ class TroubleshootingParser:
                     score += 3
 
             # Check diagram type matches
-            if "all" in ' '.join(entry.diagram_types).lower():
+            if "all" in " ".join(entry.diagram_types).lower():
                 score += 2
             elif any(type_name in t for t in entry.diagram_types):
                 score += 5
 
             # Check problem keywords
             problem_keywords = entry.problem.lower().split()
-            for keyword in ['reserved', 'missing', 'invalid', 'incorrect', 'error', 'syntax']:
+            for keyword in [
+                "reserved",
+                "missing",
+                "invalid",
+                "incorrect",
+                "error",
+                "syntax",
+            ]:
                 if keyword in error_lower and keyword in problem_keywords:
                     score += 2
 
@@ -273,21 +280,26 @@ class ResilientDiagramGenerator:
     # Patterns to detect diagram type from first line
     DIAGRAM_TYPE_PATTERNS = {
         DiagramType.FLOWCHART: [
-            r'^flowchart\s+(TB|TD|BT|RL|LR)',
-            r'^graph\s+(TB|TD|BT|RL|LR)',
+            r"^flowchart\s+(TB|TD|BT|RL|LR)",
+            r"^graph\s+(TB|TD|BT|RL|LR)",
         ],
-        DiagramType.SEQUENCE: [r'^sequenceDiagram'],
-        DiagramType.CLASS: [r'^classDiagram'],
-        DiagramType.STATE: [r'^stateDiagram(-v2)?'],
-        DiagramType.ER: [r'^erDiagram'],
-        DiagramType.GANTT: [r'^gantt'],
-        DiagramType.PIE: [r'^pie'],
-        DiagramType.MINDMAP: [r'^mindmap'],
-        DiagramType.TIMELINE: [r'^timeline'],
-        DiagramType.QUADRANT: [r'^quadrantChart'],
-        DiagramType.REQUIREMENT: [r'^requirementDiagram'],
-        DiagramType.JOURNEY: [r'^journey'],
-        DiagramType.C4: [r'^C4Context', r'^C4Container', r'^C4Component', r'^C4Deployment'],
+        DiagramType.SEQUENCE: [r"^sequenceDiagram"],
+        DiagramType.CLASS: [r"^classDiagram"],
+        DiagramType.STATE: [r"^stateDiagram(-v2)?"],
+        DiagramType.ER: [r"^erDiagram"],
+        DiagramType.GANTT: [r"^gantt"],
+        DiagramType.PIE: [r"^pie"],
+        DiagramType.MINDMAP: [r"^mindmap"],
+        DiagramType.TIMELINE: [r"^timeline"],
+        DiagramType.QUADRANT: [r"^quadrantChart"],
+        DiagramType.REQUIREMENT: [r"^requirementDiagram"],
+        DiagramType.JOURNEY: [r"^journey"],
+        DiagramType.C4: [
+            r"^C4Context",
+            r"^C4Container",
+            r"^C4Component",
+            r"^C4Deployment",
+        ],
     }
 
     def __init__(self, troubleshooting_path: Optional[Path] = None):
@@ -317,11 +329,11 @@ class ResilientDiagramGenerator:
             DiagramType enum value
         """
         # Get first non-empty, non-comment line
-        lines = mermaid_code.strip().split('\n')
+        lines = mermaid_code.strip().split("\n")
         first_line = ""
         for line in lines:
             stripped = line.strip()
-            if stripped and not stripped.startswith('%%'):
+            if stripped and not stripped.startswith("%%"):
                 first_line = stripped
                 break
 
@@ -332,13 +344,7 @@ class ResilientDiagramGenerator:
 
         return DiagramType.UNKNOWN
 
-    def generate_filename(
-        self,
-        markdown_file: str,
-        diagram_num: int,
-        diagram_type: str,
-        title: str
-    ) -> str:
+    def generate_filename(self, markdown_file: str, diagram_num: int, diagram_type: str, title: str) -> str:
         """
         Generate filename following convention:
         <markdown_file_name>_<diagram_num>_<image_type>_<title>
@@ -353,23 +359,18 @@ class ResilientDiagramGenerator:
             Base filename string (without extension)
         """
         # Sanitize markdown file name
-        safe_md = re.sub(r'[^a-zA-Z0-9_-]', '_', markdown_file.lower())
-        safe_md = re.sub(r'_+', '_', safe_md).strip('_')
+        safe_md = re.sub(r"[^a-zA-Z0-9_-]", "_", markdown_file.lower())
+        safe_md = re.sub(r"_+", "_", safe_md).strip("_")
 
         # Sanitize title: lowercase, replace spaces/special chars with underscores
-        safe_title = re.sub(r'[^a-zA-Z0-9]', '_', title.lower())
-        safe_title = re.sub(r'_+', '_', safe_title).strip('_')
+        safe_title = re.sub(r"[^a-zA-Z0-9]", "_", title.lower())
+        safe_title = re.sub(r"_+", "_", safe_title).strip("_")
         # Truncate to first 20 chars for reasonable filename length
-        safe_title = safe_title[:20].rstrip('_')
+        safe_title = safe_title[:20].rstrip("_")
 
         return f"{safe_md}_{diagram_num:02d}_{diagram_type}_{safe_title}"
 
-    def save_mmd_file(
-        self,
-        mermaid_code: str,
-        output_dir: Path,
-        base_filename: str
-    ) -> Path:
+    def save_mmd_file(self, mermaid_code: str, output_dir: Path, base_filename: str) -> Path:
         """
         Save diagram to .mmd file.
 
@@ -384,15 +385,11 @@ class ResilientDiagramGenerator:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         mmd_path = output_dir / f"{base_filename}.mmd"
-        mmd_path.write_text(mermaid_code.strip() + '\n', encoding='utf-8')
+        mmd_path.write_text(mermaid_code.strip() + "\n", encoding="utf-8")
 
         return mmd_path
 
-    def render_image(
-        self,
-        mmd_path: Path,
-        image_format: str = "png"
-    ) -> Tuple[bool, Optional[Path], Optional[str]]:
+    def render_image(self, mmd_path: Path, image_format: str = "png") -> Tuple[bool, Optional[Path], Optional[str]]:
         """
         Render diagram to image using mmdc.
 
@@ -407,14 +404,26 @@ class ResilientDiagramGenerator:
 
         # Check mmdc is installed
         if not self._check_mmdc_installed():
-            return False, None, "mmdc not found. Install with: npm install -g @mermaid-js/mermaid-cli"
+            return (
+                False,
+                None,
+                "mmdc not found. Install with: npm install -g @mermaid-js/mermaid-cli",
+            )
 
         try:
             result = subprocess.run(
-                ['mmdc', '-i', str(mmd_path), '-o', str(image_path), '-b', 'transparent'],
+                [
+                    "mmdc",
+                    "-i",
+                    str(mmd_path),
+                    "-o",
+                    str(image_path),
+                    "-b",
+                    "transparent",
+                ],
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=60,
             )
 
             if result.returncode != 0:
@@ -438,20 +447,12 @@ class ResilientDiagramGenerator:
     def _check_mmdc_installed() -> bool:
         """Check if mermaid-cli (mmdc) is installed."""
         try:
-            result = subprocess.run(
-                ['mmdc', '--version'],
-                capture_output=True,
-                timeout=5
-            )
+            result = subprocess.run(["mmdc", "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
-    def get_search_recommendation(
-        self,
-        error_message: str,
-        diagram_type: DiagramType
-    ) -> str:
+    def get_search_recommendation(self, error_message: str, diagram_type: DiagramType) -> str:
         """
         Generate search query for external tools when troubleshooting fails.
 
@@ -465,8 +466,8 @@ class ResilientDiagramGenerator:
             Search query string
         """
         # Clean up error message for search
-        clean_error = re.sub(r'\s+', ' ', error_message[:150]).strip()
-        clean_error = re.sub(r'[^\w\s:.-]', '', clean_error)
+        clean_error = re.sub(r"\s+", " ", error_message[:150]).strip()
+        clean_error = re.sub(r"[^\w\s:.-]", "", clean_error)
 
         return f"mermaid {diagram_type.value} diagram syntax error: {clean_error}"
 
@@ -477,7 +478,7 @@ class ResilientDiagramGenerator:
         diagram_num: int,
         title: str,
         output_dir: Path,
-        image_format: str = "png"
+        image_format: str = "png",
     ) -> DiagramResult:
         """
         Execute full resilient generation workflow.
@@ -497,9 +498,7 @@ class ResilientDiagramGenerator:
         diagram_type = self.detect_diagram_type(mermaid_code)
 
         # Step 2: Generate filename
-        base_filename = self.generate_filename(
-            markdown_file, diagram_num, diagram_type.value, title
-        )
+        base_filename = self.generate_filename(markdown_file, diagram_num, diagram_type.value, title)
 
         # Step 3: Save .mmd file
         mmd_path = self.save_mmd_file(mermaid_code, output_dir, base_filename)
@@ -513,7 +512,7 @@ class ResilientDiagramGenerator:
                 mmd_path=str(mmd_path),
                 image_path=str(image_path),
                 diagram_type=diagram_type.value,
-                error_message=None
+                error_message=None,
             )
 
         # Step 5: On error, search troubleshooting guide
@@ -532,7 +531,7 @@ class ResilientDiagramGenerator:
 
         # Step 6: Generate search recommendation if no good matches
         search_rec = None
-        if not matches or (matches and matches[0].get('error_number', 0) == 0):
+        if not matches or (matches and matches[0].get("error_number", 0) == 0):
             search_rec = self.get_search_recommendation(error_message, diagram_type)
 
         return DiagramResult(
@@ -543,13 +542,13 @@ class ResilientDiagramGenerator:
             error_message=error_message,
             troubleshooting_matches=matches,
             suggested_fix=suggested_fix,
-            search_recommendation=search_rec
+            search_recommendation=search_rec,
         )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Resilient Mermaid diagram generation with error recovery',
+        description="Resilient Mermaid diagram generation with error recovery",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -584,34 +583,54 @@ Error Recovery:
      - brave_web_search MCP (secondary)
      - gemini skill (tertiary)
      - WebSearch tool (fallback)
-        """
+        """,
     )
 
     # Input options (mutually exclusive)
     input_group = parser.add_mutually_exclusive_group(required=True)
-    input_group.add_argument('--code', '-c', type=str, help='Mermaid code string')
-    input_group.add_argument('--mmd-file', '-i', type=Path, help='Path to existing .mmd file')
-    input_group.add_argument('--stdin', action='store_true', help='Read Mermaid code from stdin')
+    input_group.add_argument("--code", "-c", type=str, help="Mermaid code string")
+    input_group.add_argument("--mmd-file", "-i", type=Path, help="Path to existing .mmd file")
+    input_group.add_argument("--stdin", action="store_true", help="Read Mermaid code from stdin")
 
     # Output options
-    parser.add_argument('--output-dir', '-o', type=Path, default=Path('./diagrams'),
-                        help='Output directory (default: ./diagrams)')
-    parser.add_argument('--markdown-file', '-m', type=str, default='diagram',
-                        help='Source markdown filename for naming convention')
-    parser.add_argument('--diagram-num', '-n', type=int, default=1,
-                        help='Diagram number (default: 1)')
-    parser.add_argument('--title', '-t', type=str, default='diagram',
-                        help='Diagram title for filename')
-    parser.add_argument('--format', '-f', choices=['png', 'svg', 'pdf'], default='png',
-                        help='Image format (default: png)')
+    parser.add_argument(
+        "--output-dir",
+        "-o",
+        type=Path,
+        default=Path("./diagrams"),
+        help="Output directory (default: ./diagrams)",
+    )
+    parser.add_argument(
+        "--markdown-file",
+        "-m",
+        type=str,
+        default="diagram",
+        help="Source markdown filename for naming convention",
+    )
+    parser.add_argument("--diagram-num", "-n", type=int, default=1, help="Diagram number (default: 1)")
+    parser.add_argument("--title", "-t", type=str, default="diagram", help="Diagram title for filename")
+    parser.add_argument(
+        "--format",
+        "-f",
+        choices=["png", "svg", "pdf"],
+        default="png",
+        help="Image format (default: png)",
+    )
 
     # Output format
-    parser.add_argument('--json', '-j', action='store_true',
-                        help='Output result as JSON (recommended for programmatic use)')
+    parser.add_argument(
+        "--json",
+        "-j",
+        action="store_true",
+        help="Output result as JSON (recommended for programmatic use)",
+    )
 
     # Troubleshooting guide override
-    parser.add_argument('--troubleshooting', type=Path,
-                        help='Path to troubleshooting.md (auto-detected if not specified)')
+    parser.add_argument(
+        "--troubleshooting",
+        type=Path,
+        help="Path to troubleshooting.md (auto-detected if not specified)",
+    )
 
     args = parser.parse_args()
 
@@ -622,7 +641,7 @@ Error Recovery:
         if not args.mmd_file.exists():
             print(f"ERROR: File not found: {args.mmd_file}", file=sys.stderr)
             sys.exit(1)
-        mermaid_code = args.mmd_file.read_text(encoding='utf-8')
+        mermaid_code = args.mmd_file.read_text(encoding="utf-8")
     elif args.stdin:
         mermaid_code = sys.stdin.read()
 
@@ -640,7 +659,7 @@ Error Recovery:
         diagram_num=args.diagram_num,
         title=args.title,
         output_dir=args.output_dir,
-        image_format=args.format
+        image_format=args.format,
     )
 
     # Output result
@@ -648,7 +667,7 @@ Error Recovery:
         print(json.dumps(result.to_dict(), indent=2))
     else:
         if result.success:
-            print(f"SUCCESS: Generated diagram")
+            print("SUCCESS: Generated diagram")
             print(f"  MMD file:   {result.mmd_path}")
             print(f"  Image file: {result.image_path}")
             print(f"  Type:       {result.diagram_type}")
@@ -669,16 +688,16 @@ Error Recovery:
                     print("```")
 
             if result.search_recommendation:
-                print(f"\nNo exact match found. Search recommendation:")
+                print("\nNo exact match found. Search recommendation:")
                 print(f"  Query: {result.search_recommendation}")
-                print(f"\n  Search tools (in priority order):")
-                print(f"    1. perplexity_ask MCP")
-                print(f"    2. brave_web_search MCP")
-                print(f"    3. gemini skill")
-                print(f"    4. WebSearch tool")
+                print("\n  Search tools (in priority order):")
+                print("    1. perplexity_ask MCP")
+                print("    2. brave_web_search MCP")
+                print("    3. gemini skill")
+                print("    4. WebSearch tool")
 
     sys.exit(0 if result.success else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

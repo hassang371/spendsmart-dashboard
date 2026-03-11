@@ -1,7 +1,6 @@
 """Tests for training domain — BUG-01 verification."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 class TestUpdateJobStatus:

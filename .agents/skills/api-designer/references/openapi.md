@@ -772,6 +772,7 @@ description: |
     "email": "john@example.com"
   }
   ```
+
 ```
 
 ## Code Generation

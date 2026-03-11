@@ -3,7 +3,9 @@
 Service layer handles query construction, keeping the router thin.
 """
 
-from typing import Any, Optional
+from typing import Any
+
+from fastapi import HTTPException
 
 from apps.api.core.filtering import TransactionFilter, apply_filters
 from apps.api.core.pagination import (
@@ -12,7 +14,6 @@ from apps.api.core.pagination import (
     decode_cursor,
     encode_cursor,
 )
-from fastapi import HTTPException
 
 
 def list_user_transactions(
@@ -48,22 +49,17 @@ def list_user_transactions(
     if pagination.cursor:
         try:
             cursor_date, cursor_id = decode_cursor(pagination.cursor)
-        except Exception as e:
+        except Exception:
             raise HTTPException(status_code=400, detail="Invalid pagination cursor format.")
         query = query.or_(
-            f"transaction_date.lt.{cursor_date},"
-            f"and(transaction_date.eq.{cursor_date},id.lt.{cursor_id})"
+            f"transaction_date.lt.{cursor_date}," f"and(transaction_date.eq.{cursor_date},id.lt.{cursor_id})"
         )
 
     # Apply user filters
     query = apply_filters(query, filters)
 
     # Order and limit
-    query = (
-        query.order("transaction_date", desc=True)
-        .order("id", desc=True)
-        .limit(fetch_limit)
-    )
+    query = query.order("transaction_date", desc=True).order("id", desc=True).limit(fetch_limit)
 
     result = query.execute()
     rows = result.data
@@ -81,7 +77,7 @@ def list_user_transactions(
     total_count = getattr(result, "count", None)
     if not isinstance(total_count, int):
         total_count = None
-        
+
     truncated = (total_count > pagination.limit) if total_count is not None else None
 
     return CursorPage(

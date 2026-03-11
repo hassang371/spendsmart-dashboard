@@ -6,13 +6,13 @@ Features: Auto-detection, date normalization, amount normalization,
           structured transaction extraction (UPI/POS/ATM/INB).
 """
 
-import re
 import io
 import logging
-from typing import Optional, Dict, List, Any, Callable
-from pathlib import Path
+import re
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 
@@ -499,9 +499,7 @@ class BankStatementParser:
                 except Exception as decrypt_error:
                     raise ValueError(f"Failed to decrypt file: {decrypt_error}")
             else:
-                raise ValueError(
-                    f"Could not read Excel file. If encrypted, provide password. Error: {e}"
-                )
+                raise ValueError(f"Could not read Excel file. If encrypted, provide password. Error: {e}")
 
     def _normalize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Normalize column names to standard format."""
@@ -568,20 +566,20 @@ class BankStatementParser:
         # Normalize column names with collision handling
         new_columns = {}
         seen_normalized = set()
-        
+
         for col_idx, col in enumerate(df.columns):
             col_lower = str(col).lower().strip()
-            
+
             # 1. Determine base normalized name
             if col_lower in reverse_map:
                 normalized = reverse_map[col_lower]
             else:
                 normalized = col_lower
-                
+
             # 2. Handle collisions
             if normalized in seen_normalized:
                 normalized = f"{normalized}_{col_idx}"
-                
+
             seen_normalized.add(normalized)
             new_columns[col] = normalized
 
@@ -599,14 +597,8 @@ class BankStatementParser:
 
             # Look for date + description + amount patterns
             has_date = any("date" in v for v in row_values)
-            has_desc = any(
-                any(x in v for x in ["desc", "particular", "detail", "narration"])
-                for v in row_values
-            )
-            has_amount = any(
-                any(x in v for x in ["amount", "debit", "credit", "dr", "cr"])
-                for v in row_values
-            )
+            has_desc = any(any(x in v for x in ["desc", "particular", "detail", "narration"]) for v in row_values)
+            has_amount = any(any(x in v for x in ["amount", "debit", "credit", "dr", "cr"]) for v in row_values)
 
             if has_date and has_desc and has_amount:
                 return i
@@ -654,10 +646,10 @@ class BankStatementParser:
 
         # BUG-021 fix: Handle trailing DR/CR suffix (e.g. "1234.00CR", "1,234.56DR").
         # Many Indian bank statement exports use this format.
-        is_credit_suffix = bool(re.search(r'CR$', amount_str, re.IGNORECASE))
-        is_debit_suffix = bool(re.search(r'DR$', amount_str, re.IGNORECASE))
+        is_credit_suffix = bool(re.search(r"CR$", amount_str, re.IGNORECASE))
+        is_debit_suffix = bool(re.search(r"DR$", amount_str, re.IGNORECASE))
         # Strip the suffix before further processing
-        amount_str = re.sub(r'[CcDd][Rr]$', '', amount_str).strip()
+        amount_str = re.sub(r"[CcDd][Rr]$", "", amount_str).strip()
 
         # Remove currency symbols and whitespace
         amount_str = re.sub(r"[₹$€£¥\s]", "", amount_str)
@@ -708,9 +700,7 @@ class BankStatementParser:
 
         return 0.0
 
-    def _categorize_transaction(
-        self, description: str, merchant: str, method: str
-    ) -> str:
+    def _categorize_transaction(self, description: str, merchant: str, method: str) -> str:
         """Categorize transaction based on description and merchant."""
         desc_lower = description.lower()
 
@@ -856,9 +846,7 @@ class BankStatementParser:
             raise ValueError("Could not find date column")
         if "description" not in df.columns:
             raise ValueError("Could not find description column")
-        if "amount" not in df.columns and (
-            "debit" not in df.columns and "credit" not in df.columns
-        ):
+        if "amount" not in df.columns and ("debit" not in df.columns and "credit" not in df.columns):
             raise ValueError("Could not find amount column (amount, debit, or credit)")
 
         # Parse transactions
@@ -886,14 +874,10 @@ class BankStatementParser:
                 extracted = self.extractor.extract(description)
 
                 # Determine merchant
-                merchant = extracted.get("entity") or self.merchant_extractor.extract(
-                    description
-                )
+                merchant = extracted.get("entity") or self.merchant_extractor.extract(description)
 
                 # Categorize
-                category = self._categorize_transaction(
-                    description, merchant, extracted.get("method", "")
-                )
+                category = self._categorize_transaction(description, merchant, extracted.get("method", ""))
 
                 # Create transaction
                 txn = ParsedTransaction(

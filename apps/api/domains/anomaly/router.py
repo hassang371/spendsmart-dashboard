@@ -1,6 +1,7 @@
 """Anomaly router — anomaly detection alerts (stub)."""
 
 from fastapi import APIRouter, Depends
+
 from apps.api.core.auth import CurrentUser, get_current_user
 
 router = APIRouter(prefix="/anomaly", tags=["anomaly"])

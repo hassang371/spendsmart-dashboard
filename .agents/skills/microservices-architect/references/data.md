@@ -9,6 +9,7 @@ Comprehensive guide for managing data across distributed services.
 **Core Principle:** Each microservice owns its data exclusively.
 
 **Rules:**
+
 ```
 ✓ DO:
 - Each service has its own database/schema
@@ -26,6 +27,7 @@ Comprehensive guide for managing data across distributed services.
 **Implementation Options:**
 
 **1. Separate Database Instances:**
+
 ```
 UserService → PostgreSQL instance 1
 OrderService → PostgreSQL instance 2
@@ -42,6 +44,7 @@ Cons:
 ```
 
 **2. Separate Schemas:**
+
 ```
 Same PostgreSQL instance:
 - Schema: user_service
@@ -61,6 +64,7 @@ Recommendation: Use separate schemas for dev/test, separate instances for produc
 ```
 
 **3. Polyglot Persistence:**
+
 ```
 Each service chooses optimal database:
 
@@ -88,6 +92,7 @@ Challenges: Multiple technologies to manage
 ### Strong Consistency vs Eventual Consistency
 
 **Strong Consistency:**
+
 ```
 Definition: Read after write returns latest value
 
@@ -109,6 +114,7 @@ When to Use:
 ```
 
 **Eventual Consistency:**
+
 ```
 Definition: System converges to consistent state over time
 
@@ -137,6 +143,7 @@ When to Use:
 **Problem:** Order service needs customer data owned by User service.
 
 **Anti-Pattern Solutions:**
+
 ```
 ✗ Direct database access
 ✗ Shared database
@@ -146,6 +153,7 @@ When to Use:
 **Proper Solutions:**
 
 **1. API Composition:**
+
 ```
 Client Query: Get order with customer details
 
@@ -169,6 +177,7 @@ Cons:
 ```
 
 **2. Data Replication via Events:**
+
 ```
 OrderService maintains denormalized customer data:
 
@@ -205,6 +214,7 @@ Cons:
 ```
 
 **3. CQRS with Shared Read Model:**
+
 ```
 Write Models (Command Side):
 - UserService writes to user_db
@@ -242,6 +252,7 @@ Cons:
 ### Two-Phase Commit (2PC)
 
 **How It Works:**
+
 ```
 Phase 1: Prepare
 Coordinator asks all participants: "Can you commit?"
@@ -268,6 +279,7 @@ Commit:
 ```
 
 **Problems with 2PC:**
+
 ```
 ✗ Blocking protocol (participants wait for coordinator)
 ✗ Single point of failure (coordinator down = all blocked)
@@ -281,6 +293,7 @@ Recommendation: Avoid 2PC in microservices, use Saga pattern instead
 ### Saga Pattern (Recommended)
 
 **Orchestration-Based Saga:**
+
 ```
 Transfer Money Saga:
 
@@ -317,6 +330,7 @@ return success_saga()
 ```
 
 **Saga State Persistence:**
+
 ```
 CREATE TABLE saga_state (
     saga_id UUID PRIMARY KEY,
@@ -342,6 +356,7 @@ On failure, load saga state and execute compensations
 ```
 
 **Idempotency for Saga Steps:**
+
 ```
 Each saga step must be idempotent:
 
@@ -382,6 +397,7 @@ async def compensate_debit(account_id, amount, saga_id):
 ### Core Concepts
 
 **Event Store:**
+
 ```
 All state changes stored as immutable events
 
@@ -399,6 +415,7 @@ Replay all events to reconstruct current state
 ```
 
 **Event Schema:**
+
 ```json
 {
   "eventId": "evt-789",
@@ -451,6 +468,7 @@ Snapshot Strategy:
 ```
 
 **Snapshot Table:**
+
 ```sql
 CREATE TABLE snapshots (
     aggregate_id UUID,
@@ -471,6 +489,7 @@ CREATE INDEX idx_latest_snapshot ON snapshots(aggregate_id, version DESC);
 **Strategies:**
 
 **1. Event Versioning:**
+
 ```
 Version 1:
 {
@@ -504,6 +523,7 @@ def handle_order_placed(event):
 ```
 
 **2. Event Upcasting:**
+
 ```
 Transform old events to new format during replay:
 
@@ -522,6 +542,7 @@ def upcast_event(event):
 ```
 
 **3. Event Transformation:**
+
 ```
 Create new event types, keep old ones for historical accuracy:
 
@@ -540,6 +561,7 @@ Projections handle both:
 **Purpose:** Capture database changes and publish as events.
 
 **How It Works:**
+
 ```
 Database transaction log → CDC Tool → Event Stream
 
@@ -567,6 +589,7 @@ Other services subscribe and update their read models
 ```
 
 **Benefits:**
+
 ```
 ✓ No application code changes
 ✓ Guaranteed delivery (based on database transaction log)
@@ -586,6 +609,7 @@ Use Cases:
 **Purpose:** Pre-computed denormalized views for fast queries.
 
 **Pattern:**
+
 ```
 Event-Driven Materialized View:
 
@@ -632,6 +656,7 @@ async def on_order_shipped(event):
 ### Horizontal Partitioning (Sharding)
 
 **When to Use:**
+
 ```
 - Single database can't handle load
 - Data size exceeds single server capacity
@@ -641,6 +666,7 @@ async def on_order_shipped(event):
 **Sharding Strategies:**
 
 **1. Hash-Based Sharding:**
+
 ```
 Shard = hash(customer_id) % num_shards
 
@@ -657,6 +683,7 @@ Cons:
 ```
 
 **2. Range-Based Sharding:**
+
 ```
 Shard 0: customer_id 0-999
 Shard 1: customer_id 1000-1999
@@ -672,6 +699,7 @@ Cons:
 ```
 
 **3. Geography-Based Sharding:**
+
 ```
 Shard US: customers in USA
 Shard EU: customers in Europe
@@ -687,6 +715,7 @@ Cons:
 ```
 
 **Shard Management:**
+
 ```
 Shard Map Service:
 

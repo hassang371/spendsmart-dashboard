@@ -52,7 +52,7 @@
     .w-editor #navContainer {
       transform: translate(0px, 0%)
     }
-  
+
     /* Custom fixes for SCALE */
 
     /* Fix navigation buttons - white background in normal state */
@@ -496,7 +496,7 @@
           }
 
         }
-      
+
 
         :root {
           --cubic-default: cubic-bezier(0.65, 0.05, 0, 1);
@@ -762,4 +762,3 @@
           }
 
         }
-      

@@ -23,18 +23,11 @@ class CursorPage(BaseModel, Generic[T]):
     items: list[T] = Field(description="List of items in this page")
     next_cursor: Optional[str] = Field(
         default=None,
-        description="Opaque cursor to pass as `cursor` for the next page. "
-        "Null when there are no more pages.",
+        description="Opaque cursor to pass as `cursor` for the next page. " "Null when there are no more pages.",
     )
-    has_more: bool = Field(
-        description="Whether there are more items after this page"
-    )
-    total_count: Optional[int] = Field(
-        default=None, description="Total number of items matching the query"
-    )
-    truncated: Optional[bool] = Field(
-        default=None, description="Whether the total count exceeds the pagination limit"
-    )
+    has_more: bool = Field(description="Whether there are more items after this page")
+    total_count: Optional[int] = Field(default=None, description="Total number of items matching the query")
+    truncated: Optional[bool] = Field(default=None, description="Whether the total count exceeds the pagination limit")
 
 
 class PaginationParams:

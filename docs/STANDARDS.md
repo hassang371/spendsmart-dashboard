@@ -46,15 +46,19 @@ Additional fields by doc type:
 ## Status Lifecycle
 
 ### Feature LLD
+
 `Draft` → `Proposed` → `Approved` → `In Progress` → `Implemented` → `Verified`
 
 ### Bug Report
+
 `Investigating` → `Root Cause Found` → `In Progress` → `Fix Applied` → `Verified`
 
 ### RFC
+
 `Draft` → `Proposed` → `Approved` → `In Progress` → `Implemented` → `Verified` | `Rejected` | `Superseded`
 
 ### HLD
+
 `Current` | `Outdated` | `Deprecated`
 
 **Status update rule:** Update the doc status **before or alongside** the final implementation commit — never after.
@@ -69,6 +73,7 @@ Additional fields by doc type:
 ## Required Sections Per Doc Type
 
 ### Feature LLD (all required)
+
 1. Problem Statement
 2. Success Criteria (measurable, checkboxes)
 3. Scope — In Scope / Out of Scope
@@ -81,6 +86,7 @@ Additional fields by doc type:
 10. Related Documents (HLD links, RFC links)
 
 ### Bug Report (all required)
+
 1. Observed Behavior (exact error messages / logs)
 2. Expected Behavior
 3. Steps to Reproduce
@@ -91,6 +97,7 @@ Additional fields by doc type:
 8. Related Documents
 
 ### RFC — Full (all required)
+
 1. Problem Statement
 2. Proposed Solution (with before/after Mermaid diagrams)
 3. Detailed Design
@@ -102,12 +109,14 @@ Additional fields by doc type:
 9. Related Documents
 
 ### RFC — Short (for small decisions, all required)
+
 1. Problem Statement (1–3 sentences)
 2. Decision (what was chosen and why)
 3. Alternatives Considered (1–2, brief)
 4. Impact (what changes as a result)
 
 ### HLD — Living Document (all required)
+
 1. Overview
 2. Architecture/ER/Deployment Diagrams (≥3)
 3. Domain/Module/Endpoint Details
@@ -127,6 +136,7 @@ Additional fields by doc type:
 | HLD | 3+ | Architecture + data flow + deployment |
 
 **All diagrams must:**
+
 - Use Unicode symbols (🔐 🌐 ⚙️ 💾 📬 👤)
 - Use descriptive labels — `"Auth Service (JWT)"` not `"Service A"`
 - Use high-contrast, accessible colors

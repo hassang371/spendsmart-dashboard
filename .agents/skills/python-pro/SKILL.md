@@ -59,7 +59,7 @@ Load detailed guidance based on context:
 - Test coverage exceeding 90% with pytest
 - Use `X | None` instead of `Optional[X]` (Python 3.10+)
 - Async/await for I/O-bound operations
-- Dataclasses over manual __init__ methods
+- Dataclasses over manual **init** methods
 - Context managers for resource handling
 
 ### MUST NOT DO

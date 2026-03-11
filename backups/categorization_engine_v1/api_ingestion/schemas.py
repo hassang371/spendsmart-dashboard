@@ -4,7 +4,6 @@ Provides rich OpenAPI documentation for transaction import flow.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
 
 
 class TransactionOut(BaseModel):
@@ -14,7 +13,11 @@ class TransactionOut(BaseModel):
     amount: float = Field(description="Transaction amount", examples=[-50.0])
     merchant: str = Field(default="", description="Merchant name", examples=["Starbucks"])
     description: str = Field(default="", description="Transaction description", examples=["Coffee purchase"])
-    category: str = Field(default="Uncategorized", description="Predicted category", examples=["Food & Dining"])
+    category: str = Field(
+        default="Uncategorized",
+        description="Predicted category",
+        examples=["Food & Dining"],
+    )
     confidence: float = Field(default=0.0, description="Classification confidence 0-1", examples=[0.92])
     fingerprint: str = Field(description="SHA256 dedup fingerprint (64-char hex)")
     payment_method: str = Field(default="", description="Payment method", examples=["card"])

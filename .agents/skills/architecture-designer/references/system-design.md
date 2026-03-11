@@ -25,6 +25,7 @@
 ## High-Level Architecture
 
 ```
+
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Client    │────▶│  API Gateway │────▶│  Service    │
 │   (Web)     │     │   (Kong)    │     │  (Node.js)  │
@@ -35,6 +36,7 @@
                     │    Auth     │     │  Database   │
                     │  (Auth0)    │     │ (PostgreSQL)│
                     └─────────────┘     └─────────────┘
+
 ```
 
 ## Component Details

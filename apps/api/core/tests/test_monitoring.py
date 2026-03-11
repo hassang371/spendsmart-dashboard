@@ -1,5 +1,4 @@
 import pytest
-from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
@@ -7,6 +6,7 @@ from apps.api.main import app
 
 class TestRequestIDMiddleware:
     """Test suite for the RequestIdMiddleware."""
+
     @pytest.fixture(autouse=True)
     def setup_client(self):
         self.client = TestClient(app)
@@ -20,14 +20,13 @@ class TestRequestIDMiddleware:
     def test_preserves_existing_request_id(self):
         """Verify it preserves an existing X-Request-ID if sent by a client/proxy."""
         custom_id = "custom-req-12345"
-        response = self.client.get(
-            "/api/v1/health", headers={"X-Request-ID": custom_id}
-        )
+        response = self.client.get("/api/v1/health", headers={"X-Request-ID": custom_id})
         assert response.headers["X-Request-ID"] == custom_id
 
 
 class TestRequestLoggingMiddleware:
     """Test suite for the RequestLoggingMiddleware."""
+
     # Note: capturing structlog output is tricky without dedicated helpers,
     # but we can at least assert the middleware doesn't break standard flows
     # and the request processes successfully. Deeper log assertions can be
@@ -37,6 +36,7 @@ class TestRequestLoggingMiddleware:
         client = TestClient(app)
         response = client.get("/api/v1/health")
         assert response.status_code == 200
+
 
 class TestHealthEndpoints:
     """Test suite for liveness and readiness probes."""

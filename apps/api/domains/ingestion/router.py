@@ -10,21 +10,33 @@ v3 Architecture: Insert-first, classify-later.
 import asyncio
 import hashlib
 import time
-import structlog
-import numpy as np
-import pandas as pd
 from collections import defaultdict
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
-from supabase import Client
-from apps.api.core.idempotency import get_idempotency_key, with_idempotency
+import numpy as np
+import pandas as pd
+import structlog
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 
 from apps.api.core.auth import get_current_user_id, get_user_client
-from packages.ingestion_engine.import_transactions import parse_file
+from apps.api.core.idempotency import get_idempotency_key, with_idempotency
 from apps.api.domains.ingestion.service import generate_fingerprint
-from packages.ingestion_engine.merchant_extractor import MerchantExtractor, infer_payment_method
 from packages.categorization.cleaner import process_description
+from packages.ingestion_engine.import_transactions import parse_file
+from packages.ingestion_engine.merchant_extractor import (
+    MerchantExtractor,
+    infer_payment_method,
+)
+from supabase import Client
 
 _merchant_extractor = MerchantExtractor()  # module-level singleton
 
@@ -74,11 +86,15 @@ def _build_transaction_row(row: dict, user_id: str, fingerprint: str) -> dict:
         "informative_text": informative_text,
         "bank_name": bank_name,
         "raw_data": {
-            k: (None if (v is None or (isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf"))))
-                else str(v) if hasattr(v, "isoformat") else v)
+            k: (
+                None
+                if (v is None or (isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf"))))
+                else str(v)
+                if hasattr(v, "isoformat")
+                else v
+            )
             for k, v in row.items()
         },
-
     }
 
 
@@ -89,10 +105,13 @@ def _rpc_insert_batch(client: Client, user_id: str, rows: list[dict]) -> tuple[i
     Pass rows as a native Python list — PostgREST serialises it to JSONB correctly.
     Passing json.dumps() would send a text scalar and trigger 'cannot get array length of a scalar'.
     """
-    result = client.rpc("batch_import_transactions", {
-        "p_user_id": user_id,
-        "p_rows": rows,  # NOT json.dumps — let PostgREST handle JSONB serialization
-    }).execute()
+    result = client.rpc(
+        "batch_import_transactions",
+        {
+            "p_user_id": user_id,
+            "p_rows": rows,  # NOT json.dumps — let PostgREST handle JSONB serialization
+        },
+    ).execute()
 
     if result.data:
         row = result.data[0] if isinstance(result.data, list) else result.data
@@ -109,15 +128,16 @@ def _insert_remaining_rows(user_id: str, rows: list[dict], token: str, job_id: s
     if not rows:
         return
     try:
+        from apps.api.core.auth import _get_supabase_anon_key, _get_supabase_url
         from supabase import create_client
-        from apps.api.core.auth import _get_supabase_url, _get_supabase_anon_key
+
         client = create_client(_get_supabase_url(), _get_supabase_anon_key())
         client.postgrest.auth(token)
 
         total_ins = 0
         total_skip = 0
         for i in range(0, len(rows), MAX_RPC_BATCH):
-            chunk = rows[i:i + MAX_RPC_BATCH]
+            chunk = rows[i : i + MAX_RPC_BATCH]
             ins, skip = _rpc_insert_batch(client, user_id, chunk)
             total_ins += ins
             total_skip += skip
@@ -140,10 +160,11 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, dict]:
 
     try:
         from apps.api.domains.categorization.service import classify_batch_in_process
+
         classifications = classify_batch_in_process(descriptions)
         for desc, clf in zip(descriptions, classifications):
             result[desc] = {
-                "category":   clf.get("category", "Uncategorized"),
+                "category": clf.get("category", "Uncategorized"),
                 "confidence": float(clf.get("confidence", 0.0)),
             }
         return result
@@ -152,6 +173,7 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, dict]:
 
     # Fallback: keyword matcher
     from packages.categorization.rules import KeywordMatcher
+
     matcher = KeywordMatcher()
     for desc in descriptions:
         match = matcher.predict(desc)
@@ -160,9 +182,7 @@ def _classify_descriptions(descriptions: list[str]) -> dict[str, dict]:
     return result
 
 
-def _classify_and_update_transactions(
-    user_id: str, fps_to_desc: dict, token: str, job_id: str | None = None
-) -> None:
+def _classify_and_update_transactions(user_id: str, fps_to_desc: dict, token: str, job_id: str | None = None) -> None:
     """Background task: classify inserted transactions and update categories.
 
     Uses import_jobs table for status tracking.
@@ -195,8 +215,9 @@ def _classify_and_update_transactions(
             uncertain_rows.append({"fp": fp, "suggested": cat, "confidence": conf})
 
     try:
+        from apps.api.core.auth import _get_supabase_anon_key, _get_supabase_url
         from supabase import create_client
-        from apps.api.core.auth import _get_supabase_url, _get_supabase_anon_key
+
         client = create_client(_get_supabase_url(), _get_supabase_anon_key())
         client.postgrest.auth(token)
 
@@ -206,9 +227,13 @@ def _classify_and_update_transactions(
         # Update confident predictions — only rows still Uncategorized
         for category, fps in confident_fps.items():
             for i in range(0, len(fps), CHUNK_SIZE):
-                chunk = fps[i:i + CHUNK_SIZE]
+                chunk = fps[i : i + CHUNK_SIZE]
                 client.table("transactions").update(
-                    {"category": category, "suggested_category": None, "confidence_score": None}
+                    {
+                        "category": category,
+                        "suggested_category": None,
+                        "confidence_score": None,
+                    }
                 ).eq("user_id", user_id).eq("category", "Uncategorized").in_("fingerprint", chunk).execute()
                 classified += len(chunk)
 
@@ -219,22 +244,26 @@ def _classify_and_update_transactions(
 
         for (suggested, confidence), fps in uncertain_groups.items():
             for i in range(0, len(fps), CHUNK_SIZE):
-                chunk = fps[i:i + CHUNK_SIZE]
-                client.table("transactions").update({
-                    "category": "Uncategorized",
-                    "suggested_category": suggested,
-                    "confidence_score": confidence,
-                }).eq("user_id", user_id).eq("category", "Uncategorized").in_("fingerprint", chunk).execute()
+                chunk = fps[i : i + CHUNK_SIZE]
+                client.table("transactions").update(
+                    {
+                        "category": "Uncategorized",
+                        "suggested_category": suggested,
+                        "confidence_score": confidence,
+                    }
+                ).eq("user_id", user_id).eq("category", "Uncategorized").in_("fingerprint", chunk).execute()
                 classified += len(chunk)
 
         # Mark import job as complete
         if job_id:
             try:
-                client.table("import_jobs").update({
-                    "status": "complete",
-                    "classified": classified,
-                    "completed_at": datetime.utcnow().isoformat(),
-                }).eq("id", job_id).execute()
+                client.table("import_jobs").update(
+                    {
+                        "status": "complete",
+                        "classified": classified,
+                        "completed_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", job_id).execute()
             except Exception:
                 pass
 
@@ -248,13 +277,12 @@ def _classify_and_update_transactions(
         logger.warning("bg_category_update_failed", user_id=user_id, error=str(e))
         if job_id:
             try:
+                from apps.api.core.auth import _get_supabase_anon_key, _get_supabase_url
                 from supabase import create_client
-                from apps.api.core.auth import _get_supabase_url, _get_supabase_anon_key
+
                 _c = create_client(_get_supabase_url(), _get_supabase_anon_key())
                 _c.postgrest.auth(token)
-                _c.table("import_jobs").update(
-                    {"status": "failed", "error_message": str(e)}
-                ).eq("id", job_id).execute()
+                _c.table("import_jobs").update({"status": "failed", "error_message": str(e)}).eq("id", job_id).execute()
             except Exception:
                 pass
 
@@ -266,7 +294,16 @@ async def ingest_csv(
     client: Client = Depends(get_user_client),
 ):
     """Parse-only endpoint — returns parsed transactions without inserting."""
-    allowed_extensions = (".csv", ".tsv", ".xls", ".xlsx", ".xlsm", ".json", ".txt", ".pdf")
+    allowed_extensions = (
+        ".csv",
+        ".tsv",
+        ".xls",
+        ".xlsx",
+        ".xlsm",
+        ".json",
+        ".txt",
+        ".pdf",
+    )
     filename = file.filename or ""
     if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
         raise HTTPException(
@@ -329,6 +366,7 @@ async def import_file(
     5. Enqueue background classification
     6. Return immediately — categories appear via refreshAfterImport()
     """
+
     async def _execute():
         timings: dict[str, float] = {}
         t_start = time.perf_counter()
@@ -339,7 +377,16 @@ async def import_file(
             await limiter(request)
 
         # Validate file type
-        allowed_extensions = (".csv", ".tsv", ".xls", ".xlsx", ".xlsm", ".json", ".txt", ".pdf")
+        allowed_extensions = (
+            ".csv",
+            ".tsv",
+            ".xls",
+            ".xlsx",
+            ".xlsm",
+            ".json",
+            ".txt",
+            ".pdf",
+        )
         filename = file.filename or ""
         if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
             raise HTTPException(
@@ -358,9 +405,9 @@ async def import_file(
         # --- File-hash dedup (instant rejection for re-uploads) ---
         file_hash = hashlib.sha256(contents).hexdigest()
         try:
-            existing_file = client.table("uploaded_files").select("id").eq(
-                "user_id", user_id
-            ).eq("file_hash", file_hash).execute()
+            existing_file = (
+                client.table("uploaded_files").select("id").eq("user_id", user_id).eq("file_hash", file_hash).execute()
+            )
             if existing_file.data:
                 logger.info("file_already_imported", user_id=user_id, filename=filename)
                 return {
@@ -455,7 +502,7 @@ async def import_file(
             # Synchronous insert: latest 100 rows only
             try:
                 for i in range(0, len(priority_rows), MAX_RPC_BATCH):
-                    chunk = priority_rows[i:i + MAX_RPC_BATCH]
+                    chunk = priority_rows[i : i + MAX_RPC_BATCH]
                     ins, skip = _rpc_insert_batch(client, user_id, chunk)
                     total_inserted += ins
                     total_skipped += skip
@@ -475,7 +522,7 @@ async def import_file(
             remaining_rows = []
             try:
                 for i in range(0, len(insert_rows), MAX_RPC_BATCH):
-                    chunk = insert_rows[i:i + MAX_RPC_BATCH]
+                    chunk = insert_rows[i : i + MAX_RPC_BATCH]
                     ins, skip = _rpc_insert_batch(client, user_id, chunk)
                     total_inserted += ins
                     total_skipped += skip
@@ -486,30 +533,37 @@ async def import_file(
         timings["insert_ms"] = round((time.perf_counter() - t2) * 1000)
         timings["total_ms"] = round((time.perf_counter() - t_start) * 1000)
 
-
         # --- Record uploaded file ---
         try:
-            client.table("uploaded_files").insert({
-                "user_id": user_id,
-                "file_hash": file_hash,
-                "filename": filename,
-                "upload_type": "import",
-            }).execute()
+            client.table("uploaded_files").insert(
+                {
+                    "user_id": user_id,
+                    "file_hash": file_hash,
+                    "filename": filename,
+                    "upload_type": "import",
+                }
+            ).execute()
         except Exception as e:
             logger.warning("uploaded_file_tracking_failed", error=str(e))
 
         # --- Create import job for monitoring ---
         job_id: str | None = None
         try:
-            job_res = client.table("import_jobs").insert({
-                "user_id": user_id,
-                "status": "classifying",
-                "filename": filename,
-                "total_parsed": len(insert_rows),
-                "inserted": total_inserted,
-                "skipped_duplicates": total_skipped,
-                "timings": timings,
-            }).execute()
+            job_res = (
+                client.table("import_jobs")
+                .insert(
+                    {
+                        "user_id": user_id,
+                        "status": "classifying",
+                        "filename": filename,
+                        "total_parsed": len(insert_rows),
+                        "inserted": total_inserted,
+                        "skipped_duplicates": total_skipped,
+                        "timings": timings,
+                    }
+                )
+                .execute()
+            )
             if job_res.data:
                 job_id = job_res.data[0].get("id")
         except Exception as e:
@@ -520,15 +574,11 @@ async def import_file(
 
         # For large files: insert remaining rows in background first
         if is_large_file and remaining_rows:
-            background_tasks.add_task(
-                _insert_remaining_rows, user_id, remaining_rows, token, job_id
-            )
+            background_tasks.add_task(_insert_remaining_rows, user_id, remaining_rows, token, job_id)
 
         # Classify and update categories in background
         if fps_to_desc:
-            background_tasks.add_task(
-                _classify_and_update_transactions, user_id, fps_to_desc, token, job_id
-            )
+            background_tasks.add_task(_classify_and_update_transactions, user_id, fps_to_desc, token, job_id)
 
         logger.info(
             "import_complete",
@@ -545,4 +595,5 @@ async def import_file(
             "total_parsed": len(insert_rows),
             "filename": filename,
         }
+
     return await with_idempotency(idempotency_key, _execute)

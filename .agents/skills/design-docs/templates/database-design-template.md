@@ -308,14 +308,17 @@ graph TB
 ### 7.1 Query Patterns
 
 **Pattern 1: User Login**
+
 ```sql
 SELECT id, email, password_hash, role
 FROM users
 WHERE email = ? AND is_active = true;
 ```
+
 **Indexes Used:** `idx_users_email`
 
 **Pattern 2: Order History**
+
 ```sql
 SELECT o.*, oi.*, p.*
 FROM orders o
@@ -325,6 +328,7 @@ WHERE o.user_id = ?
 ORDER BY o.order_date DESC
 LIMIT 20;
 ```
+
 **Indexes Used:** `idx_orders_user_id`, `idx_orders_order_date`
 
 ### 7.2 Query Flow
@@ -467,6 +471,7 @@ flowchart TD
 ### 12.1 Query Optimization
 
 **Slow Query Example:**
+
 ```sql
 -- SLOW: Full table scan
 SELECT * FROM orders WHERE EXTRACT(YEAR FROM order_date) = 2024;

@@ -21,6 +21,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict
+
 import yaml
 
 
@@ -98,9 +99,7 @@ class PipelineAnalyzer:
         if "push" in trigger_types:
             push_config = triggers.get("push", {}) if isinstance(triggers, dict) else {}
             if not push_config or not push_config.get("branches"):
-                self.findings.append(
-                    "Workflow triggers on all push events (no branch filter)"
-                )
+                self.findings.append("Workflow triggers on all push events (no branch filter)")
                 self.optimizations.append(
                     "Add branch filters to 'push' trigger to reduce unnecessary runs:\n"
                     "  on:\n"
@@ -110,9 +109,7 @@ class PipelineAnalyzer:
 
         # Check for path filters
         if "pull_request" in trigger_types:
-            pr_config = (
-                triggers.get("pull_request", {}) if isinstance(triggers, dict) else {}
-            )
+            pr_config = triggers.get("pull_request", {}) if isinstance(triggers, dict) else {}
             if not pr_config.get("paths") and not pr_config.get("paths-ignore"):
                 self.optimizations.append(
                     "Consider adding path filters to skip unnecessary PR runs:\n"
@@ -131,9 +128,7 @@ class PipelineAnalyzer:
             for job_name, job in jobs.items():
                 steps = job.get("steps", [])
                 for step in steps:
-                    if isinstance(step, dict) and step.get("uses", "").startswith(
-                        "actions/cache"
-                    ):
+                    if isinstance(step, dict) and step.get("uses", "").startswith("actions/cache"):
                         has_cache = True
                         break
 
@@ -182,31 +177,21 @@ class PipelineAnalyzer:
             jobs = config.get("jobs", {})
 
             # Count jobs with dependencies
-            jobs_with_needs = sum(
-                1 for job in jobs.values() if isinstance(job, dict) and "needs" in job
-            )
+            jobs_with_needs = sum(1 for job in jobs.values() if isinstance(job, dict) and "needs" in job)
 
             if len(jobs) > 1 and jobs_with_needs == 0:
                 self.optimizations.append(
                     f"Found {len(jobs)} jobs with no dependencies - they will run in parallel (good!)"
                 )
             elif len(jobs) > 3 and jobs_with_needs == len(jobs):
-                self.findings.append(
-                    "All jobs have 'needs' dependencies - may be unnecessarily sequential"
-                )
-                self.optimizations.append(
-                    "Review job dependencies - remove 'needs' where jobs can run in parallel"
-                )
+                self.findings.append("All jobs have 'needs' dependencies - may be unnecessarily sequential")
+                self.optimizations.append("Review job dependencies - remove 'needs' where jobs can run in parallel")
 
         elif platform == "gitlab":
             stages = config.get("stages", [])
             if len(stages) > 5:
-                self.findings.append(
-                    f"Pipeline has {len(stages)} stages - may be overly sequential"
-                )
-                self.optimizations.append(
-                    "Consider reducing stages to allow more parallel execution"
-                )
+                self.findings.append(f"Pipeline has {len(stages)} stages - may be overly sequential")
+                self.optimizations.append("Consider reducing stages to allow more parallel execution")
 
     def _check_dependency_management(self, config: Dict, platform: str):
         """Check dependency installation patterns"""
@@ -220,9 +205,7 @@ class PipelineAnalyzer:
 
                         # Check for npm ci vs npm install
                         if "npm install" in run_cmd and "npm ci" not in run_cmd:
-                            self.findings.append(
-                                f"Job '{job_name}' uses 'npm install' instead of 'npm ci'"
-                            )
+                            self.findings.append(f"Job '{job_name}' uses 'npm install' instead of 'npm ci'")
                             self.optimizations.append(
                                 "Use 'npm ci' instead of 'npm install' for faster, reproducible installs"
                             )
@@ -265,9 +248,7 @@ class PipelineAnalyzer:
                             matrix_size *= len(values)
 
                     if matrix_size > 20:
-                        self.findings.append(
-                            f"Job '{job_name}' has large matrix ({matrix_size} combinations)"
-                        )
+                        self.findings.append(f"Job '{job_name}' has large matrix ({matrix_size} combinations)")
                         self.optimizations.append(
                             "Consider reducing matrix size or using 'exclude' to skip unnecessary combinations"
                         )
@@ -298,12 +279,8 @@ class PipelineAnalyzer:
         # Check for unused artifacts
         for artifact, uploader in uploads.items():
             if artifact not in downloads:
-                self.findings.append(
-                    f"Artifact '{artifact}' uploaded but never downloaded"
-                )
-                self.optimizations.append(
-                    "Remove unused artifact upload or add download step"
-                )
+                self.findings.append(f"Artifact '{artifact}' uploaded but never downloaded")
+                self.optimizations.append("Remove unused artifact upload or add download step")
 
     def _analyze_action_versions(self, workflow: Dict):
         """Check for outdated action versions"""
@@ -324,20 +301,15 @@ class PipelineAnalyzer:
                         outdated_actions.append(uses)
 
         if outdated_actions:
-            self.findings.append(
-                f"Found {len(outdated_actions)} potentially outdated actions"
-            )
+            self.findings.append(f"Found {len(outdated_actions)} potentially outdated actions")
             self.optimizations.append(
-                "Update to latest action versions:\n"
-                + "\n".join(f"  - {action}" for action in set(outdated_actions))
+                "Update to latest action versions:\n" + "\n".join(f"  - {action}" for action in set(outdated_actions))
             )
 
     def _check_gitlab_specific_features(self, config: Dict):
         """Check GitLab-specific optimization opportunities"""
         # Check for interruptible jobs
-        has_interruptible = any(
-            isinstance(v, dict) and v.get("interruptible") for v in config.values()
-        )
+        has_interruptible = any(isinstance(v, dict) and v.get("interruptible") for v in config.values())
 
         if not has_interruptible:
             self.optimizations.append(
@@ -408,15 +380,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument(
-        "--platform", required=True, choices=["github", "gitlab"], help="CI/CD platform"
-    )
+    parser.add_argument("--platform", required=True, choices=["github", "gitlab"], help="CI/CD platform")
     parser.add_argument("--workflow", help="Path to GitHub Actions workflow file")
     parser.add_argument("--config", help="Path to GitLab CI config file")
     parser.add_argument("--repo", help="Repository (owner/repo) for run analysis")
-    parser.add_argument(
-        "--analyze-runs", type=int, help="Number of recent runs to analyze"
-    )
+    parser.add_argument("--analyze-runs", type=int, help="Number of recent runs to analyze")
 
     args = parser.parse_args()
 
@@ -431,9 +399,7 @@ def main():
             # Try to find workflow files
             workflow_dir = Path(".github/workflows")
             if workflow_dir.exists():
-                workflows = list(workflow_dir.glob("*.yml")) + list(
-                    workflow_dir.glob("*.yaml")
-                )
+                workflows = list(workflow_dir.glob("*.yml")) + list(workflow_dir.glob("*.yaml"))
                 if workflows:
                     print(f"Found {len(workflows)} workflow(s), analyzing first one...")
                     report = analyzer.analyze_github_workflow(str(workflows[0]))

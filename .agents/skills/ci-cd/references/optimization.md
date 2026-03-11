@@ -22,6 +22,7 @@ Comprehensive guide to improving pipeline performance through caching, paralleli
 #### GitHub Actions
 
 **Node.js/npm:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -34,6 +35,7 @@ Comprehensive guide to improving pipeline performance through caching, paralleli
 ```
 
 **Python/pip:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -46,6 +48,7 @@ Comprehensive guide to improving pipeline performance through caching, paralleli
 ```
 
 **Go modules:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -60,6 +63,7 @@ Comprehensive guide to improving pipeline performance through caching, paralleli
 ```
 
 **Rust/Cargo:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -77,6 +81,7 @@ Comprehensive guide to improving pipeline performance through caching, paralleli
 ```
 
 **Maven:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -91,6 +96,7 @@ Comprehensive guide to improving pipeline performance through caching, paralleli
 #### GitLab CI
 
 **Global cache:**
+
 ```yaml
 cache:
   key: ${CI_COMMIT_REF_SLUG}
@@ -101,6 +107,7 @@ cache:
 ```
 
 **Job-specific cache:**
+
 ```yaml
 build:
   cache:
@@ -118,6 +125,7 @@ test:
 ```
 
 **Cache with files checksum:**
+
 ```yaml
 cache:
   key:
@@ -131,6 +139,7 @@ cache:
 ### Build Artifact Caching
 
 **Docker layer caching (GitHub):**
+
 ```yaml
 - uses: docker/setup-buildx-action@v3
 
@@ -144,6 +153,7 @@ cache:
 ```
 
 **Docker layer caching (GitLab):**
+
 ```yaml
 build:
   image: docker:latest
@@ -158,6 +168,7 @@ build:
 ```
 
 **Gradle build cache:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -178,6 +189,7 @@ build:
 - Separate caches for different purposes
 
 **Cache invalidation:**
+
 ```yaml
 # Version in cache key
 cache:
@@ -195,6 +207,7 @@ cache:
 ### Job Parallelization
 
 **Remove unnecessary dependencies:**
+
 ```yaml
 # Before - Sequential
 jobs:
@@ -215,6 +228,7 @@ jobs:
 ### Matrix Builds
 
 **GitHub Actions:**
+
 ```yaml
 strategy:
   matrix:
@@ -232,6 +246,7 @@ strategy:
 ```
 
 **GitLab parallel:**
+
 ```yaml
 test:
   parallel:
@@ -246,6 +261,7 @@ test:
 ### Test Splitting
 
 **Jest sharding:**
+
 ```yaml
 strategy:
   matrix:
@@ -255,6 +271,7 @@ steps:
 ```
 
 **Playwright sharding:**
+
 ```yaml
 strategy:
   matrix:
@@ -265,6 +282,7 @@ steps:
 ```
 
 **Pytest splitting:**
+
 ```yaml
 strategy:
   matrix:
@@ -276,6 +294,7 @@ steps:
 ### Conditional Execution
 
 **Path-based:**
+
 ```yaml
 jobs:
   frontend-test:
@@ -286,6 +305,7 @@ jobs:
 ```
 
 **GitLab rules:**
+
 ```yaml
 frontend-test:
   rules:
@@ -307,11 +327,13 @@ backend-test:
 **Turb
 
 orepo (monorepo):**
+
 ```yaml
 - run: npx turbo run build test lint --filter=[HEAD^1]
 ```
 
 **Nx (monorepo):**
+
 ```yaml
 - run: npx nx affected --target=build --base=origin/main
 ```
@@ -319,6 +341,7 @@ orepo (monorepo):**
 ### Compiler Optimizations
 
 **TypeScript incremental:**
+
 ```json
 {
   "compilerOptions": {
@@ -329,6 +352,7 @@ orepo (monorepo):**
 ```
 
 **Cache tsbuildinfo:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -359,6 +383,7 @@ CMD ["node", "dist/server.js"]
 ### Build Tool Configuration
 
 **Webpack production mode:**
+
 ```javascript
 module.exports = {
   mode: 'production',
@@ -372,6 +397,7 @@ module.exports = {
 ```
 
 **Vite optimization:**
+
 ```javascript
 export default {
   build: {
@@ -396,6 +422,7 @@ export default {
 ### Test Categorization
 
 **Run fast tests first:**
+
 ```yaml
 jobs:
   unit-test:
@@ -420,6 +447,7 @@ jobs:
 ### Selective Test Execution
 
 **Run only changed:**
+
 ```yaml
 - name: Get changed files
   id: changed
@@ -436,6 +464,7 @@ jobs:
 ### Test Fixtures & Data
 
 **Reuse test databases:**
+
 ```yaml
 services:
   postgres:
@@ -454,6 +483,7 @@ steps:
 ```
 
 **Snapshot testing:**
+
 ```javascript
 // Faster than full rendering tests
 expect(component).toMatchSnapshot();
@@ -475,6 +505,7 @@ jest.mock('./api', () => ({
 ### Job Timeouts
 
 **Prevent hung jobs:**
+
 ```yaml
 jobs:
   test:
@@ -485,6 +516,7 @@ jobs:
 ```
 
 **GitLab:**
+
 ```yaml
 test:
   timeout: 30m  # Default: 1h
@@ -493,6 +525,7 @@ test:
 ### Concurrency Control
 
 **GitHub Actions:**
+
 ```yaml
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -500,6 +533,7 @@ concurrency:
 ```
 
 **GitLab:**
+
 ```yaml
 workflow:
   auto_cancel:
@@ -512,6 +546,7 @@ job:
 ### Resource Allocation
 
 **GitLab runner tags:**
+
 ```yaml
 build:
   tags:
@@ -520,6 +555,7 @@ build:
 ```
 
 **Kubernetes resource limits:**
+
 ```yaml
 # GitLab Runner config
 [[runners]]
@@ -537,6 +573,7 @@ build:
 ### Track Key Metrics
 
 **Build duration:**
+
 ```yaml
 - name: Track duration
   run: |
@@ -547,6 +584,7 @@ build:
 ```
 
 **Cache hit rate:**
+
 ```yaml
 - uses: actions/cache@v4
   id: cache
@@ -566,6 +604,7 @@ build:
 ### Performance Regression Detection
 
 **Compare against baseline:**
+
 ```yaml
 - name: Benchmark
   run: npm run benchmark > results.json
@@ -583,11 +622,13 @@ build:
 ### External Monitoring
 
 **DataDog CI Visibility:**
+
 ```yaml
 - run: datadog-ci junit upload --service myapp junit-results.xml
 ```
 
 **BuildPulse (flaky test detection):**
+
 ```yaml
 - uses: buildpulse/buildpulse-action@v0.11.0
   with:

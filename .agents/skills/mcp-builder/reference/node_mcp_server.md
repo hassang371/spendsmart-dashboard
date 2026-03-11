@@ -9,6 +9,7 @@ This document provides Node/TypeScript-specific best practices and examples for 
 ## Quick Reference
 
 ### Key Imports
+
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -18,6 +19,7 @@ import { z } from "zod";
 ```
 
 ### Server Initialization
+
 ```typescript
 const server = new McpServer({
   name: "service-mcp-server",
@@ -26,6 +28,7 @@ const server = new McpServer({
 ```
 
 ### Tool Registration Pattern
+
 ```typescript
 server.registerTool(
   "tool_name",

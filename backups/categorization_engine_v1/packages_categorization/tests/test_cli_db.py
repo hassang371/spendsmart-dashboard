@@ -1,8 +1,9 @@
+import os  # Restored
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
-import sys
+
 import torch  # Added
-import os  # Restored
 
 sys.path.append(os.getcwd())
 

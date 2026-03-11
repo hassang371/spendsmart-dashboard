@@ -1,0 +1,37 @@
+# Disable rules that conflict with our compact documentation style
+
+# Allow long lines (useful for tables and links)
+MD013: false
+
+# Allow headings to be immediately followed by content
+MD022: false
+
+# Allow lists to start immediately after headings without a blank space
+MD032: false
+
+# Allow compact table separators (e.g. |---|---| instead of | --- | --- |)
+MD060: false
+
+# Allow fenced code blocks without a language specified
+MD040: false
+
+# Allow duplicate headings (common in runbooks/templates)
+MD024: false
+
+# Allow emphasis as heading (common for metadata lines)
+MD036: false
+
+# Allow missing leading/trailing pipes in tables (more permissive compact tables)
+MD055: false
+
+# Allow inline HTML (often used for badges, comments, or custom formatting)
+MD033: false
+
+# Allow blank lines inside blockquotes
+MD028: false
+
+# Allow non-sequential heading increments (common in legacy docs)
+MD001: false
+
+# Allow multiple top-level headings (common in reference docs and skills)
+MD025: false

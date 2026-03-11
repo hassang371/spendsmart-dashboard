@@ -8,8 +8,8 @@ Production systems should use actual tokenizers (tiktoken for OpenAI,
 model-specific tokenizers for other providers) for accurate token counts.
 """
 
-from typing import Dict, List
 import hashlib
+from typing import Dict, List
 
 
 def estimate_token_count(text: str) -> int:
@@ -85,9 +85,7 @@ class ContextBuilder:
         self.sections: Dict[str, str] = {}
         self.order: List[str] = []
 
-    def add_section(
-        self, name: str, content: str, priority: int = 0, category: str = "other"
-    ):
+    def add_section(self, name: str, content: str, priority: int = 0, category: str = "other"):
         """Add section to context."""
         if name not in self.sections:
             self.order.append(name)
@@ -104,9 +102,7 @@ class ContextBuilder:
         limit = max_tokens or self.context_limit
 
         # Sort by priority (higher first)
-        sorted_sections = sorted(
-            self.order, key=lambda n: self.sections[n]["priority"], reverse=True
-        )
+        sorted_sections = sorted(self.order, key=lambda n: self.sections[n]["priority"], reverse=True)
 
         # Build context
         context_parts = []
@@ -197,9 +193,7 @@ def truncate_messages(messages: list, max_tokens: int) -> list:
             recent_messages.append(msg)
 
     # Calculate token usage
-    tokens_for_system = (
-        estimate_token_count(system_prompt["content"]) if system_prompt else 0
-    )
+    tokens_for_system = estimate_token_count(system_prompt["content"]) if system_prompt else 0
     tokens_for_recent = estimate_message_tokens(recent_messages)
     tokens_for_summary = estimate_token_count(summary["content"]) if summary else 0
 
@@ -250,9 +244,7 @@ def validate_context_structure(context: Dict) -> Dict:
     # Check for excessive length
     total_tokens = sum(estimate_token_count(str(c)) for c in context.values())
     if total_tokens > 80000:
-        issues.append(
-            f"Context length ({total_tokens} tokens) exceeds recommended limit"
-        )
+        issues.append(f"Context length ({total_tokens} tokens) exceeds recommended limit")
         recommendations.append("Consider context compaction or partitioning")
 
     # Check for missing sections
@@ -336,9 +328,7 @@ class ProgressiveDisclosureManager:
 # Usage Example
 
 
-def build_agent_context(
-    task: str, system_prompt: str, documents: List[str] = None
-) -> Dict:
+def build_agent_context(task: str, system_prompt: str, documents: List[str] = None) -> Dict:
     """Build optimized context for agent task."""
     builder = ContextBuilder(context_limit=80000)
 

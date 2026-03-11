@@ -19,8 +19,9 @@ M5 Monitoring & Observability:
 """
 
 import os
-import structlog
 from contextlib import asynccontextmanager
+
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -31,14 +32,14 @@ from apps.api.core.errors import register_error_handlers
 from apps.api.core.logging_config import setup_logging, structlog_middleware
 from apps.api.core.rate_limiter import RateLimiter, rate_limit_dependency
 from apps.api.core.security_headers import SecurityHeadersMiddleware
+from apps.api.domains.accounts.router import router as accounts_router
+from apps.api.domains.anomaly.router import router as anomaly_router
+from apps.api.domains.categorization.router import router as categorization_router
+from apps.api.domains.forecasting.router import router as forecasting_router
 
 # Domain routers (new)
 from apps.api.domains.ingestion.router import router as ingestion_router
-from apps.api.domains.categorization.router import router as categorization_router
-from apps.api.domains.forecasting.router import router as forecasting_router
 from apps.api.domains.training.router import router as training_router
-from apps.api.domains.anomaly.router import router as anomaly_router
-from apps.api.domains.accounts.router import router as accounts_router
 
 # Legacy routers (preserving for backward compat during migration)
 from apps.api.routers import health
@@ -85,8 +86,7 @@ class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
                         "title": "Content Too Large",
                         "status": 413,
                         "detail": (
-                            f"Request body exceeds maximum allowed size of "
-                            f"{self._max_bytes // (1024 * 1024)} MB."
+                            f"Request body exceeds maximum allowed size of " f"{self._max_bytes // (1024 * 1024)} MB."
                         ),
                     },
                 )

@@ -92,6 +92,7 @@ graph LR
 Authenticate a user and receive access token.
 
 **Request:**
+
 ```json
 {
   "email": "user@example.com",
@@ -100,6 +101,7 @@ Authenticate a user and receive access token.
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "access_token": "eyJhbGc...",
@@ -123,6 +125,7 @@ Retrieve user details by ID.
 - `id` (path, required): User ID
 
 **Response (200 OK):**
+
 ```json
 {
   "id": "123",
@@ -144,6 +147,7 @@ Retrieve user details by ID.
 Create a new resource.
 
 **Request:**
+
 ```json
 {
   "name": "Resource Name",
@@ -156,6 +160,7 @@ Create a new resource.
 ```
 
 **Response (201 Created):**
+
 ```json
 {
   "id": "res_123",
@@ -293,6 +298,7 @@ stateDiagram-v2
 | Premium | 1000 | 100000 | 200 |
 
 **Headers:**
+
 ```
 X-RateLimit-Limit: 60
 X-RateLimit-Remaining: 45
@@ -337,11 +343,13 @@ X-RateLimit-Reset: 1640995200
 ## 8. Pagination
 
 **Request:**
+
 ```
 GET /resources?page=2&per_page=20&sort=created_at&order=desc
 ```
 
 **Response:**
+
 ```json
 {
   "data": [...],
@@ -408,6 +416,7 @@ sequenceDiagram
 - `user.created`
 
 **Webhook Payload:**
+
 ```json
 {
   "event": "resource.created",
@@ -431,6 +440,7 @@ sequenceDiagram
 - Sunset notices sent via email and API headers
 
 **Version Headers:**
+
 ```
 API-Version: 1.0
 API-Deprecated: false

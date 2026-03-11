@@ -1,5 +1,6 @@
-import pandas as pd
 import lightning.pytorch as pl
+import pandas as pd
+
 from packages.forecasting.dataset import TransactionLoader, create_timeseries_dataset
 from packages.forecasting.tft_model import create_tft_model
 

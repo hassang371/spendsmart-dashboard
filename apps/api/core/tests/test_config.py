@@ -1,7 +1,5 @@
 """Tests for core config module."""
 
-import pytest
-
 
 class TestSettings:
     """Test Pydantic Settings loads env vars correctly."""
@@ -12,6 +10,7 @@ class TestSettings:
         monkeypatch.setenv("SUPABASE_ANON_KEY", "test-anon-key")
 
         from apps.api.core.config import Settings
+
         settings = Settings()
         assert settings.SUPABASE_URL == "https://test.supabase.co"
 
@@ -22,6 +21,7 @@ class TestSettings:
         monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:3000,https://scale-app.com")
 
         from apps.api.core.config import Settings
+
         settings = Settings()
         assert settings.allowed_origins == [
             "http://localhost:3000",
@@ -34,6 +34,7 @@ class TestSettings:
         monkeypatch.setenv("SUPABASE_ANON_KEY", "test-anon-key")
 
         from apps.api.core.config import Settings
+
         settings = Settings()
         assert settings.LOG_LEVEL == "INFO"
         assert settings.ENVIRONMENT == "development"

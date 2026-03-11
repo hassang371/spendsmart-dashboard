@@ -63,6 +63,7 @@ Every service should monitor:
 - **E**rrors**: Error count
 
 **Quick Start - Web Application Example**:
+
 ```promql
 # Rate (requests/sec)
 sum(rate(http_requests_total[5m]))
@@ -123,6 +124,7 @@ Every log entry should include:
 - ✅ Request ID (for tracing)
 
 **Example structured log (JSON)**:
+
 ```json
 {
   "timestamp": "2024-10-28T14:32:15Z",
@@ -408,6 +410,7 @@ Use distributed tracing when you need to:
 ### OpenTelemetry Implementation
 
 **Python example**:
+
 ```python
 from opentelemetry import trace
 
@@ -435,6 +438,7 @@ def process_order(order_id):
 - **Production**: 1-10% (or error-based sampling)
 
 **Error-based sampling** (always sample errors, 1% of successes):
+
 ```python
 class ErrorSampler(Sampler):
     def should_sample(self, parent_context, trace_id, name, **kwargs):
@@ -575,6 +579,7 @@ If you're considering migrating to a more cost-effective open-source stack:
 When migrating dashboards and alerts, you'll need to translate Datadog queries to PromQL:
 
 **Quick examples**:
+
 ```
 # Average CPU
 Datadog: avg:system.cpu.user{*}
@@ -779,6 +784,7 @@ kubectl rollout history deployment/<name> -n <namespace>
 ### Log Queries
 
 **Elasticsearch**:
+
 ```json
 GET /logs-*/_search
 {
@@ -794,11 +800,13 @@ GET /logs-*/_search
 ```
 
 **Loki (LogQL)**:
+
 ```logql
 {job="app", level="error"} |= "error" | json
 ```
 
 **CloudWatch Insights**:
+
 ```
 fields @timestamp, level, message
 | filter level = "error"

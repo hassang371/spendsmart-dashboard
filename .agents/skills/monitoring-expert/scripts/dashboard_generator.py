@@ -5,9 +5,9 @@ Supports: web applications, Kubernetes, databases, Redis, and custom metrics.
 """
 
 import argparse
-import sys
 import json
-from typing import Dict, List, Any
+import sys
+from typing import Any, Dict, List
 
 
 class DashboardGenerator:
@@ -232,16 +232,12 @@ class DashboardGenerator:
 
     def generate_kubernetes_dashboard(self, namespace: str):
         """Generate dashboard for Kubernetes cluster."""
-        self.add_variable(
-            "namespace", "Namespace", "label_values(kube_pod_info, namespace)"
-        )
+        self.add_variable("namespace", "Namespace", "label_values(kube_pod_info, namespace)")
 
         # Cluster overview
         self.add_row("Cluster Overview")
 
-        self.add_stat(
-            "Total Pods", f'count(kube_pod_info{{namespace="{namespace}"}})', width=6
-        )
+        self.add_stat("Total Pods", f'count(kube_pod_info{{namespace="{namespace}"}})', width=6)
         self.add_stat(
             "Running Pods",
             f'count(kube_pod_status_phase{{namespace="{namespace}", phase="Running"}})',
@@ -425,9 +421,7 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "type", choices=["webapp", "kubernetes", "database"], help="Dashboard type"
-    )
+    parser.add_argument("type", choices=["webapp", "kubernetes", "database"], help="Dashboard type")
     parser.add_argument("--title", required=True, help="Dashboard title")
     parser.add_argument("--output", required=True, help="Output file path")
     parser.add_argument("--datasource", default="Prometheus", help="Data source name")
@@ -439,9 +433,7 @@ Examples:
     parser.add_argument("--namespace", help="Kubernetes namespace")
 
     # Database specific
-    parser.add_argument(
-        "--db-type", choices=["postgres", "mysql"], help="Database type"
-    )
+    parser.add_argument("--db-type", choices=["postgres", "mysql"], help="Database type")
     parser.add_argument("--instance", help="Database instance")
 
     args = parser.parse_args()

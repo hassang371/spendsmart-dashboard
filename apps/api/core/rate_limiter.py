@@ -11,10 +11,10 @@ with a Redis-backed sliding window using sorted sets.
 
 import hashlib
 import time
-import structlog
 from typing import Optional, Tuple
 
-from fastapi import Depends, HTTPException, Request
+import structlog
+from fastapi import HTTPException, Request
 
 logger = structlog.get_logger()
 
@@ -92,6 +92,7 @@ class RateLimiter:
         except Exception as e:
             logger.warning("rate_limit_redis_error", error=str(e), user_id=user_id)
             import os
+
             if os.getenv("ENVIRONMENT", "development") == "production":
                 # Fail-closed in production: reject when Redis is unavailable
                 return False, 0, self.window_seconds

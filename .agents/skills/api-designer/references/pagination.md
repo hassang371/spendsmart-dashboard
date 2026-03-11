@@ -17,11 +17,13 @@ Always paginate collection endpoints.
 Most common and intuitive. Uses `offset` (skip) and `limit` (page size).
 
 **Request:**
+
 ```http
 GET /users?offset=20&limit=10
 ```
 
 **Response:**
+
 ```json
 {
   "data": [
@@ -66,11 +68,13 @@ GET /users?offset=20&limit=10
 Simplified offset pagination using page numbers.
 
 **Request:**
+
 ```http
 GET /users?page=3&per_page=10
 ```
 
 **Response:**
+
 ```json
 {
   "data": [...],
@@ -102,12 +106,14 @@ GET /users?page=3&per_page=10
 Uses an opaque cursor (pointer) to the next set of results.
 
 **Request:**
+
 ```http
 GET /users?limit=10
 GET /users?cursor=eyJpZCI6MTIzfQ&limit=10
 ```
 
 **Response:**
+
 ```json
 {
   "data": [
@@ -127,11 +133,13 @@ GET /users?cursor=eyJpZCI6MTIzfQ&limit=10
 ```
 
 **Cursor structure (base64 encoded):**
+
 ```json
 {"id": 30, "sort": "created_at"}
 ```
 
 **Implementation:**
+
 ```sql
 -- First page
 SELECT * FROM users ORDER BY created_at DESC LIMIT 10;
@@ -168,12 +176,14 @@ LIMIT 10;
 Similar to cursor but uses actual field values instead of opaque cursor.
 
 **Request:**
+
 ```http
 GET /users?after_id=20&limit=10
 GET /users?after_created_at=2024-01-15T10:30:00Z&limit=10
 ```
 
 **Response:**
+
 ```json
 {
   "data": [
@@ -192,6 +202,7 @@ GET /users?after_created_at=2024-01-15T10:30:00Z&limit=10
 ```
 
 **Implementation:**
+
 ```sql
 SELECT * FROM users
 WHERE id > 20
@@ -222,11 +233,13 @@ LIMIT 10;
 Specialized keyset pagination for time-series data.
 
 **Request:**
+
 ```http
 GET /events?since=2024-01-15T10:00:00Z&until=2024-01-15T11:00:00Z&limit=100
 ```
 
 **Response:**
+
 ```json
 {
   "data": [...],
@@ -261,6 +274,7 @@ Always set reasonable defaults and maximum limits:
 ```
 
 **Validation:**
+
 ```http
 GET /users?limit=1000
 
@@ -327,6 +341,7 @@ GET /users?sort=last_name,first_name&limit=10           # Multi-field
 ```
 
 **For cursor pagination, cursor must include sort fields:**
+
 ```json
 {
   "cursor": {
@@ -455,6 +470,7 @@ Response: 200 OK (empty results)
 ```
 
 Or return 404 for pages that don't exist:
+
 ```http
 GET /users?page=1000&per_page=10
 

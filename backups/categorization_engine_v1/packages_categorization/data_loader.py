@@ -1,7 +1,8 @@
-import pandas as pd
-import msoffcrypto
 import io
 import re
+
+import msoffcrypto
+import pandas as pd
 
 
 class BankStatementParser:
@@ -248,9 +249,7 @@ class BankStatementParser:
             # Check for App at the end (e.g. /Paym)
             parts = text.split("/")
             if len(parts) > 6:
-                info["meta"]["app"] = parts[-1].split()[
-                    0
-                ]  # Take first word if extra junk
+                info["meta"]["app"] = parts[-1].split()[0]  # Take first word if extra junk
             return info
 
         # 2. POS / Card Transactions

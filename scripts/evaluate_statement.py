@@ -15,15 +15,15 @@ Output:
 
 import argparse
 import csv
-import sys
 import os
+import sys
 from collections import defaultdict
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from packages.categorization.cleaner import process_description
 from packages.categorization.classifier import TransactionClassifier
+from packages.categorization.cleaner import process_description
 
 
 def run_evaluation(input_path: str, true_column: str | None = None) -> None:
@@ -41,7 +41,14 @@ def run_evaluation(input_path: str, true_column: str | None = None) -> None:
     if "description" not in rows[0]:
         # Try common alternatives
         desc_col = None
-        for candidate in ["Description", "desc", "Desc", "DESCRIPTION", "narration", "Narration"]:
+        for candidate in [
+            "Description",
+            "desc",
+            "Desc",
+            "DESCRIPTION",
+            "narration",
+            "Narration",
+        ]:
             if candidate in rows[0]:
                 desc_col = candidate
                 break
@@ -134,7 +141,7 @@ def run_evaluation(input_path: str, true_column: str | None = None) -> None:
         idx = min(int(c / 0.2), 4)
         buckets[bucket_keys[idx]] += 1
 
-    print(f"\n📊 Confidence Distribution:")
+    print("\n📊 Confidence Distribution:")
     for k, v in buckets.items():
         bar = "█" * (v * 50 // max(len(confidences), 1))
         print(f"   {k}: {v:>4} {bar}")
@@ -143,16 +150,18 @@ def run_evaluation(input_path: str, true_column: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Evaluate the categorization engine on a CSV file."
+    parser = argparse.ArgumentParser(description="Evaluate the categorization engine on a CSV file.")
+    parser.add_argument(
+        "--input",
+        "-i",
+        required=True,
+        help="Path to CSV file with 'description' column",
     )
     parser.add_argument(
-        "--input", "-i", required=True,
-        help="Path to CSV file with 'description' column"
-    )
-    parser.add_argument(
-        "--true-column", "-t", default="true_category",
-        help="Column name containing ground truth categories (default: true_category)"
+        "--true-column",
+        "-t",
+        default="true_category",
+        help="Column name containing ground truth categories (default: true_category)",
     )
     args = parser.parse_args()
     run_evaluation(args.input, args.true_column)

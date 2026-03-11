@@ -1,4 +1,5 @@
 """Tests for _classify_descriptions confidence handling in the v2 ingestion pipeline."""
+
 from unittest.mock import patch
 
 
@@ -13,6 +14,7 @@ def test_classify_descriptions_returns_confidence():
         return_value=mock_clf,
     ):
         from apps.api.domains.ingestion import router as ingestion_router
+
         result = ingestion_router._classify_descriptions(["swiggy", "some unknown"])
 
     assert result["swiggy"]["category"] == "Food"
@@ -28,6 +30,7 @@ def test_classify_descriptions_fallback_uses_keyword_matcher():
         side_effect=RuntimeError("classifier offline"),
     ):
         from apps.api.domains.ingestion import router as ingestion_router
+
         result = ingestion_router._classify_descriptions(["swiggy order", "xyz unknown thing"])
 
     assert isinstance(result["swiggy order"], dict)

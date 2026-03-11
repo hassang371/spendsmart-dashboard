@@ -16,6 +16,7 @@ Two high-severity security bugs (BUG-002 IDOR in Safe-to-Spend, BUG-032 IDOR in 
 ## Decision
 
 We are adopting a **Dual-Layer Isolation Model**:
+
 1. **Database Layer:** Supabase RLS remains active as a defense-in-depth safety net.
 2. **Service Layer (Mandatory):** The Python backend MUST explicitly verify authorization boundaries. Specifically:
    - The user ID MUST be derived from the verified JWT (via `CurrentUser` dependency), never from path/body parameters for operations acting on "self".
@@ -25,7 +26,7 @@ We are adopting a **Dual-Layer Isolation Model**:
 flowchart LR
     A["🔴 Before (Vulnerable)"] -->|Trusts input user_id| B["Route Handler"]
     B -->|Query without .eq()| C["Supabase (Relies solely on RLS)"]
-    
+
     D["✅ After (Dual-Layer)"] -->|Extracts UID from JWT| E["Route Handler"]
     E -->|Explicit .eq('user_id', uid)| F["Supabase (RLS + Explicit Filter)"]
 ```

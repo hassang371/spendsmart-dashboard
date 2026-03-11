@@ -39,6 +39,7 @@ Loaded by `brainstorm.md` at the start of every brainstorm session. Provides the
 | Error format | RFC 9457 Problem Detail |
 
 ### Domain Structure
+
 ```
 apps/api/domains/<domain>/
   router.py     ← thin, delegates to service

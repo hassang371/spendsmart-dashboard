@@ -58,9 +58,7 @@ class MermaidRenderer:
         """
         if not self._check_mmdc_installed():
             print("ERROR: mermaid-cli (mmdc) not found.", file=sys.stderr)
-            print(
-                "Install with: npm install -g @mermaid-js/mermaid-cli", file=sys.stderr
-            )
+            print("Install with: npm install -g @mermaid-js/mermaid-cli", file=sys.stderr)
             sys.exit(1)
 
         self.theme = theme if theme in self.VALID_THEMES else "default"
@@ -187,14 +185,10 @@ class MermaidRenderer:
             # Determine output path
             if recursive:
                 relative_path = input_file.relative_to(input_dir)
-                output_file = output_dir / relative_path.with_suffix(
-                    f".{output_format}"
-                )
+                output_file = output_dir / relative_path.with_suffix(f".{output_format}")
                 output_file.parent.mkdir(parents=True, exist_ok=True)
             else:
-                output_file = (
-                    output_dir / input_file.with_suffix(f".{output_format}").name
-                )
+                output_file = output_dir / input_file.with_suffix(f".{output_format}").name
 
             print(f"  Rendering: {input_file.name} -> {output_file.name}...", end=" ")
 
@@ -211,9 +205,7 @@ class MermaidRenderer:
     def _check_mmdc_installed() -> bool:
         """Check if mermaid-cli (mmdc) is installed."""
         try:
-            result = subprocess.run(
-                ["mmdc", "--version"], capture_output=True, timeout=5
-            )
+            result = subprocess.run(["mmdc", "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
@@ -242,9 +234,7 @@ Themes:
         """,
     )
 
-    parser.add_argument(
-        "input", type=str, help='Input file (.mmd), directory, or "-" for stdin'
-    )
+    parser.add_argument("input", type=str, help='Input file (.mmd), directory, or "-" for stdin')
     parser.add_argument("output", type=str, help="Output file or directory")
 
     # Rendering options
@@ -271,9 +261,7 @@ Themes:
         choices=[1, 2, 3],
         help="Scale factor (default: 1)",
     )
-    parser.add_argument(
-        "--config", "-c", type=Path, help="Path to custom Mermaid config file"
-    )
+    parser.add_argument("--config", "-c", type=Path, help="Path to custom Mermaid config file")
 
     # Batch options
     parser.add_argument(

@@ -3,7 +3,7 @@
 Service layer handles query construction, keeping the router thin.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from apps.api.core.filtering import TransactionFilter, apply_filters
 from apps.api.core.pagination import (
@@ -35,11 +35,7 @@ def list_user_transactions(
     """
     fetch_limit = pagination.limit + 1  # Fetch one extra to detect more pages
 
-    query = (
-        client.table("transactions")
-        .select("*")
-        .eq("user_id", user_id)
-    )
+    query = client.table("transactions").select("*").eq("user_id", user_id)
 
     # Apply cursor position if provided
     # True keyset pagination: rows where (created_at < cursor_date) OR
@@ -47,20 +43,13 @@ def list_user_transactions(
     # This handles batch-imported transactions with identical timestamps correctly.
     if pagination.cursor:
         cursor_date, cursor_id = decode_cursor(pagination.cursor)
-        query = query.or_(
-            f"created_at.lt.{cursor_date},"
-            f"and(created_at.eq.{cursor_date},id.lt.{cursor_id})"
-        )
+        query = query.or_(f"created_at.lt.{cursor_date}," f"and(created_at.eq.{cursor_date},id.lt.{cursor_id})")
 
     # Apply user filters
     query = apply_filters(query, filters)
 
     # Order and limit
-    query = (
-        query.order("created_at", desc=True)
-        .order("id", desc=True)
-        .limit(fetch_limit)
-    )
+    query = query.order("created_at", desc=True).order("id", desc=True).limit(fetch_limit)
 
     result = query.execute()
     rows = result.data

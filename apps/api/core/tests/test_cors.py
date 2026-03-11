@@ -12,7 +12,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-
 ALLOWED_ORIGIN = "https://app.scale.com"
 OTHER_ORIGIN = "https://evil.example.com"
 

@@ -7,6 +7,7 @@
 **Deployment Strategies**:
 
 ### 1. Canary
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
@@ -24,6 +25,7 @@ spec:
 ```
 
 ### 2. Blue-Green
+
 ```yaml
 spec:
   strategy:
@@ -34,6 +36,7 @@ spec:
 ```
 
 ### 3. Analysis with Metrics
+
 ```yaml
 spec:
   strategy:
@@ -51,12 +54,14 @@ spec:
 ## Flagger (with Flux)
 
 **Installation**:
+
 ```bash
 flux install
 kubectl apply -k github.com/fluxcd/flagger//kustomize/linkerd
 ```
 
 **Canary with Flagger**:
+
 ```yaml
 apiVersion: flagger.app/v1beta1
 kind: Canary

@@ -24,6 +24,7 @@ Dispatch superpowers:code-reviewer subagent to catch issues before they cascade.
 ## How to Request
 
 **1. Get git SHAs:**
+
 ```bash
 BASE_SHA=$(git rev-parse HEAD~1)  # or origin/main
 HEAD_SHA=$(git rev-parse HEAD)

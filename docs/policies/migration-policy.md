@@ -13,22 +13,26 @@ All migrations under `supabase/migrations/` must satisfy this checklist before m
 ## Pre-Migration Checklist
 
 ### Risk Assessment
+
 - [ ] Lock-risk assessed: could this block writes/reads on large tables?
   - If yes → use `CONCURRENTLY` for indexes, `NOT VALID` for constraints, schedule in low-traffic window
 - [ ] Table size estimated (check `pg_relation_size` in staging before prod)
 - [ ] Estimated migration wall-clock time documented
 
 ### Safety Guards
+
 - [ ] No `DROP TABLE ... CASCADE` — always check and list dependents explicitly
 - [ ] No unconditional `DELETE`/`TRUNCATE` without a `WHERE` guard
 - [ ] `IF EXISTS` / `IF NOT EXISTS` guards on all DDL where applicable
 - [ ] Non-transactional marker added if using `CONCURRENTLY` (cannot run in a transaction block)
 
 ### Rollback
+
 - [ ] Rollback script written and tested in staging
 - [ ] Rollback script included as a comment block at the bottom of the migration file
 
 ### Review
+
 - [ ] Migration reviewed by at least one other engineer
 - [ ] PR labelled `migration` for extra review attention
 - [ ] Backup confirmation noted (Supabase point-in-time recovery enabled)

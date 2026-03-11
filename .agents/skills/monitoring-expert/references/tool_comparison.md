@@ -47,6 +47,7 @@
 **Setup Complexity**: Medium
 
 **Example**:
+
 ```yaml
 # prometheus.yml
 scrape_configs:
@@ -85,6 +86,7 @@ scrape_configs:
 **Setup Complexity**: Low
 
 **Example**:
+
 ```bash
 # Install agent
 DD_API_KEY=xxx bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
@@ -119,6 +121,7 @@ DD_API_KEY=xxx bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/inst
 **Setup Complexity**: Low
 
 **Example**:
+
 ```python
 import newrelic.agent
 newrelic.agent.initialize('newrelic.ini')
@@ -157,6 +160,7 @@ newrelic.agent.initialize('newrelic.ini')
 **Setup Complexity**: Low (for AWS), Medium (for custom metrics)
 
 **Example**:
+
 ```python
 import boto3
 cloudwatch = boto3.client('cloudwatch')
@@ -230,6 +234,7 @@ cloudwatch.put_metric_data(
 **Setup Complexity**: High
 
 **Example**:
+
 ```json
 PUT /logs-2024.10/_doc/1
 {
@@ -272,6 +277,7 @@ PUT /logs-2024.10/_doc/1
 **Setup Complexity**: Medium
 
 **Example**:
+
 ```logql
 {job="api", environment="prod"} |= "error" | json | level="error"
 ```
@@ -614,41 +620,41 @@ PUT /logs-2024.10/_doc/1
 
 ## Decision Matrix
 
-### Choose Prometheus + Grafana If:
+### Choose Prometheus + Grafana If
 - ✅ Using Kubernetes
 - ✅ Want control and customization
 - ✅ Have ops capacity
 - ✅ Budget-conscious
 - ✅ Need Prometheus ecosystem
 
-### Choose Datadog If:
+### Choose Datadog If
 - ✅ Want ease of use
 - ✅ Need full observability now
 - ✅ Budget allows ($8k+/month for 100 hosts)
 - ✅ Limited ops team
 - ✅ Need excellent UX
 
-### Choose ELK If:
+### Choose ELK If
 - ✅ Heavy log analysis needs
 - ✅ Need powerful search
 - ✅ Have dedicated ops team
 - ✅ Compliance requirements
 - ✅ Willing to invest in infrastructure
 
-### Choose Grafana Stack (LGTM) If:
+### Choose Grafana Stack (LGTM) If
 - ✅ Want open source full stack
 - ✅ Cost-effective solution
 - ✅ Cloud-native architecture
 - ✅ Already using Prometheus
 - ✅ Have some ops capacity
 
-### Choose New Relic If:
+### Choose New Relic If
 - ✅ Startup with free tier
 - ✅ APM is priority
 - ✅ Want easy setup
 - ✅ Don't need heavy customization
 
-### Choose Cloud Native (CloudWatch/etc) If:
+### Choose Cloud Native (CloudWatch/etc) If
 - ✅ Single cloud provider
 - ✅ Simple needs
 - ✅ Want minimal setup

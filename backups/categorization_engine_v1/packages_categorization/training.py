@@ -1,8 +1,10 @@
 """Training pipeline for HypCD with RiemannianAdam and hybrid loss."""
+
+from typing import List
+
 import torch
 import torch.nn.functional as F
 from geoopt.optim import RiemannianAdam
-from typing import List
 
 
 class HypCDTrainer:
@@ -15,9 +17,7 @@ class HypCDTrainer:
     - Dynamic λ scheduling
     """
 
-    def __init__(
-        self, projector, manifold, lr: float = 1e-4, weight_decay: float = 0.0
-    ):
+    def __init__(self, projector, manifold, lr: float = 1e-4, weight_decay: float = 0.0):
         """
         Initialize trainer.
 
@@ -31,13 +31,9 @@ class HypCDTrainer:
         self.manifold = manifold
 
         # RiemannianAdam handles hyperbolic gradients correctly
-        self.optimizer = RiemannianAdam(
-            projector.parameters(), lr=lr, weight_decay=weight_decay
-        )
+        self.optimizer = RiemannianAdam(projector.parameters(), lr=lr, weight_decay=weight_decay)
 
-    def hyperbolic_distance_loss(
-        self, z_i: torch.Tensor, z_j: torch.Tensor, negatives: torch.Tensor
-    ) -> torch.Tensor:
+    def hyperbolic_distance_loss(self, z_i: torch.Tensor, z_j: torch.Tensor, negatives: torch.Tensor) -> torch.Tensor:
         """
         L_d: Pull positives together, push negatives apart.
 
@@ -149,40 +145,38 @@ class HypCDTrainer:
 
         return loss.item()
 
-    def _sample_negatives(
-        self, z_orig: torch.Tensor, z_aug: torch.Tensor
-    ) -> torch.Tensor:
+    def _sample_negatives(self, z_orig: torch.Tensor, z_aug: torch.Tensor) -> torch.Tensor:
         """
         Sample negative examples from batch.
-        
+
         Returns:
             negatives: Tensor of shape (batch, n_neg, dim)
         """
         batch_size = z_orig.shape[0]
         dim = z_orig.shape[1]
-        
+
         # Combine original and augmented: (2*batch, dim)
         all_samples = torch.cat([z_orig, z_aug], dim=0)
         total_samples = 2 * batch_size
-        
+
         # Build a mask to exclude self (each row i should exclude i and i+batch)
         # Result: (batch, total_samples) boolean mask
         mask = torch.ones(batch_size, total_samples, dtype=torch.bool, device=z_orig.device)
         for i in range(batch_size):
             mask[i, i] = False  # Exclude self in original
             mask[i, i + batch_size] = False  # Exclude self in augmented
-        
+
         # For each sample, gather valid negatives
         # We'll take up to n_neg negatives per sample
         n_neg = min(10, total_samples - 2)
         negatives = torch.zeros(batch_size, n_neg, dim, device=z_orig.device)
-        
+
         for i in range(batch_size):
             valid_negs = all_samples[mask[i]]  # (total_samples - 2, dim)
             # Shuffle and take n_neg
             perm = torch.randperm(len(valid_negs))
             negatives[i] = valid_negs[perm[:n_neg]]
-        
+
         return negatives
 
     def train_epochs(
@@ -209,4 +203,3 @@ class HypCDTrainer:
             epoch_losses.append(avg)
 
         return epoch_losses
-

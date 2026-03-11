@@ -16,19 +16,18 @@ Requirements:
 """
 
 import argparse
-import boto3
-from datetime import datetime, timedelta
-from typing import List, Dict
-from collections import defaultdict
-from tabulate import tabulate
 import sys
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Dict, List
+
+import boto3
+from tabulate import tabulate
 
 
 class RIAnalyzer:
     def __init__(self, profile: str = None, region: str = None, days: int = 30):
-        self.session = (
-            boto3.Session(profile_name=profile) if profile else boto3.Session()
-        )
+        self.session = boto3.Session(profile_name=profile) if profile else boto3.Session()
         self.regions = [region] if region else self._get_all_regions()
         self.days = days
         self.recommendations = {"ec2": [], "rds": []}
@@ -96,9 +95,7 @@ class RIAnalyzer:
 
         return cost_map[instance_type]
 
-    def _calculate_savings(
-        self, hourly_cost: float, hours_running: float
-    ) -> Dict[str, float]:
+    def _calculate_savings(self, hourly_cost: float, hours_running: float) -> Dict[str, float]:
         """Calculate potential savings with different RI options."""
         monthly_od_cost = hourly_cost * hours_running
 
@@ -126,9 +123,7 @@ class RIAnalyzer:
                 ec2 = self.session.client("ec2", region_name=region)
                 cloudwatch = self.session.client("cloudwatch", region_name=region)
 
-                instances = ec2.describe_instances(
-                    Filters=[{"Name": "instance-state-name", "Values": ["running"]}]
-                )
+                instances = ec2.describe_instances(Filters=[{"Name": "instance-state-name", "Values": ["running"]}])
 
                 for reservation in instances["Reservations"]:
                     for instance in reservation["Instances"]:
@@ -138,9 +133,7 @@ class RIAnalyzer:
 
                         # Check if instance has been running consistently
                         launch_time = instance["LaunchTime"]
-                        days_running = (
-                            datetime.now(launch_time.tzinfo) - launch_time
-                        ).days
+                        days_running = (datetime.now(launch_time.tzinfo) - launch_time).days
 
                         if days_running >= self.days:
                             # Check uptime via CloudWatch
@@ -151,9 +144,7 @@ class RIAnalyzer:
                                 metrics = cloudwatch.get_metric_statistics(
                                     Namespace="AWS/EC2",
                                     MetricName="StatusCheckFailed",
-                                    Dimensions=[
-                                        {"Name": "InstanceId", "Value": instance_id}
-                                    ],
+                                    Dimensions=[{"Name": "InstanceId", "Value": instance_id}],
                                     StartTime=start_time,
                                     EndTime=end_time,
                                     Period=3600,
@@ -274,9 +265,7 @@ class RIAnalyzer:
 
                 # RDS pricing is roughly 2x EC2 for same instance type
                 # This is a rough approximation
-                base_hourly = self._estimate_hourly_cost(
-                    instance_class.replace("db.", "")
-                )
+                base_hourly = self._estimate_hourly_cost(instance_class.replace("db.", ""))
                 hourly_cost = base_hourly * 2
                 if multi_az:
                     hourly_cost *= 2  # Multi-AZ doubles the cost
@@ -313,28 +302,20 @@ class RIAnalyzer:
         if self.recommendations["ec2"]:
             print("\nEC2 RESERVED INSTANCE OPPORTUNITIES")
             print("-" * 100)
-            print(
-                tabulate(self.recommendations["ec2"], headers="keys", tablefmt="grid")
-            )
+            print(tabulate(self.recommendations["ec2"], headers="keys", tablefmt="grid"))
 
         if self.recommendations["rds"]:
             print("\nRDS RESERVED INSTANCE OPPORTUNITIES")
             print("-" * 100)
-            print(
-                tabulate(self.recommendations["rds"], headers="keys", tablefmt="grid")
-            )
+            print(tabulate(self.recommendations["rds"], headers="keys", tablefmt="grid"))
 
         print("\n" + "=" * 100)
         print(f"TOTAL ANNUAL SAVINGS POTENTIAL: ${self.total_potential_savings:.2f}")
         print("=" * 100)
 
         print("\n\nRECOMMENDATIONS:")
-        print(
-            "- Standard RIs offer the highest discount but no flexibility to change instance type"
-        )
-        print(
-            "- Consider Convertible RIs if you need flexibility (slightly lower discount)"
-        )
+        print("- Standard RIs offer the highest discount but no flexibility to change instance type")
+        print("- Consider Convertible RIs if you need flexibility (slightly lower discount)")
         print("- All Upfront payment offers maximum savings")
         print("- Partial Upfront balances savings with cash flow")
         print("- No Upfront minimizes initial cost but reduces savings")

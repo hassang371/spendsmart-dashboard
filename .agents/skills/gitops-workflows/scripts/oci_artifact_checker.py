@@ -5,8 +5,8 @@ Supports Flux v2.6+ OCI artifacts with cosign/notation verification.
 """
 
 import argparse
-import sys
 import subprocess
+import sys
 
 try:
     from kubernetes import client, config
@@ -67,9 +67,7 @@ def verify_oci_artifact(image: str, provider: str = "cosign"):
 
     if provider == "cosign":
         try:
-            result = subprocess.run(
-                ["cosign", "verify", image], capture_output=True, text=True
-            )
+            result = subprocess.run(["cosign", "verify", image], capture_output=True, text=True)
             if result.returncode == 0:
                 print("✅ Signature verification successful")
                 return True
@@ -82,9 +80,7 @@ def verify_oci_artifact(image: str, provider: str = "cosign"):
 
     elif provider == "notation":
         try:
-            result = subprocess.run(
-                ["notation", "verify", image], capture_output=True, text=True
-            )
+            result = subprocess.run(["notation", "verify", image], capture_output=True, text=True)
             if result.returncode == 0:
                 print("✅ Signature verification successful")
                 return True

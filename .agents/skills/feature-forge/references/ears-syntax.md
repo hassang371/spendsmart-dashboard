@@ -13,33 +13,43 @@ While <precondition>, when <trigger>, the system shall <response>.
 ### Pattern Types
 
 **Ubiquitous (Always True)**
+
 ```
 The system shall [action].
 ```
+
 Example: The system shall encrypt all passwords using bcrypt.
 
 **Event-Driven**
+
 ```
 When [trigger], the system shall [action].
 ```
+
 Example: When the user clicks "Submit", the system shall save the form data.
 
 **State-Driven**
+
 ```
 While [state], the system shall [action].
 ```
+
 Example: While the user is logged in, the system shall display the dashboard.
 
 **Conditional (Most Common)**
+
 ```
 While [state], when [trigger], the system shall [action].
 ```
+
 Example: While the cart contains items, when the user clicks "Checkout", the system shall navigate to the payment page.
 
 **Optional**
+
 ```
 Where [feature enabled], the system shall [action].
 ```
+
 Example: Where two-factor authentication is enabled, the system shall require a verification code.
 
 ## Examples by Domain

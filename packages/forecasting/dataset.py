@@ -1,7 +1,7 @@
-import pandas as pd
 import numpy as np
-from sklearn.preprocessing import RobustScaler
+import pandas as pd
 from pytorch_forecasting import TimeSeriesDataSet
+from sklearn.preprocessing import RobustScaler
 
 
 class TimeScalar:
@@ -78,9 +78,7 @@ class TransactionLoader:
         spend_series = df[df["amount"] < 0]["amount"].resample("D").sum().abs()
 
         # Recombine
-        daily_df = pd.DataFrame(
-            {"daily_income": income_series, "daily_spend": spend_series}
-        )
+        daily_df = pd.DataFrame({"daily_income": income_series, "daily_spend": spend_series})
 
         # Fill NaNs from resampling (days with no transactions)
         daily_df.fillna(0.0, inplace=True)
@@ -133,9 +131,7 @@ class TransactionLoader:
         return df
 
 
-def create_timeseries_dataset(
-    data: pd.DataFrame, max_encoder_length=30, max_prediction_length=7
-):
+def create_timeseries_dataset(data: pd.DataFrame, max_encoder_length=30, max_prediction_length=7):
     """
     Creates a TimeSeriesDataSet for TFT training.
     Automatically includes ``is_payday`` as a known categorical when present.

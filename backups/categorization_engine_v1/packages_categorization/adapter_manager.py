@@ -11,9 +11,10 @@ Per-user adapter stored at:  users/{user_id}/adapter.pt
 
 import io
 import os
+from typing import TYPE_CHECKING
+
 import structlog
 import torch
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from packages.categorization.hypcd import HypCDClassifier
@@ -33,9 +34,10 @@ class AdapterManager:
         local_dir: str = "checkpoints",
     ):
         self._supabase_url = supabase_url if supabase_url is not None else os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
-        self._supabase_key = supabase_key if supabase_key is not None else (
-            os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-            or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+        self._supabase_key = (
+            supabase_key
+            if supabase_key is not None
+            else (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", ""))
         )
         self.local_dir = local_dir
 
@@ -45,6 +47,7 @@ class AdapterManager:
 
     def _storage(self):
         from supabase import create_client
+
         return create_client(self._supabase_url, self._supabase_key).storage
 
     def _load_from_path(self, storage_path: str) -> dict | None:
@@ -82,7 +85,10 @@ class AdapterManager:
                 self._storage().from_(_BUCKET).upload(
                     path=storage_path,
                     file=blob,
-                    file_options={"content-type": "application/octet-stream", "upsert": "true"},
+                    file_options={
+                        "content-type": "application/octet-stream",
+                        "upsert": "true",
+                    },
                 )
                 logger.info("adapter_uploaded", path=storage_path)
         except Exception as e:
@@ -123,11 +129,15 @@ class AdapterManager:
         Uses augmented positive pairs — no labels required.
         Updates the HyperbolicProjector weights (shared with fine-tuning).
         """
-        from packages.categorization.training import HypCDTrainer
         from packages.categorization.cleaner import TextAugmenter
+        from packages.categorization.training import HypCDTrainer
 
         if len(texts) < 4:
-            logger.debug("contrastive_pretraining_skipped", reason="too_few_texts", count=len(texts))
+            logger.debug(
+                "contrastive_pretraining_skipped",
+                reason="too_few_texts",
+                count=len(texts),
+            )
             return
 
         augmenter = TextAugmenter(texts)
@@ -207,6 +217,7 @@ class AdapterManager:
 # ------------------------------------------------------------------ #
 #  Shared helpers                                                      #
 # ------------------------------------------------------------------ #
+
 
 def _lambda_schedule(epoch: int, total_epochs: int) -> float:
     """Dynamic lambda for hybrid loss: ramp from 0->0.5 over first 20% of epochs.

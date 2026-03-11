@@ -27,6 +27,7 @@ Mermaid supports Unicode characters within node labels when enclosed in double q
 | 🗄️ | Server/Storage | `[🗄️ File Server]` |
 
 **Example:**
+
 ```mermaid
 graph LR
     Client[👤 User] --> CDN[☁️ CloudFront]
@@ -47,6 +48,7 @@ graph LR
 | 💨 | Fast/Lightweight | `[💨 Quick Response]` |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     Start([🚀 Start]) --> Process[⚙️ Process Data]
@@ -69,6 +71,7 @@ flowchart TD
 | 🧊 | Cold Storage | `[🧊 Glacier]` |
 
 **Example:**
+
 ```mermaid
 graph TB
     App[⚙️ App] --> Hot[💾 Hot Database]
@@ -90,6 +93,7 @@ graph TB
 | 📲 | Mobile Push | `[📲 Mobile Alerts]` |
 
 **Example:**
+
 ```mermaid
 flowchart LR
     Producer[⚙️ Producer] --> Queue[📬 Message Queue]
@@ -113,6 +117,7 @@ flowchart LR
 | 🔓 | Unlocked/Public | `[🔓 Public API]` |
 
 **Example:**
+
 ```mermaid
 sequenceDiagram
     participant U as 👤 User
@@ -143,6 +148,7 @@ sequenceDiagram
 | 🏷️ | Tag/Label | `[🏷️ Resource Tags]` |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     App[⚙️ Application] --> Log[📝 Logger]
@@ -169,6 +175,7 @@ flowchart TD
 | ⭕ | Pending/Waiting | `[⭕ Pending]` |
 
 **Example:**
+
 ```mermaid
 stateDiagram-v2
     [*] --> ⭕Pending
@@ -193,6 +200,7 @@ stateDiagram-v2
 | 🕐-🕛 | Specific Time | `[🕐 1:00 AM Job]` |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     Cron[⏰ Cron: 0 2 * * *] --> Start[Start Backup]
@@ -215,6 +223,7 @@ flowchart TD
 | 🔀 | Branch/Merge | `[🔀 Git Merge]` |
 
 **Example:**
+
 ```mermaid
 flowchart LR
     Code[💻 Code] --> Build[🏗️ Build]
@@ -236,6 +245,7 @@ flowchart LR
 | 👁️ | View/Display | `[👁️ Render View]` |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     User[👤 User] --> Browser[🌐 Browser]
@@ -258,6 +268,7 @@ flowchart TD
 | 🎁 | Reward/Bonus | `[🎁 Loyalty Program]` |
 
 **Example:**
+
 ```mermaid
 flowchart TD
     Cart[🛒 Cart] --> Checkout[💰 Checkout]
@@ -274,6 +285,7 @@ flowchart TD
 Use the same symbol for the same concept throughout all diagrams in a project:
 
 ✅ **Good - Consistent:**
+
 ```mermaid
 graph LR
     A[⚙️ Service A] --> B[💾 Database]
@@ -281,6 +293,7 @@ graph LR
 ```
 
 ❌ **Bad - Inconsistent:**
+
 ```mermaid
 graph LR
     A[⚙️ Service A] --> B[💾 Database]
@@ -292,6 +305,7 @@ graph LR
 One or two symbols per node is ideal:
 
 ✅ **Good - Clear:**
+
 ```mermaid
 graph LR
     A[🔐 Auth Service]
@@ -299,6 +313,7 @@ graph LR
 ```
 
 ❌ **Bad - Too Many:**
+
 ```mermaid
 graph LR
     A[🔐🔑🛡️👤 Auth Service]  %% Cluttered
@@ -309,12 +324,14 @@ graph LR
 Symbols should complement, not replace, descriptive text:
 
 ✅ **Good:**
+
 ```mermaid
 graph LR
     A[⚙️ Payment Processor<br/>Stripe Integration]
 ```
 
 ❌ **Bad:**
+
 ```mermaid
 graph LR
     A[💰💳🏦]  %% No context
@@ -337,12 +354,14 @@ Stick to well-established Unicode symbols (≤ Unicode 13.0) for maximum compati
 Remember that some users may use screen readers. The text should make sense without symbols:
 
 ✅ **Good:**
+
 ```mermaid
 graph LR
     A[🔐 Authentication Service]  %% "Authentication Service" is clear
 ```
 
 ❌ **Bad:**
+
 ```mermaid
 graph LR
     A[🔐]  %% Screen reader only says "lock"
@@ -353,6 +372,7 @@ graph LR
 ### Common Patterns
 
 **Cache with Database:**
+
 ```mermaid
 graph LR
     App[⚙️ App] --> Cache[⚡ Redis Cache]
@@ -360,6 +380,7 @@ graph LR
 ```
 
 **Event-Driven Architecture:**
+
 ```mermaid
 flowchart TD
     Producer[⚙️ Producer] --> Bus[📨 Event Bus]
@@ -370,6 +391,7 @@ flowchart TD
 ```
 
 **Security Flow:**
+
 ```mermaid
 sequenceDiagram
     participant U as 👤 User
@@ -388,6 +410,7 @@ sequenceDiagram
 ```
 
 **CI/CD Pipeline:**
+
 ```mermaid
 flowchart LR
     Code[💻 Code Push] --> Build[🏗️ Build]
@@ -400,6 +423,7 @@ flowchart LR
 ## Language-Specific Symbol Conventions
 
 ### Python
+
 ```mermaid
 graph LR
     Script[🐍 Python Script] --> Lib[📚 Library]
@@ -407,6 +431,7 @@ graph LR
 ```
 
 ### Java/Spring
+
 ```mermaid
 graph LR
     Spring[☕ Spring Boot] --> JPA[💾 JPA Repository]
@@ -414,6 +439,7 @@ graph LR
 ```
 
 ### JavaScript/Node
+
 ```mermaid
 graph LR
     Node[📗 Node.js] --> Express[⚙️ Express API]
@@ -421,6 +447,7 @@ graph LR
 ```
 
 ### React
+
 ```mermaid
 graph LR
     React[⚛️ React App] --> Redux[📦 Redux Store]

@@ -13,3 +13,22 @@ testpaths = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "F401", # Unused import
+    "F841", # Unused local variable
+    "E722", # Bare except
+    "E402", # Module level import not at top of file
+    "F821", # Undefined name
+    "E741", # Ambiguous variable name
+    "E501", # Line too long
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "packages", "architecture", "tools"]

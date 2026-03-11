@@ -138,12 +138,14 @@ Step 6: Commit    → Conventional commits, HLD sync check
 ### Design-Docs Skill Update
 
 **Restore from original `design-doc-mermaid`:**
+
 - `references/troubleshooting.md` — 28 Mermaid error fixes
 - `references/resilient-workflow.md` — validation pipeline
 - `scripts/resilient_diagram.py` — automated validation + image gen
 - `scripts/mermaid_to_image.py` — PNG/SVG rendering
 
 **Keep SCALE custom:**
+
 - `references/doc-standards.md` — LLD/HLD quality checklists
 - `references/hld-sync-protocol.md` — LLD-to-HLD sync protocol
 - All 8 templates (feature-lld, bug-report, rfc, + 5 design templates)
@@ -151,6 +153,7 @@ Step 6: Commit    → Conventional commits, HLD sync check
 - `scripts/extract_mermaid.py` — diagram extraction
 
 **Rewrite SKILL.md with progressive disclosure:**
+
 - Decision tree routes to specific guides on demand
 - Only loads what's needed per request (~2KB vs ~50KB)
 - Merges doc-centric workflow with original's hierarchical architecture

@@ -9,5 +9,5 @@ DROP INDEX IF EXISTS idx_transactions_fingerprint;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_user_fingerprint ON public.transactions(user_id, fingerprint) WHERE fingerprint IS NOT NULL;
 
 -- 3. Add the unique constraint to support ON CONFLICT
-ALTER TABLE public.transactions 
+ALTER TABLE public.transactions
 ADD CONSTRAINT transactions_user_fingerprint_key UNIQUE USING INDEX idx_transactions_user_fingerprint;

@@ -58,18 +58,21 @@ erDiagram
 ## Tables
 
 ### `transactions`
+
 Primary data table. Stores all user financial transactions with deduplication via fingerprint.
 
 - **RLS:** Enabled — users can only access their own rows (`auth.uid() = user_id`)
 - **Fingerprint:** SHA256 hash of canonical fields (date, amount, merchant, description, payment_method, reference). UNIQUE per user.
 
 ### `training_jobs`
+
 Tracks ML model training jobs (HypCD, TFT).
 
 - **RLS:** Enabled
 - **Service Role:** Celery worker uses `service_role` key to update status (bypasses RLS)
 
 ### `uploaded_files`
+
 Tracks file uploads for deduplication.
 
 ## Index Strategy
@@ -101,6 +104,7 @@ graph LR
 ## Query Patterns
 
 ### Keyset Pagination (replacing OFFSET)
+
 ```sql
 SELECT * FROM transactions
 WHERE user_id = $1
@@ -110,6 +114,7 @@ LIMIT 50;
 ```
 
 ### Batch Upsert (import)
+
 ```sql
 INSERT INTO transactions (user_id, transaction_date, amount, ...)
 VALUES ($1, $2, $3, ...),

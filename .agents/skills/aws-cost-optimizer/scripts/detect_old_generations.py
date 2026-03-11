@@ -16,17 +16,16 @@ Requirements:
 """
 
 import argparse
-import boto3
-from typing import List
-from tabulate import tabulate
 import sys
+from typing import List
+
+import boto3
+from tabulate import tabulate
 
 
 class OldGenerationDetector:
     def __init__(self, profile: str = None, region: str = None):
-        self.session = (
-            boto3.Session(profile_name=profile) if profile else boto3.Session()
-        )
+        self.session = boto3.Session(profile_name=profile) if profile else boto3.Session()
         self.regions = [region] if region else self._get_all_regions()
         self.findings = {
             "ec2_migrations": [],
@@ -185,11 +184,7 @@ class OldGenerationDetector:
                         state = instance["State"]["Name"]
 
                         name_tag = next(
-                            (
-                                tag["Value"]
-                                for tag in instance.get("Tags", [])
-                                if tag["Key"] == "Name"
-                            ),
+                            (tag["Value"] for tag in instance.get("Tags", []) if tag["Key"] == "Name"),
                             "N/A",
                         )
 
@@ -219,9 +214,7 @@ class OldGenerationDetector:
 
                         # Check for Graviton migration
                         elif instance_type in self.graviton_migrations:
-                            new_type, savings_pct = self.graviton_migrations[
-                                instance_type
-                            ]
+                            new_type, savings_pct = self.graviton_migrations[instance_type]
                             current_cost = self._estimate_hourly_cost(instance_type)
                             new_cost = self._estimate_hourly_cost(new_type)
                             monthly_savings = (current_cost - new_cost) * 730
@@ -247,9 +240,7 @@ class OldGenerationDetector:
                 print(f"  Error scanning {region}: {str(e)}")
 
         print(f"  Found {len(self.findings['ec2_migrations'])} standard migrations")
-        print(
-            f"  Found {len(self.findings['graviton_opportunities'])} Graviton opportunities"
-        )
+        print(f"  Found {len(self.findings['graviton_opportunities'])} Graviton opportunities")
 
     def detect_rds_migrations(self):
         """Detect old generation RDS instances."""
@@ -305,11 +296,7 @@ class OldGenerationDetector:
         if self.findings["ec2_migrations"]:
             print("\nEC2 STANDARD MIGRATION OPPORTUNITIES")
             print("-" * 100)
-            print(
-                tabulate(
-                    self.findings["ec2_migrations"], headers="keys", tablefmt="grid"
-                )
-            )
+            print(tabulate(self.findings["ec2_migrations"], headers="keys", tablefmt="grid"))
 
         if self.findings["graviton_opportunities"]:
             print("\nEC2 GRAVITON (ARM64) MIGRATION OPPORTUNITIES")
@@ -321,19 +308,13 @@ class OldGenerationDetector:
                     tablefmt="grid",
                 )
             )
-            print(
-                "\nNOTE: Graviton instances offer significant savings but require ARM64-compatible workloads"
-            )
+            print("\nNOTE: Graviton instances offer significant savings but require ARM64-compatible workloads")
             print("Test thoroughly before migrating production workloads")
 
         if self.findings["rds_migrations"]:
             print("\nRDS MIGRATION OPPORTUNITIES")
             print("-" * 100)
-            print(
-                tabulate(
-                    self.findings["rds_migrations"], headers="keys", tablefmt="grid"
-                )
-            )
+            print(tabulate(self.findings["rds_migrations"], headers="keys", tablefmt="grid"))
 
         print("\n" + "=" * 100)
         print(f"ESTIMATED ANNUAL SAVINGS: ${self.total_savings:.2f}")
@@ -357,9 +338,7 @@ class OldGenerationDetector:
 
     def run(self):
         """Run old generation detection."""
-        print(
-            f"Scanning for old generation instances across {len(self.regions)} region(s)..."
-        )
+        print(f"Scanning for old generation instances across {len(self.regions)} region(s)...")
 
         self.detect_ec2_migrations()
         self.detect_rds_migrations()

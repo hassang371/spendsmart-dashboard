@@ -29,6 +29,7 @@ This reference provides detailed information about common Kubernetes issues, the
 5. Private registry without imagePullSecrets
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe pod <pod-name> -n <namespace>
 kubectl get events -n <namespace> --field-selector involvedObject.name=<pod-name>
@@ -66,6 +67,7 @@ kubectl get events -n <namespace> --field-selector involvedObject.name=<pod-name
 6. Command/args misconfiguration
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl logs <pod-name> -n <namespace>
 kubectl logs <pod-name> -n <namespace> --previous
@@ -107,6 +109,7 @@ kubectl get pod <pod-name> -n <namespace> -o yaml
 6. Scheduler not running or misconfigured
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe pod <pod-name> -n <namespace>
 kubectl get nodes -o wide
@@ -148,6 +151,7 @@ kubectl get resourcequota -n <namespace>
 4. No memory limits (using node's memory)
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe pod <pod-name> -n <namespace>
 kubectl logs <pod-name> --previous -n <namespace>
@@ -190,6 +194,7 @@ kubectl top pod <pod-name> -n <namespace>
 6. Container runtime issues
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe node <node-name>
 kubectl get nodes -o wide
@@ -232,6 +237,7 @@ ssh <node> "free -m"
 4. System logs filling up
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe node <node-name> | grep -A 10 Conditions
 ssh <node> "df -h"
@@ -276,6 +282,7 @@ ssh <node> "docker system df"
 5. Pod CIDR exhaustion
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl get networkpolicies --all-namespaces
 kubectl exec -it <pod> -- ping <target-pod-ip>
@@ -318,6 +325,7 @@ kubectl get endpoints <service-name> -n <namespace>
 5. Port conflicts
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl get svc <service-name> -n <namespace>
 kubectl describe svc <service-name> -n <namespace>
@@ -360,6 +368,7 @@ kubectl logs -l <service-selector> -n <namespace>
 5. Volume capacity exhausted in storage backend
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe pvc <pvc-name> -n <namespace>
 kubectl get pv
@@ -401,6 +410,7 @@ kubectl get pods -n <provisioner-namespace>
 5. Filesystem issues on volume
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe pod <pod-name> -n <namespace>
 kubectl describe pvc <pvc-name> -n <namespace>
@@ -442,6 +452,7 @@ kubectl get volumeattachments
 4. Quota misconfiguration
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl describe resourcequota -n <namespace>
 kubectl describe limitrange -n <namespace>
@@ -480,6 +491,7 @@ kubectl describe namespace <namespace>
 4. CPU limits set without understanding workload
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl top pod <pod-name> -n <namespace>
 kubectl describe pod <pod-name> -n <namespace> | grep -A 5 Limits
@@ -513,6 +525,7 @@ kubectl exec <pod-name> -- cat /sys/fs/cgroup/cpu/cpu.cfs_throttled_time
 - Known CVEs in running images
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl get pods -o jsonpath='{.items[*].spec.containers[*].image}' | tr ' ' '\n' | sort -u
 trivy image <image-name>
@@ -548,6 +561,7 @@ trivy image <image-name>
 4. Namespace-scoped role for cluster-wide resource
 
 **Diagnostic Commands:**
+
 ```bash
 kubectl auth can-i <verb> <resource> --as=<user/sa>
 kubectl get rolebindings -n <namespace>

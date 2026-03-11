@@ -8,8 +8,8 @@ import argparse
 import json
 import subprocess
 import sys
-from typing import Dict, List, Any
 from datetime import datetime
+from typing import Any, Dict, List
 
 
 def run_kubectl(args: List[str], namespace: str = None) -> Dict[str, Any]:
@@ -68,9 +68,7 @@ def check_pods(namespace: str) -> Dict[str, Any]:
                 results["running"] += 1
                 if restart_count >= 5:
                     results["crashlooping"] += 1
-                    results["issues"].append(
-                        f"Pod {name}: High restart count ({restart_count})"
-                    )
+                    results["issues"].append(f"Pod {name}: High restart count ({restart_count})")
                     results["unhealthy_pods"].append(name)
                 if not all_ready:
                     results["issues"].append(f"Pod {name}: Not all containers ready")
@@ -131,9 +129,7 @@ def check_services(namespace: str) -> Dict[str, Any]:
                 results["with_endpoints"] += 1
             else:
                 results["without_endpoints"] += 1
-                results["issues"].append(
-                    f"Service {name}: No endpoints (no pods matching selector)"
-                )
+                results["issues"].append(f"Service {name}: No endpoints (no pods matching selector)")
 
         # Check LoadBalancer status
         if svc_type == "LoadBalancer":
@@ -141,9 +137,7 @@ def check_services(namespace: str) -> Dict[str, Any]:
             lb_ingress = svc["status"].get("loadBalancer", {}).get("ingress", [])
             if not lb_ingress:
                 results["load_balancers_pending"] += 1
-                results["issues"].append(
-                    f"Service {name}: LoadBalancer stuck in Pending"
-                )
+                results["issues"].append(f"Service {name}: LoadBalancer stuck in Pending")
 
     return results
 
@@ -176,14 +170,10 @@ def check_deployments(namespace: str) -> Dict[str, Any]:
             results["available"] += 1
         elif available_replicas == 0:
             results["unavailable"] += 1
-            results["issues"].append(
-                f"Deployment {name}: No replicas available ({ready_replicas}/{replicas})"
-            )
+            results["issues"].append(f"Deployment {name}: No replicas available ({ready_replicas}/{replicas})")
         else:
             results["progressing"] += 1
-            results["issues"].append(
-                f"Deployment {name}: Partially available ({available_replicas}/{replicas})"
-            )
+            results["issues"].append(f"Deployment {name}: Partially available ({available_replicas}/{replicas})")
 
     return results
 
@@ -254,9 +244,7 @@ def check_resource_quotas(namespace: str) -> Dict[str, Any]:
 
                     if usage_percent >= 100:
                         results["exceeded"].append(resource)
-                        results["issues"].append(
-                            f"Quota {name}: {resource} exceeded ({usage}/{limit})"
-                        )
+                        results["issues"].append(f"Quota {name}: {resource} exceeded ({usage}/{limit})")
                     elif usage_percent >= 80:
                         results["near_limit"].append(resource)
                         results["issues"].append(
@@ -287,9 +275,7 @@ def parse_cpu(value: str) -> int:
 
 def get_recent_events(namespace: str, limit: int = 10) -> List[Dict[str, Any]]:
     """Get recent events in namespace"""
-    events = run_kubectl(
-        ["get", "events", "--sort-by=.lastTimestamp", "-o", "json"], namespace
-    )
+    events = run_kubectl(["get", "events", "--sort-by=.lastTimestamp", "-o", "json"], namespace)
 
     if "error" in events:
         return []
@@ -316,57 +302,37 @@ def generate_recommendations(results: Dict[str, Any]) -> List[str]:
 
     # Pod recommendations
     if results["pods"]["pending"] > 0:
-        recommendations.append(
-            "⚠️  Check pending pods with: kubectl describe pod <pod-name> -n <namespace>"
-        )
+        recommendations.append("⚠️  Check pending pods with: kubectl describe pod <pod-name> -n <namespace>")
         recommendations.append("⚠️  Verify node resources: kubectl describe nodes")
 
     if results["pods"]["crashlooping"] > 0:
-        recommendations.append(
-            "⚠️  Investigate crashlooping pods: kubectl logs <pod-name> -n <namespace> --previous"
-        )
+        recommendations.append("⚠️  Investigate crashlooping pods: kubectl logs <pod-name> -n <namespace> --previous")
 
     if results["pods"]["image_pull_errors"] > 0:
-        recommendations.append(
-            "⚠️  Fix image pull errors: verify image name, check imagePullSecrets"
-        )
+        recommendations.append("⚠️  Fix image pull errors: verify image name, check imagePullSecrets")
 
     # Service recommendations
     if results["services"]["without_endpoints"] > 0:
-        recommendations.append(
-            "⚠️  Services without endpoints: check pod selectors match pod labels"
-        )
+        recommendations.append("⚠️  Services without endpoints: check pod selectors match pod labels")
 
     if results["services"]["load_balancers_pending"] > 0:
-        recommendations.append(
-            "⚠️  LoadBalancer stuck: check cloud provider controller logs"
-        )
+        recommendations.append("⚠️  LoadBalancer stuck: check cloud provider controller logs")
 
     # Deployment recommendations
     if results["deployments"]["unavailable"] > 0:
-        recommendations.append(
-            "⚠️  Unavailable deployments: check pod errors and resource availability"
-        )
+        recommendations.append("⚠️  Unavailable deployments: check pod errors and resource availability")
 
     # PVC recommendations
     if results["pvcs"]["pending"] > 0:
-        recommendations.append(
-            "⚠️  Pending PVCs: verify StorageClass exists and provisioner is working"
-        )
+        recommendations.append("⚠️  Pending PVCs: verify StorageClass exists and provisioner is working")
 
     # Quota recommendations
     if results["quotas"]["exceeded"]:
-        recommendations.append(
-            f"🚨 Resource quotas exceeded: {', '.join(results['quotas']['exceeded'])}"
-        )
-        recommendations.append(
-            "🚨 Action required: increase quota or reduce resource requests"
-        )
+        recommendations.append(f"🚨 Resource quotas exceeded: {', '.join(results['quotas']['exceeded'])}")
+        recommendations.append("🚨 Action required: increase quota or reduce resource requests")
 
     if results["quotas"]["near_limit"]:
-        recommendations.append(
-            f"⚠️  Near quota limits: {', '.join(results['quotas']['near_limit'])}"
-        )
+        recommendations.append(f"⚠️  Near quota limits: {', '.join(results['quotas']['near_limit'])}")
 
     if not recommendations:
         recommendations.append("✅ No critical issues detected")
@@ -428,13 +394,7 @@ Examples:
         + len(results["quotas"].get("issues", []))
     )
 
-    results["health_status"] = (
-        "healthy"
-        if total_issues == 0
-        else "degraded"
-        if total_issues < 5
-        else "critical"
-    )
+    results["health_status"] = "healthy" if total_issues == 0 else "degraded" if total_issues < 5 else "critical"
 
     if args.json:
         print(json.dumps(results, indent=2))
@@ -461,9 +421,7 @@ Examples:
         print(f"   Total: {results['services']['total']}")
         print(f"   With Endpoints: {results['services']['with_endpoints']}")
         if results["services"]["without_endpoints"] > 0:
-            print(
-                f"   ⚠️  Without Endpoints: {results['services']['without_endpoints']}"
-            )
+            print(f"   ⚠️  Without Endpoints: {results['services']['without_endpoints']}")
         if results["services"]["load_balancers_pending"] > 0:
             print(f"   ⚠️  LB Pending: {results['services']['load_balancers_pending']}")
         print()
@@ -509,9 +467,7 @@ Examples:
             for issue in all_issues[:10]:  # Show first 10
                 print(f"   - {issue}")
             if len(all_issues) > 10:
-                print(
-                    f"   ... and {len(all_issues) - 10} more (use --json for full list)"
-                )
+                print(f"   ... and {len(all_issues) - 10} more (use --json for full list)")
             print()
 
         # Recommendations

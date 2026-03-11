@@ -24,7 +24,7 @@ import sys
 import time
 import webbrowser
 from functools import partial
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 # Files to exclude from output listings
@@ -269,9 +269,7 @@ def load_previous_iteration(workspace: Path) -> dict[str, dict]:
         try:
             data = json.loads(feedback_path.read_text())
             feedback_map = {
-                r["run_id"]: r["feedback"]
-                for r in data.get("reviews", [])
-                if r.get("feedback", "").strip()
+                r["run_id"]: r["feedback"] for r in data.get("reviews", []) if r.get("feedback", "").strip()
             }
         except (json.JSONDecodeError, OSError, KeyError):
             pass
@@ -323,9 +321,7 @@ def generate_html(
 
     data_json = json.dumps(embedded)
 
-    return template.replace(
-        "/*__EMBEDDED_DATA__*/", f"const EMBEDDED_DATA = {data_json};"
-    )
+    return template.replace("/*__EMBEDDED_DATA__*/", f"const EMBEDDED_DATA = {data_json};")
 
 
 # ---------------------------------------------------------------------------
@@ -438,12 +434,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate and serve eval review")
     parser.add_argument("workspace", type=Path, help="Path to workspace directory")
-    parser.add_argument(
-        "--port", "-p", type=int, default=3117, help="Server port (default: 3117)"
-    )
-    parser.add_argument(
-        "--skill-name", "-n", type=str, default=None, help="Skill name for header"
-    )
+    parser.add_argument("--port", "-p", type=int, default=3117, help="Server port (default: 3117)")
+    parser.add_argument("--skill-name", "-n", type=str, default=None, help="Skill name for header")
     parser.add_argument(
         "--previous-workspace",
         type=Path,
@@ -500,9 +492,7 @@ def main() -> None:
     # Kill any existing process on the target port
     port = args.port
     _kill_port(port)
-    handler = partial(
-        ReviewHandler, workspace, skill_name, feedback_path, previous, benchmark_path
-    )
+    handler = partial(ReviewHandler, workspace, skill_name, feedback_path, previous, benchmark_path)
     try:
         server = HTTPServer(("127.0.0.1", port), handler)
     except OSError:

@@ -5,11 +5,11 @@ Supports: error detection, frequency analysis, pattern matching.
 """
 
 import argparse
-import sys
 import re
+import sys
 from collections import Counter
-from typing import Dict, List, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 try:
     from tabulate import tabulate
@@ -196,9 +196,7 @@ class LogAnalyzer:
         return stack_traces
 
 
-def print_analysis_results(
-    analyzer: LogAnalyzer, show_errors: bool = False, show_traces: bool = False
-):
+def print_analysis_results(analyzer: LogAnalyzer, show_errors: bool = False, show_traces: bool = False):
     """Print analysis results."""
     print("\n" + "=" * 60)
     print("📝 LOG ANALYSIS RESULTS")
@@ -302,9 +300,7 @@ Features:
     parser.add_argument("log_file", help="Path to log file")
     parser.add_argument("--show-errors", action="store_true", help="Show error lines")
     parser.add_argument("--show-traces", action="store_true", help="Show stack traces")
-    parser.add_argument(
-        "--timestamp-pattern", help="Custom regex for timestamp extraction"
-    )
+    parser.add_argument("--timestamp-pattern", help="Custom regex for timestamp extraction")
 
     args = parser.parse_args()
 

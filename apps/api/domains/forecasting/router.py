@@ -11,12 +11,12 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from supabase import Client
 
 from apps.api.core.auth import get_current_user_id, get_user_client
 from packages.forecasting.dataset import TransactionLoader
 from packages.forecasting.inference import load_model, predict_with_tft
 from packages.ingestion_engine.import_transactions import parse_file
+from supabase import Client
 
 router = APIRouter(prefix="/forecast", tags=["forecast"])
 logger = structlog.get_logger()
@@ -36,11 +36,7 @@ async def forecast_predict(
     IMP-05 fix: Auth check and duplicate-file check happen before any
     parsing work, so duplicate uploads fail fast.
     """
-    if (
-        file.content_type
-        and "csv" not in file.content_type
-        and "text" not in file.content_type
-    ):
+    if file.content_type and "csv" not in file.content_type and "text" not in file.content_type:
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
     contents = await file.read()
@@ -77,22 +73,14 @@ async def forecast_predict(
         loader = TransactionLoader(df)
         daily_df = loader.aggregate_daily()
     except Exception:
-        client.table("uploaded_files").delete().eq("user_id", user_id).eq(
-            "file_hash", file_hash
-        ).execute()
+        client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
         raise HTTPException(status_code=400, detail="Failed to aggregate transactions")
 
     # Statistical forecast
     horizon = 7
     recent = daily_df.tail(min(30, len(daily_df)))
-    avg_daily_spend = (
-        float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
-    )
-    avg_daily_income = (
-        float(recent["daily_income"].mean())
-        if "daily_income" in recent.columns
-        else 0.0
-    )
+    avg_daily_spend = float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
+    avg_daily_income = float(recent["daily_income"].mean()) if "daily_income" in recent.columns else 0.0
 
     predictions = [
         {
@@ -123,9 +111,7 @@ async def safe_to_spend(
     lookback_days = 90
 
     try:
-        cutoff = (
-            datetime.now(timezone.utc) - timedelta(days=lookback_days)
-        ).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
         response = (
             client.table("transactions")
             .select("transaction_date, amount, status")
@@ -170,14 +156,8 @@ async def safe_to_spend(
     model_name = "statistical_mvp"
     model_note = f"Based on {days_of_data} days of transaction history."
 
-    avg_daily_income = (
-        float(recent["daily_income"].mean())
-        if "daily_income" in recent.columns
-        else 0.0
-    )
-    avg_daily_spend = (
-        float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
-    )
+    avg_daily_income = float(recent["daily_income"].mean()) if "daily_income" in recent.columns else 0.0
+    avg_daily_spend = float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
     net = (avg_daily_income - avg_daily_spend) * horizon
     safe_amount = round(max(0.0, net), 2)
     projected_overspend = round(max(0.0, -net), 2)
@@ -195,9 +175,7 @@ async def safe_to_spend(
                 safe_amount = round(max(0.0, tft_net), 2)
                 projected_overspend = round(max(0.0, -tft_net), 2)
                 model_name = "tft_v1"
-                model_note = (
-                    "AI prediction (TFT) for spending, statistical avg for income."
-                )
+                model_note = "AI prediction (TFT) for spending, statistical avg for income."
                 forecast_breakdown = forecast
     except Exception as e:
         logger.warning("tft_inference_failed", error=str(e))

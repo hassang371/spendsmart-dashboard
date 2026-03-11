@@ -14,11 +14,11 @@ Usage:
       -- python test.py
 """
 
-import subprocess
-import socket
-import time
-import sys
 import argparse
+import socket
+import subprocess
+import sys
+import time
 
 
 def is_server_ready(port, timeout=30):
@@ -56,9 +56,7 @@ def main():
         default=30,
         help="Timeout in seconds per server (default: 30)",
     )
-    parser.add_argument(
-        "command", nargs=argparse.REMAINDER, help="Command to run after server(s) ready"
-    )
+    parser.add_argument("command", nargs=argparse.REMAINDER, help="Command to run after server(s) ready")
 
     args = parser.parse_args()
 
@@ -98,9 +96,7 @@ def main():
             # Wait for this server to be ready
             print(f"Waiting for server on port {server['port']}...")
             if not is_server_ready(server["port"], timeout=args.timeout):
-                raise RuntimeError(
-                    f"Server failed to start on port {server['port']} within {args.timeout}s"
-                )
+                raise RuntimeError(f"Server failed to start on port {server['port']} within {args.timeout}s")
 
             print(f"Server ready on port {server['port']}")
 

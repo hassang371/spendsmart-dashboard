@@ -726,19 +726,23 @@ graph TB
 ### ❌ Pitfall 1: Mixing Abstraction Levels
 
 **Bad:**
+
 ```mermaid
 graph TB
     UserService --> Database
     UserService --> UserRepository.findById
 ```
+
 ❌ Mixing component (UserService) with method call (findById)
 
 **Good:**
+
 ```mermaid
 graph TB
     UserService --> UserRepository
     UserRepository --> Database
 ```
+
 ✅ Consistent abstraction level (components)
 
 ### ❌ Pitfall 2: Overloading Diagrams
@@ -752,17 +756,21 @@ graph TB
 ### ❌ Pitfall 3: Missing Communication Protocols
 
 **Bad:**
+
 ```mermaid
 graph TB
     ServiceA --> ServiceB
 ```
+
 ❌ How do they communicate?
 
 **Good:**
+
 ```mermaid
 graph TB
     ServiceA -->|REST API<br/>HTTPS<br/>JSON| ServiceB
 ```
+
 ✅ Protocol specified
 
 ### ❌ Pitfall 4: Ignoring Error Paths

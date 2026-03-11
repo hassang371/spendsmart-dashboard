@@ -140,6 +140,7 @@ Skipping human evaluation: Automated evaluation misses subtle issues.
 ## Examples
 
 **Example 1: Simple Evaluation**
+
 ```python
 def evaluate_agent_response(response, expected):
     rubric = load_rubric()

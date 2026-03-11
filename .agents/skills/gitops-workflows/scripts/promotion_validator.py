@@ -5,8 +5,8 @@ Checks that changes are promoted through environments in the correct order.
 """
 
 import argparse
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -75,12 +75,8 @@ Checks:
         """,
     )
 
-    parser.add_argument(
-        "--source", required=True, help="Source environment (dev/staging)"
-    )
-    parser.add_argument(
-        "--target", required=True, help="Target environment (staging/production)"
-    )
+    parser.add_argument("--source", required=True, help="Source environment (dev/staging)")
+    parser.add_argument("--target", required=True, help="Target environment (staging/production)")
     parser.add_argument("--repo-path", default=".", help="Repository path")
 
     args = parser.parse_args()

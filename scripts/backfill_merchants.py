@@ -14,9 +14,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
-from supabase import create_client
 
-from packages.ingestion_engine.merchant_extractor import MerchantExtractor, infer_payment_method
+from packages.ingestion_engine.merchant_extractor import (
+    MerchantExtractor,
+    infer_payment_method,
+)
+from supabase import create_client
 
 load_dotenv()
 
@@ -61,7 +64,9 @@ def main():
             if updates:
                 client.table("transactions").update(updates).eq("id", row["id"]).execute()
                 total_updated += 1
-                print(f"  Updated {row['id'][:8]}... merchant={updates.get('merchant_name', '-')}, method={updates.get('payment_method', '-')}")
+                print(
+                    f"  Updated {row['id'][:8]}... merchant={updates.get('merchant_name', '-')}, method={updates.get('payment_method', '-')}"
+                )
 
         print(f"Processed {offset + len(rows)} rows so far ({total_updated} updated)")
         if len(rows) < batch_size:

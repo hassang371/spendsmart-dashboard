@@ -5,10 +5,10 @@ Checks for: alert naming, severity labels, runbook links, expression quality.
 """
 
 import argparse
-import sys
 import re
-from typing import Dict, List, Any
+import sys
 from pathlib import Path
+from typing import Any, Dict, List
 
 try:
     import yaml
@@ -29,15 +29,11 @@ class AlertQualityChecker:
 
         # Should be PascalCase or camelCase
         if not re.match(r"^[A-Z][a-zA-Z0-9]*$", alert_name):
-            issues.append(
-                f"Alert name '{alert_name}' should use PascalCase (e.g., HighCPUUsage)"
-            )
+            issues.append(f"Alert name '{alert_name}' should use PascalCase (e.g., HighCPUUsage)")
 
         # Should be descriptive
         if len(alert_name) < 5:
-            issues.append(
-                f"Alert name '{alert_name}' is too short, use descriptive names"
-            )
+            issues.append(f"Alert name '{alert_name}' is too short, use descriptive names")
 
         # Avoid generic names
         generic_names = ["Alert", "Test", "Warning", "Error"]
@@ -55,18 +51,14 @@ class AlertQualityChecker:
         if "severity" not in labels:
             issues.append("Missing required 'severity' label (critical/warning/info)")
         elif labels["severity"] not in ["critical", "warning", "info"]:
-            issues.append(
-                f"Severity '{labels['severity']}' should be one of: critical, warning, info"
-            )
+            issues.append(f"Severity '{labels['severity']}' should be one of: critical, warning, info")
 
         # Recommended labels
         if "team" not in labels:
             self.recommendations.append("Consider adding 'team' label for routing")
 
         if "component" not in labels and "service" not in labels:
-            self.recommendations.append(
-                "Consider adding 'component' or 'service' label"
-            )
+            self.recommendations.append("Consider adding 'component' or 'service' label")
 
         return issues
 
@@ -86,19 +78,12 @@ class AlertQualityChecker:
 
         # Runbook
         if "runbook_url" not in annotations and "runbook" not in annotations:
-            self.recommendations.append(
-                "Consider adding 'runbook_url' for incident response"
-            )
+            self.recommendations.append("Consider adding 'runbook_url' for incident response")
 
         # Check for templating
         if "summary" in annotations:
-            if (
-                "{{ $value }}" not in annotations["summary"]
-                and "{{" not in annotations["summary"]
-            ):
-                self.recommendations.append(
-                    "Consider using template variables in summary (e.g., {{ $value }})"
-                )
+            if "{{ $value }}" not in annotations["summary"] and "{{" not in annotations["summary"]:
+                self.recommendations.append("Consider using template variables in summary (e.g., {{ $value }})")
 
         return issues
 
@@ -107,26 +92,17 @@ class AlertQualityChecker:
         issues = []
 
         # Should have a threshold
-        if (
-            ">" not in expr
-            and "<" not in expr
-            and "==" not in expr
-            and "!=" not in expr
-        ):
+        if ">" not in expr and "<" not in expr and "==" not in expr and "!=" not in expr:
             issues.append("Expression should include a comparison operator")
 
         # Should use rate() for counters
         if "_total" in expr and "rate(" not in expr and "increase(" not in expr:
-            self.recommendations.append(
-                "Consider using rate() or increase() for counter metrics (*_total)"
-            )
+            self.recommendations.append("Consider using rate() or increase() for counter metrics (*_total)")
 
         # Avoid instant queries without aggregation
         if not any(agg in expr for agg in ["sum(", "avg(", "min(", "max(", "count("]):
             if expr.count("{") > 1:  # Multiple metrics without aggregation
-                self.recommendations.append(
-                    "Consider aggregating metrics with sum(), avg(), etc."
-                )
+                self.recommendations.append("Consider aggregating metrics with sum(), avg(), etc.")
 
         # Check for proper time windows
         if "[" not in expr and "rate(" in expr:
@@ -141,22 +117,14 @@ class AlertQualityChecker:
 
         if "for" not in rule:
             if severity == "critical":
-                issues.append(
-                    "Critical alerts should have 'for' clause to prevent flapping"
-                )
+                issues.append("Critical alerts should have 'for' clause to prevent flapping")
             else:
-                self.warnings.append(
-                    "Consider adding 'for' clause to prevent alert flapping"
-                )
+                self.warnings.append("Consider adding 'for' clause to prevent alert flapping")
         else:
             # Parse duration
             duration = rule["for"]
-            if severity == "critical" and any(
-                x in duration for x in ["0s", "30s", "1m"]
-            ):
-                self.warnings.append(
-                    f"'for' duration ({duration}) might be too short for critical alerts"
-                )
+            if severity == "critical" and any(x in duration for x in ["0s", "30s", "1m"]):
+                self.warnings.append(f"'for' duration ({duration}) might be too short for critical alerts")
 
         return issues
 
@@ -278,9 +246,7 @@ def print_results(analysis: Dict[str, Any], checker: AlertQualityChecker):
         print(f"\n{'='*60}")
         print("💡 RECOMMENDATIONS:")
         print(f"{'='*60}")
-        for rec in list(set(checker.recommendations))[
-            :10
-        ]:  # Top 10 unique recommendations
+        for rec in list(set(checker.recommendations))[:10]:  # Top 10 unique recommendations
             print(f"• {rec}")
 
     # Overall score
@@ -288,9 +254,7 @@ def print_results(analysis: Dict[str, Any], checker: AlertQualityChecker):
     if total_alerts > 0:
         quality_score = ((total_alerts - critical_count) / total_alerts) * 100
         print(f"\n{'='*60}")
-        print(
-            f"📊 Quality Score: {quality_score:.1f}% ({total_alerts - critical_count}/{total_alerts} alerts passing)"
-        )
+        print(f"📊 Quality Score: {quality_score:.1f}% ({total_alerts - critical_count}/{total_alerts} alerts passing)")
         print(f"{'='*60}\n")
 
 
@@ -318,9 +282,7 @@ Best Practices Checked:
     )
 
     parser.add_argument("path", help="Path to alert rules file or directory")
-    parser.add_argument(
-        "--verbose", action="store_true", help="Show all recommendations"
-    )
+    parser.add_argument("--verbose", action="store_true", help="Show all recommendations")
 
     args = parser.parse_args()
 
@@ -332,9 +294,7 @@ Best Practices Checked:
     if path.is_file():
         files = [str(path)]
     elif path.is_dir():
-        files = [str(f) for f in path.rglob("*.yml")] + [
-            str(f) for f in path.rglob("*.yaml")
-        ]
+        files = [str(f) for f in path.rglob("*.yml")] + [str(f) for f in path.rglob("*.yaml")]
     else:
         print(f"❌ Path not found: {args.path}")
         sys.exit(1)

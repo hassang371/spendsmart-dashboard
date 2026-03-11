@@ -5,18 +5,18 @@ not the full HypCD pipeline. The frozen MiniLM base model is never retrained.
 """
 
 import hashlib
+from typing import Optional
 
 import pandas as pd
 import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from supabase import Client
-from apps.api.core.idempotency import get_idempotency_key, with_idempotency
-from typing import Optional
 
 from apps.api.core.auth import get_current_user_id, get_user_client
+from apps.api.core.idempotency import get_idempotency_key, with_idempotency
 from apps.api.domains.ingestion.service import generate_fingerprint
 from apps.api.tasks.training_tasks import train_adapter_task
 from packages.ingestion_engine.import_transactions import parse_file
+from supabase import Client
 
 router = APIRouter(prefix="/training", tags=["training"])
 logger = structlog.get_logger()
@@ -81,11 +81,7 @@ async def upload_training_data(
         # Check duplicates
         try:
             existing = (
-                client.table("uploaded_files")
-                .select("id")
-                .eq("user_id", user_id)
-                .eq("file_hash", file_hash)
-                .execute()
+                client.table("uploaded_files").select("id").eq("user_id", user_id).eq("file_hash", file_hash).execute()
             )
             if existing.data:
                 raise HTTPException(
@@ -103,9 +99,7 @@ async def upload_training_data(
                 raise HTTPException(status_code=400, detail="Empty file.")
             df = parse_file(contents, file.filename, password=password)
             if df.empty:
-                raise HTTPException(
-                    status_code=400, detail="No valid transactions found."
-                )
+                raise HTTPException(status_code=400, detail="No valid transactions found.")
         except HTTPException:
             raise
         except Exception as e:
@@ -128,9 +122,7 @@ async def upload_training_data(
             raise HTTPException(status_code=500, detail="Failed to register upload")
 
         # Insert transactions
-        transactions_to_insert = [
-            prepare_transaction_payload(row, user_id) for _, row in df.iterrows()
-        ]
+        transactions_to_insert = [prepare_transaction_payload(row, user_id) for _, row in df.iterrows()]
 
         try:
             client.table("transactions").upsert(
@@ -141,9 +133,7 @@ async def upload_training_data(
         except Exception as e:
             logger.error("db_insert_failed", error=str(e))
             try:
-                client.table("uploaded_files").delete().eq("user_id", user_id).eq(
-                    "file_hash", file_hash
-                ).execute()
+                client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
             except Exception:
                 logger.warning("rollback_failed")
             raise HTTPException(status_code=500, detail="Database error")
@@ -162,9 +152,7 @@ async def upload_training_data(
             labeled_rows = [
                 tx
                 for tx in transactions_to_insert
-                if tx.get("category")
-                and tx.get("category") != "Uncategorized"
-                and tx.get("description")
+                if tx.get("category") and tx.get("category") != "Uncategorized" and tx.get("description")
             ]
 
             # If we don't have enough explicitly labeled rows, just train on the descriptions and assign them newly
@@ -189,11 +177,7 @@ async def upload_training_data(
                 # (For adapters this might just re-verify the base embeddings)
                 # This explicitly resolves the inconsistent pending job state.
                 task = train_adapter_task.delay(
-                    texts=[
-                        tx["description"]
-                        for tx in transactions_to_insert
-                        if tx.get("description")
-                    ],
+                    texts=[tx["description"] for tx in transactions_to_insert if tx.get("description")],
                     categories=["Uncategorized"] * len(transactions_to_insert),
                     user_id=user_id,
                     job_id=job_id,
@@ -208,9 +192,7 @@ async def upload_training_data(
                 queued = True
         except Exception as e:
             logger.error("job_enqueue_failed", error=str(e))
-            raise HTTPException(
-                status_code=500, detail="Failed to enqueue training job"
-            )
+            raise HTTPException(status_code=500, detail="Failed to enqueue training job")
 
         return {
             "status": "success",
@@ -239,14 +221,7 @@ async def get_training_status(
     """
 
     try:
-        res = (
-            client.table("training_jobs")
-            .select("*")
-            .eq("id", job_id)
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-        )
+        res = client.table("training_jobs").select("*").eq("id", job_id).eq("user_id", user_id).single().execute()
         if not res.data:
             raise HTTPException(status_code=404, detail="Training job not found")
         return res.data
@@ -316,16 +291,11 @@ async def train_adapter_async(
             import hashlib
             import json
 
-            dates = [
-                tx["transaction_date"] for tx in res.data if tx.get("transaction_date")
-            ]
+            dates = [tx["transaction_date"] for tx in res.data if tx.get("transaction_date")]
             date_start = min(dates) if dates else None
             date_end = max(dates) if dates else None
 
-            raw_to_hash = [
-                {"d": tx.get("description", ""), "c": tx.get("category", "")}
-                for tx in res.data
-            ]
+            raw_to_hash = [{"d": tx.get("description", ""), "c": tx.get("category", "")} for tx in res.data]
             fp_str = json.dumps(raw_to_hash, sort_keys=True)
             data_fingerprint = hashlib.sha256(fp_str.encode()).hexdigest()
 

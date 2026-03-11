@@ -27,6 +27,7 @@ Use this skill when:
 ### 1. Creating a New Pipeline
 
 **Decision tree:**
+
 ```
 What are you building?
 ├── Node.js/Frontend → GitHub: templates/github-actions/node-ci.yml | GitLab: templates/gitlab-ci/node-ci.yml
@@ -37,6 +38,7 @@ What are you building?
 ```
 
 **Basic pipeline structure:**
+
 ```yaml
 # 1. Fast feedback (lint, format) - <1 min
 # 2. Unit tests - 1-5 min
@@ -65,6 +67,7 @@ See [best_practices.md](references/best_practices.md) for comprehensive pipeline
 - [ ] Enable concurrency cancellation for duplicate runs
 
 **Analyze existing pipeline:**
+
 ```bash
 # Use the pipeline analyzer script
 python3 scripts/pipeline_analyzer.py --platform github --workflow .github/workflows/ci.yml
@@ -92,6 +95,7 @@ See [optimization.md](references/optimization.md) for detailed caching strategie
 **Quick setup - OIDC authentication:**
 
 **GitHub Actions → AWS:**
+
 ```yaml
 permissions:
   id-token: write
@@ -118,6 +122,7 @@ See [security.md](references/security.md) for comprehensive security patterns, s
 **Systematic approach:**
 
 **Step 1: Check pipeline health**
+
 ```bash
 python3 scripts/ci_health.py --platform github --repo owner/repo
 ```
@@ -135,6 +140,7 @@ python3 scripts/ci_health.py --platform github --repo owner/repo
 **Step 3: Enable debug logging**
 
 GitHub Actions:
+
 ```yaml
 # Add repository secrets:
 # ACTIONS_RUNNER_DEBUG = true
@@ -142,12 +148,14 @@ GitHub Actions:
 ```
 
 GitLab CI:
+
 ```yaml
 variables:
   CI_DEBUG_TRACE: "true"
 ```
 
 **Step 4: Reproduce locally**
+
 ```bash
 # GitHub Actions - use act
 act -j build
@@ -171,6 +179,7 @@ See [troubleshooting.md](references/troubleshooting.md) for comprehensive issue 
 | Rolling | Kubernetes, containers | Medium | Low |
 
 **Basic deployment structure:**
+
 ```yaml
 deploy:
   needs: [build, test]
@@ -207,6 +216,7 @@ See [best_practices.md](references/best_practices.md#deployment-strategies) for 
 **Quick setup - Add security to existing pipeline:**
 
 **GitHub Actions:**
+
 ```yaml
 jobs:
   # Add before build job
@@ -235,6 +245,7 @@ jobs:
 ```
 
 **GitLab CI:**
+
 ```yaml
 stages:
   - security  # Add before other stages
@@ -345,6 +356,7 @@ gl project-job artifacts <job-id>
 ### GitHub Actions
 
 **Reusable workflows:**
+
 ```yaml
 # .github/workflows/reusable-test.yml
 on:
@@ -364,6 +376,7 @@ jobs:
 ```
 
 **Call from another workflow:**
+
 ```yaml
 jobs:
   test:
@@ -375,6 +388,7 @@ jobs:
 ### GitLab CI
 
 **Templates with extends:**
+
 ```yaml
 .test_template:
   image: node:20
@@ -393,6 +407,7 @@ integration-test:
 ```
 
 **DAG pipelines with needs:**
+
 ```yaml
 build:
   stage: build
@@ -482,6 +497,7 @@ Starter templates for common use cases:
 ### Caching Dependencies
 
 **GitHub Actions:**
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -493,6 +509,7 @@ Starter templates for common use cases:
 ```
 
 **GitLab CI:**
+
 ```yaml
 cache:
   key:
@@ -505,6 +522,7 @@ cache:
 ### Matrix Builds
 
 **GitHub Actions:**
+
 ```yaml
 strategy:
   matrix:
@@ -514,6 +532,7 @@ strategy:
 ```
 
 **GitLab CI:**
+
 ```yaml
 test:
   parallel:
@@ -524,12 +543,14 @@ test:
 ### Conditional Execution
 
 **GitHub Actions:**
+
 ```yaml
 - name: Deploy
   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 ```
 
 **GitLab CI:**
+
 ```yaml
 deploy:
   rules:

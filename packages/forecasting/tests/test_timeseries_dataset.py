@@ -1,6 +1,7 @@
 import pandas as pd
-from packages.forecasting.dataset import TransactionLoader, create_timeseries_dataset
 from pytorch_forecasting import TimeSeriesDataSet
+
+from packages.forecasting.dataset import TransactionLoader, create_timeseries_dataset
 
 
 def test_create_timeseries_dataset():
@@ -20,9 +21,7 @@ def test_create_timeseries_dataset():
     enriched_df = loader.enrich_features(daily_df)
 
     # Create dataset
-    ts_dataset = create_timeseries_dataset(
-        enriched_df, max_encoder_length=30, max_prediction_length=7
-    )
+    ts_dataset = create_timeseries_dataset(enriched_df, max_encoder_length=30, max_prediction_length=7)
 
     # Assertions
     assert isinstance(ts_dataset, TimeSeriesDataSet)

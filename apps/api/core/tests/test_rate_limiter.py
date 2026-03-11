@@ -4,10 +4,10 @@ TDD: Tests define expected behavior of core/rate_limiter.py before it exists.
 Uses a mock Redis client to verify rate limiting logic without a live Redis.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-import time
-from unittest.mock import MagicMock, AsyncMock, patch
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.core.rate_limiter import RateLimiter, rate_limit_dependency
@@ -21,7 +21,12 @@ def mock_redis():
     redis.pipeline.return_value = pipeline
     pipeline.__enter__ = MagicMock(return_value=pipeline)
     pipeline.__exit__ = MagicMock(return_value=False)
-    pipeline.execute.return_value = [0, 1, True, 5]  # zremrangebyscore, zadd, expire, zcard
+    pipeline.execute.return_value = [
+        0,
+        1,
+        True,
+        5,
+    ]  # zremrangebyscore, zadd, expire, zcard
     return redis
 
 
@@ -116,7 +121,10 @@ class TestRateLimitDependency:
 
         app = self._make_app(mock_redis, max_requests=2)
 
-        with patch("apps.api.core.rate_limiter.get_user_id_from_request", return_value="test-user"):
+        with patch(
+            "apps.api.core.rate_limiter.get_user_id_from_request",
+            return_value="test-user",
+        ):
             client = TestClient(app)
             response = client.get("/test")
             assert response.status_code == 429
@@ -134,7 +142,10 @@ class TestRateLimitDependency:
 
         app = self._make_app(mock_redis, max_requests=5)
 
-        with patch("apps.api.core.rate_limiter.get_user_id_from_request", return_value="test-user"):
+        with patch(
+            "apps.api.core.rate_limiter.get_user_id_from_request",
+            return_value="test-user",
+        ):
             client = TestClient(app)
             response = client.get("/test")
             assert response.status_code == 200

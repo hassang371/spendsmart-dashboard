@@ -4,13 +4,19 @@ Tests cover transaction listing (with pagination + filtering),
 profile endpoint, and response model validation.
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from apps.api.core.auth import (
+    CurrentUser,
+    get_current_user,
+    get_current_user_id,
+    get_user_client,
+)
 from apps.api.domains.accounts.router import router
-from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
 
 
 @pytest.fixture
@@ -39,24 +45,26 @@ def mock_user_client():
     mock_table.lte.return_value = mock_table
     mock_table.ilike.return_value = mock_table
     mock_table.lt.return_value = mock_table
-    mock_table.execute.return_value = MagicMock(data=[
-        {
-            "id": "tx-1",
-            "user_id": "test-user-123",
-            "amount": -50.0,
-            "description": "Coffee",
-            "merchant_name": "Starbucks",
-            "transaction_date": "2026-01-15",
-            "currency": "INR",
-            "category": "Food & Dining",
-            "payment_method": "card",
-            "status": "completed",
-            "type": "debit",
-            "fingerprint": "abc123",
-            "is_manual": False,
-            "created_at": "2026-01-15T10:30:00+05:30",
-        },
-    ])
+    mock_table.execute.return_value = MagicMock(
+        data=[
+            {
+                "id": "tx-1",
+                "user_id": "test-user-123",
+                "amount": -50.0,
+                "description": "Coffee",
+                "merchant_name": "Starbucks",
+                "transaction_date": "2026-01-15",
+                "currency": "INR",
+                "category": "Food & Dining",
+                "payment_method": "card",
+                "status": "completed",
+                "type": "debit",
+                "fingerprint": "abc123",
+                "is_manual": False,
+                "created_at": "2026-01-15T10:30:00+05:30",
+            },
+        ]
+    )
     return mock_client
 
 
@@ -105,9 +113,7 @@ class TestTransactions:
     def test_list_transactions_with_merchant_filter(self, client, mock_user_client):
         """Merchant filter should use ilike for case-insensitive search."""
         client.get("/api/v1/accounts/transactions?merchant=Starbucks")
-        mock_user_client.table.return_value.ilike.assert_called_with(
-            "merchant_name", "%Starbucks%"
-        )
+        mock_user_client.table.return_value.ilike.assert_called_with("merchant_name", "%Starbucks%")
 
 
 class TestProfile:

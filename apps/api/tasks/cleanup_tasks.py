@@ -34,9 +34,7 @@ def cleanup_stale_training_jobs() -> Dict:
         from apps.api.core.auth import get_service_client
 
         client = get_service_client()
-        cutoff = (
-            datetime.now(timezone.utc) - timedelta(hours=STALE_JOB_THRESHOLD_HOURS)
-        ).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=STALE_JOB_THRESHOLD_HOURS)).isoformat()
 
         result = (
             client.table("training_jobs")
@@ -105,7 +103,11 @@ def cleanup_old_checkpoints(
                     os.remove(filepath)
                     deleted_count += 1
                     deleted_bytes += size
-                    logger.info("checkpoint_deleted", path=filepath, age_days=int((time.time() - mtime) / 86400))
+                    logger.info(
+                        "checkpoint_deleted",
+                        path=filepath,
+                        age_days=int((time.time() - mtime) / 86400),
+                    )
                 except OSError as e:
                     logger.warning("checkpoint_delete_failed", path=filepath, error=str(e))
 

@@ -10,12 +10,12 @@ Covers:
 import base64
 import json
 import time
+
 import pytest
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from apps.api.core.auth import get_user_token, _decode_jwt_payload
-
+from apps.api.core.auth import _decode_jwt_payload, get_user_token
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -24,15 +24,9 @@ from apps.api.core.auth import get_user_token, _decode_jwt_payload
 
 def _make_jwt(payload: dict) -> str:
     """Build a minimal JWT (unsigned) for testing."""
-    header = (
-        base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-        .rstrip(b"=")
-        .decode()
-    )
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).rstrip(b"=").decode()
 
-    payload_b64 = (
-        base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
-    )
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
 
     # Fake signature — auth.py does NOT verify signatures
     sig = base64.urlsafe_b64encode(b"fakesig").rstrip(b"=").decode()
@@ -118,26 +112,20 @@ class TestGetUserToken:
 
     def test_expired_token_returns_401(self, client):
         token = _expired_token()
-        response = client.get(
-            "/protected", headers={"Authorization": f"Bearer {token}"}
-        )
+        response = client.get("/protected", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 401
         assert "expired" in response.json()["detail"].lower()
 
     def test_valid_token_passes_through(self, client):
         """A non-expired token should not be rejected by the pre-flight check."""
         token = _valid_token()
-        response = client.get(
-            "/protected", headers={"Authorization": f"Bearer {token}"}
-        )
+        response = client.get("/protected", headers={"Authorization": f"Bearer {token}"})
         # Should reach the endpoint (200), not be rejected (401)
         assert response.status_code == 200
 
     def test_malformed_jwt_passes_through(self, client):
         """A structurally invalid JWT is allowed through for Supabase to reject."""
-        response = client.get(
-            "/protected", headers={"Authorization": "Bearer not.a.realJWT"}
-        )
+        response = client.get("/protected", headers={"Authorization": "Bearer not.a.realJWT"})
         # The pre-flight decoding fails gracefully; Supabase will reject it later.
         # The pre-flight should NOT raise a 401 for malformed payloads.
         # (The endpoint itself might fail at the Supabase layer, but that's outside this test.)
@@ -146,17 +134,13 @@ class TestGetUserToken:
     def test_malformed_exp_claim_dict_returns_401(self, client):
         """If `exp` is structurally valid JSON but not a number/string, it shouldn't crash."""
         token = _make_jwt({"sub": "user-123", "exp": {"unknown": "format"}})
-        response = client.get(
-            "/protected", headers={"Authorization": f"Bearer {token}"}
-        )
+        response = client.get("/protected", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 401
         assert "malformed exp claim" in response.json()["detail"].lower()
 
     def test_malformed_exp_claim_list_returns_401(self, client):
         """If `exp` is structurally valid JSON but it is a list, it shouldn't crash."""
         token = _make_jwt({"sub": "user-123", "exp": [1, 2, 3]})
-        response = client.get(
-            "/protected", headers={"Authorization": f"Bearer {token}"}
-        )
+        response = client.get("/protected", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 401
         assert "malformed exp claim" in response.json()["detail"].lower()

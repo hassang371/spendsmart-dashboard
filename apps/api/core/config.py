@@ -4,8 +4,8 @@ Loads all env vars into a typed Settings instance. Replaces scattered
 os.environ.get() calls throughout the codebase.
 """
 
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -51,18 +51,23 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         """Parse comma-separated origins into a list.
-        
+
         M3 Fix: Enforces strict CORS in production. Triggers warning if * is used.
         """
         import logging
+
         logger = logging.getLogger(__name__)
-        
-        origins_str = self.PRODUCTION_ORIGINS if self.ENVIRONMENT == "production" and self.PRODUCTION_ORIGINS else self.ALLOWED_ORIGINS
+
+        origins_str = (
+            self.PRODUCTION_ORIGINS
+            if self.ENVIRONMENT == "production" and self.PRODUCTION_ORIGINS
+            else self.ALLOWED_ORIGINS
+        )
         origins = [o.strip() for o in origins_str.split(",") if o.strip()]
-        
+
         if self.ENVIRONMENT == "production" and "*" in origins:
             logger.warning("SECURITY RISK: Wildcard (*) CORS origin allowed in production!")
-            
+
         return origins
 
     @property
@@ -83,4 +88,3 @@ try:
 except Exception:
     # During testing, env vars may not be set — defer to test fixtures
     settings = None  # type: ignore[assignment]
-

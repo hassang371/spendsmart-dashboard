@@ -1,28 +1,32 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from apps.api.core.tasks.maintenance_tasks import cleanup_stale_jobs
+
 
 @pytest.fixture
 def mock_supabase():
     with patch("apps.api.core.tasks.maintenance_tasks.get_service_client") as mock:
         yield mock
 
+
 class TestCleanupStaleJobs:
     """Test the maintenance task for cleaning up stale training jobs."""
-    
+
     def test_cleanup_stale_jobs_success(self, mock_supabase):
         """Test it updates jobs older than 2 hours correctly."""
         # Setup mock client
         mock_client = MagicMock()
         mock_supabase.return_value = mock_client
-        
+
         # Mock the chained select/update/execute calls
         mock_query = MagicMock()
         mock_client.table.return_value = mock_query
         mock_query.update.return_value = mock_query
         mock_query.eq.return_value = mock_query
         mock_query.lt.return_value = mock_query
-        
+
         # Simulate returning 2 rows affected
         mock_response = MagicMock()
         mock_response.data = [{"id": "1"}, {"id": "2"}]
@@ -47,13 +51,13 @@ class TestCleanupStaleJobs:
         """Test behavior when no stale jobs exist."""
         mock_client = MagicMock()
         mock_supabase.return_value = mock_client
-        
+
         mock_query = MagicMock()
         mock_client.table.return_value = mock_query
         mock_query.update.return_value = mock_query
         mock_query.eq.return_value = mock_query
         mock_query.lt.return_value = mock_query
-        
+
         mock_response = MagicMock()
         mock_response.data = []
         mock_query.execute.return_value = mock_response
@@ -65,11 +69,11 @@ class TestCleanupStaleJobs:
         """Test behavior when Supabase throws an exception."""
         mock_client = MagicMock()
         mock_supabase.return_value = mock_client
-        
+
         mock_query = MagicMock()
         mock_client.table.return_value = mock_query
         mock_query.update.return_value = mock_query
-        
+
         # Raise generic exception when eq is called
         mock_query.eq.side_effect = Exception("Database connection failed")
 

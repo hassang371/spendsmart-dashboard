@@ -33,6 +33,7 @@
 ## ArgoCD 3.x Specific
 
 **Fine-Grained RBAC** (new in 3.0):
+
 ```yaml
 p, role:dev, applications, *, dev/*, allow
 p, role:dev, applications/resources, *, dev/*/Deployment/*, allow
@@ -64,6 +65,7 @@ p, role:dev, applications/resources, *, dev/*/Deployment/*, allow
 ## CI/CD Integration
 
 **Git Workflow**:
+
 ```
 1. Developer commits to feature branch
 2. CI runs tests, builds image
@@ -91,12 +93,14 @@ p, role:dev, applications/resources, *, dev/*/Deployment/*, allow
 ## Image Management
 
 ✅ **Good**:
+
 ```yaml
 image: myapp:v1.2.3
 image: myapp@sha256:abc123...
 ```
 
 ❌ **Bad**:
+
 ```yaml
 image: myapp:latest
 image: myapp:dev
@@ -107,6 +111,7 @@ image: myapp:dev
 ## Environment Promotion
 
 **Recommended Flow**:
+
 ```
 Dev (auto-sync) → Staging (auto-sync) → Production (manual approval)
 ```

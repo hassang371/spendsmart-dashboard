@@ -21,7 +21,7 @@ graph TB
 
     subgraph Gateway["⚙️ FastAPI Gateway"]
         Core["🛡️ Core Layer<br/>Auth | CORS | Rate Limit | Logging"]
-        
+
         subgraph Domains["📦 Domain Modules"]
             Ing["📥 Ingestion<br/>import, parse, dedup"]
             Cat["🏷️ Categorization<br/>classify, feedback"]

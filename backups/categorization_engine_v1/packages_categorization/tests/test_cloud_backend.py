@@ -1,5 +1,6 @@
 # packages/categorization/tests/test_cloud_backend.py
 import torch
+
 from packages.categorization.backends.cloud import CloudBackend
 
 
@@ -34,9 +35,10 @@ def test_cloud_backend_embed_single():
 def test_finbert_model_name():
     """CloudBackend must use ProsusAI/finbert, not bert-base-uncased."""
     import inspect
+
     from packages.categorization.backends.cloud import CloudBackend
+
     src = inspect.getsource(CloudBackend.__init__)
     assert "finbert" in src.lower(), (
-        "CloudBackend must use ProsusAI/finbert as default model. "
-        "Update model_name default to 'ProsusAI/finbert'."
+        "CloudBackend must use ProsusAI/finbert as default model. " "Update model_name default to 'ProsusAI/finbert'."
     )

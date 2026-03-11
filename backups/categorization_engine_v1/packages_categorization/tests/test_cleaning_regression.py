@@ -1,6 +1,7 @@
 import pytest
-from packages.categorization.data_loader import BankStatementParser
+
 from packages.categorization.cleaner import clean_description
+from packages.categorization.data_loader import BankStatementParser
 
 # (Input, Expected Output)
 # These are the "Golden" examples we want to protect against regression

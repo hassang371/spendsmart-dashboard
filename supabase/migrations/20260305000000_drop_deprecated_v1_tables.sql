@@ -47,4 +47,3 @@ DROP TABLE IF EXISTS "public"."classification_jobs";
 --   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 -- );
 -- =============================================================================
-

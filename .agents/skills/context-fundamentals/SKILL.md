@@ -105,6 +105,7 @@ Effective context budgeting requires understanding not just raw token counts but
 ## Examples
 
 **Example 1: Organizing System Prompts**
+
 ```markdown
 <BACKGROUND_INFORMATION>
 You are a Python expert helping a development team.
@@ -130,6 +131,7 @@ Explain non-obvious decisions in comments.
 ```
 
 **Example 2: Progressive Document Loading**
+
 ```markdown
 # Instead of loading all documentation at once:
 

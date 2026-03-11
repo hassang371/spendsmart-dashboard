@@ -7,7 +7,6 @@ Supports Cluster, List, and Matrix generators (ArgoCD 3.x).
 import argparse
 import sys
 
-
 APPLICATIONSET_TEMPLATE = """---
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -44,11 +43,7 @@ spec:
 
 def generate_cluster_generator(label_selector: str = "") -> str:
     """Generate Cluster generator."""
-    selector = (
-        f"\n      selector:\n        matchLabels:\n          {label_selector}"
-        if label_selector
-        else ""
-    )
+    selector = f"\n      selector:\n        matchLabels:\n          {label_selector}" if label_selector else ""
     return f"""  - cluster: {{{selector}}}"""
 
 
@@ -106,9 +101,7 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "generator_type", choices=["cluster", "list", "matrix"], help="Generator type"
-    )
+    parser.add_argument("generator_type", choices=["cluster", "list", "matrix"], help="Generator type")
     parser.add_argument("--name", required=True, help="ApplicationSet name")
     parser.add_argument(
         "--repo-url",

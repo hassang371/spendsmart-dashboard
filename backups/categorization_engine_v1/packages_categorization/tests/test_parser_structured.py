@@ -10,9 +10,7 @@ INB_GIFT = "WDL TFR INB Gift to relatives / Friends"
 CASH_DEP = "CASH DEPOSIT SELF AT 04413 PBB NELLORE"
 CDM_DEP = "CEMTEX DEP 00000004413 0 40623"
 # Bank transfer examples (user-reported: should extract "MEERA MOHIDDIN" as entity)
-BANK_TRANSFER_IN = (
-    "DEP TFR SBIY2260332207597607O6924 M Transfer to Family or OF Mr MEERA MOHIDDIN MO"
-)
+BANK_TRANSFER_IN = "DEP TFR SBIY2260332207597607O6924 M Transfer to Family or OF Mr MEERA MOHIDDIN MO"
 BANK_TRANSFER_OUT = "WDL TFR 0010604296427 OF Mr HASSAN MOHIDDIN AT 04413 PBB NELLORE"
 NEFT_TRANSFER = "NEFT/N123456789/MEERA MOHIDDIN/SBI/HDFC"
 
@@ -71,9 +69,7 @@ class TestStructuredParsing:
         parser = BankStatementParser("dummy.xlsx")
         info = parser.extract_details(BANK_TRANSFER_IN)
         assert info["method"] == "TRANSFER", f"Expected TRANSFER, got {info['method']}"
-        assert (
-            info["entity"] == "MEERA MOHIDDIN"
-        ), f"Expected 'MEERA MOHIDDIN', got '{info['entity']}'"
+        assert info["entity"] == "MEERA MOHIDDIN", f"Expected 'MEERA MOHIDDIN', got '{info['entity']}'"
         assert info["type"] == "CREDIT"  # DEP = incoming
 
     def test_extract_bank_transfer_outgoing(self):
@@ -81,9 +77,7 @@ class TestStructuredParsing:
         parser = BankStatementParser("dummy.xlsx")
         info = parser.extract_details(BANK_TRANSFER_OUT)
         assert info["method"] == "TRANSFER", f"Expected TRANSFER, got {info['method']}"
-        assert (
-            info["entity"] == "HASSAN MOHIDDIN"
-        ), f"Expected 'HASSAN MOHIDDIN', got '{info['entity']}'"
+        assert info["entity"] == "HASSAN MOHIDDIN", f"Expected 'HASSAN MOHIDDIN', got '{info['entity']}'"
         assert info["type"] == "DEBIT"  # WDL = outgoing
 
     def test_extract_neft_transfer(self):
@@ -91,6 +85,4 @@ class TestStructuredParsing:
         parser = BankStatementParser("dummy.xlsx")
         info = parser.extract_details(NEFT_TRANSFER)
         assert info["method"] == "NEFT", f"Expected NEFT, got {info['method']}"
-        assert (
-            info["entity"] == "MEERA MOHIDDIN"
-        ), f"Expected 'MEERA MOHIDDIN', got '{info['entity']}'"
+        assert info["entity"] == "MEERA MOHIDDIN", f"Expected 'MEERA MOHIDDIN', got '{info['entity']}'"

@@ -105,7 +105,7 @@ Check these at the two moments that matter — **before writing any code** and *
 
 Skip brainstorming **only if** the change is trivially scoped: you know exactly what to change, it's a single file/function, and the approach is completely obvious (rename, typo, update a string). When in doubt — brainstorm.
 
-### Red Flags — You Are Drifting If:
+### Red Flags — You Are Drifting If
 
 - You wrote code without a test
 - You wrote code without a design doc in `docs/`

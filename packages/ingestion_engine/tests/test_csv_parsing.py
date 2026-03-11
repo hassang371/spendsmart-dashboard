@@ -1,4 +1,5 @@
 from io import StringIO
+
 from packages.ingestion_engine.import_transactions import parse_csv_content
 
 
@@ -69,9 +70,7 @@ def test_parse_csv_payment_method_mapping():
 
     df = parse_csv_content(StringIO(csv_data))
 
-    assert (
-        "method" in df.columns
-    ), "Expected 'method' column from 'Payment method' mapping"
+    assert "method" in df.columns, "Expected 'method' column from 'Payment method' mapping"
     assert df.iloc[0]["method"] == "Visa **** 3534"
     assert df.iloc[1]["method"] == "UPI: QR code"
     assert df.iloc[2]["method"] == "Axis Bank UPI"

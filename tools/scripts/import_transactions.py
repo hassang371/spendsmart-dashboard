@@ -1,11 +1,13 @@
+import argparse
+import hashlib
+import math
 import os
 import sys
-import argparse
-import math
-import hashlib
+
 import pandas as pd
-from supabase import create_client, Client
 from dotenv import load_dotenv
+
+from supabase import Client, create_client
 
 # Load env
 load_dotenv()
@@ -77,9 +79,7 @@ def ingest_file(file_path: str, user_id: str):
     for _, row in df.iterrows():
         try:
             # Parse Amount
-            amt = float(
-                str(row["amount"]).replace(",", "").replace("₹", "").replace("$", "")
-            )
+            amt = float(str(row["amount"]).replace(",", "").replace("₹", "").replace("$", ""))
 
             # Type handling (if exists)
             txn_type = str(row.get("type", "") or "").lower()
@@ -99,15 +99,9 @@ def ingest_file(file_path: str, user_id: str):
                 "amount": amt,
                 "currency": str(row.get("currency", "INR") or "INR"),
                 "description": str(row["description"]),
-                "category": str(
-                    row.get("category", "Uncategorized") or "Uncategorized"
-                ),
-                "merchant_name": str(
-                    row.get("merchant", row["description"]) or row["description"]
-                ),
-                "payment_method": str(
-                    row.get("payment_method", "unknown") or "unknown"
-                ),
+                "category": str(row.get("category", "Uncategorized") or "Uncategorized"),
+                "merchant_name": str(row.get("merchant", row["description"]) or row["description"]),
+                "payment_method": str(row.get("payment_method", "unknown") or "unknown"),
                 "status": str(row.get("status", "completed") or "completed"),
                 "fingerprint": fingerprint,
                 "raw_data": {k: sanitize_value(v) for k, v in row.to_dict().items()},
@@ -137,9 +131,7 @@ def ingest_file(file_path: str, user_id: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingest transactions")
     parser.add_argument("file", help="Path to CSV/Excel file")
-    parser.add_argument(
-        "--user_id", required=True, help="Target Supabase User ID (UUID)"
-    )
+    parser.add_argument("--user_id", required=True, help="Target Supabase User ID (UUID)")
 
     args = parser.parse_args()
 

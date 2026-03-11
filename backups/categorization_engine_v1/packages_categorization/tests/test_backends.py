@@ -1,6 +1,8 @@
 """Tests for backend base class."""
+
 import pytest
 import torch
+
 from packages.categorization.backends.base import BackendBase
 
 

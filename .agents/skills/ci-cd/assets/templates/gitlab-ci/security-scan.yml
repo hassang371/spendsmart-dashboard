@@ -114,9 +114,14 @@ sast:go:
       - go.mod
   allow_failure: false
 
-# GitLab built-in SAST
+# GitLab built-in security templates
 include:
   - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Container-Scanning.gitlab-ci.yml
+  - template: DAST.gitlab-ci.yml
+  - template: Security/License-Scanning.gitlab-ci.yml
+
 
 sast:
   variables:
@@ -156,9 +161,7 @@ sca:python:
       - requirements.txt
   allow_failure: false
 
-# GitLab built-in Dependency Scanning
-include:
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
 
 dependency_scanning:
   variables:
@@ -260,9 +263,7 @@ container:sbom:
     - main
     - tags
 
-# GitLab built-in Container Scanning
-include:
-  - template: Security/Container-Scanning.gitlab-ci.yml
+
 
 container_scanning:
   needs: [build:docker]
@@ -314,9 +315,7 @@ dast:zap-full:
     - schedules  # Run on schedule only (slow)
   allow_failure: true
 
-# GitLab built-in DAST
-include:
-  - template: DAST.gitlab-ci.yml
+
 
 dast:
   variables:
@@ -344,9 +343,7 @@ license:check:
       - package.json
   allow_failure: false
 
-# GitLab built-in License Scanning
-include:
-  - template: Security/License-Scanning.gitlab-ci.yml
+
 
 license_scanning:
   only:
@@ -468,12 +465,3 @@ workflow:
 # Interruptible jobs for MR pipelines
 .interruptible:
   interruptible: true
-
-secret-scan:trufflehog:
-  extends: .interruptible
-
-sast:semgrep:
-  extends: .interruptible
-
-sca:npm-audit:
-  extends: .interruptible

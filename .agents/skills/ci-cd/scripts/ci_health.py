@@ -21,8 +21,8 @@ import argparse
 import json
 import subprocess
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Dict
 
 
@@ -88,9 +88,7 @@ class CIHealthChecker:
             self.metrics["failed_runs"] = len(failed_runs)
             self.metrics["cancelled_runs"] = len(cancelled_runs)
             self.metrics["success_runs"] = len(success_runs)
-            self.metrics["failure_rate"] = (
-                (len(failed_runs) / total_runs * 100) if total_runs > 0 else 0
-            )
+            self.metrics["failure_rate"] = (len(failed_runs) / total_runs * 100) if total_runs > 0 else 0
 
             # Group failures by workflow
             failure_by_workflow = {}
@@ -99,39 +97,23 @@ class CIHealthChecker:
                 failure_by_workflow[workflow] = failure_by_workflow.get(workflow, 0) + 1
 
             print(f"✅ Analyzed {total_runs} recent runs:")
-            print(
-                f"   - Success: {len(success_runs)} ({len(success_runs)/total_runs*100:.1f}%)"
-            )
-            print(
-                f"   - Failed: {len(failed_runs)} ({len(failed_runs)/total_runs*100:.1f}%)"
-            )
-            print(
-                f"   - Cancelled: {len(cancelled_runs)} ({len(cancelled_runs)/total_runs*100:.1f}%)"
-            )
+            print(f"   - Success: {len(success_runs)} ({len(success_runs)/total_runs*100:.1f}%)")
+            print(f"   - Failed: {len(failed_runs)} ({len(failed_runs)/total_runs*100:.1f}%)")
+            print(f"   - Cancelled: {len(cancelled_runs)} ({len(cancelled_runs)/total_runs*100:.1f}%)")
 
             # Identify issues
             if self.metrics["failure_rate"] > 20:
-                self.issues.append(
-                    f"High failure rate: {self.metrics['failure_rate']:.1f}%"
-                )
-                self.insights.append(
-                    "Investigate failing workflows and address root causes"
-                )
+                self.issues.append(f"High failure rate: {self.metrics['failure_rate']:.1f}%")
+                self.insights.append("Investigate failing workflows and address root causes")
 
             if failure_by_workflow:
                 self.warnings.append("Workflows with recent failures:")
-                for workflow, count in sorted(
-                    failure_by_workflow.items(), key=lambda x: x[1], reverse=True
-                ):
+                for workflow, count in sorted(failure_by_workflow.items(), key=lambda x: x[1], reverse=True):
                     self.warnings.append(f"  - {workflow}: {count} failure(s)")
-                    self.insights.append(
-                        f"Review logs for '{workflow}': gh run view --repo {repo}"
-                    )
+                    self.insights.append(f"Review logs for '{workflow}': gh run view --repo {repo}")
 
             if len(cancelled_runs) > total_runs * 0.3:
-                self.warnings.append(
-                    f"High cancellation rate: {len(cancelled_runs)/total_runs*100:.1f}%"
-                )
+                self.warnings.append(f"High cancellation rate: {len(cancelled_runs)/total_runs*100:.1f}%")
                 self.insights.append(
                     "Excessive cancellations may indicate workflow timeout issues or manual interventions"
                 )
@@ -166,9 +148,7 @@ class CIHealthChecker:
         try:
             # Get recent pipelines
             per_page = self.config.get("limit", 20)
-            api_url = (
-                f"{url}/api/v4/projects/{project_id}/pipelines?per_page={per_page}"
-            )
+            api_url = f"{url}/api/v4/projects/{project_id}/pipelines?per_page={per_page}"
             req = urllib.request.Request(api_url, headers={"PRIVATE-TOKEN": token})
 
             with urllib.request.urlopen(req, timeout=30) as response:
@@ -189,28 +169,18 @@ class CIHealthChecker:
             self.metrics["failed"] = len(failed)
             self.metrics["success"] = len(success)
             self.metrics["running"] = len(running)
-            self.metrics["failure_rate"] = (
-                (len(failed) / total_pipelines * 100) if total_pipelines > 0 else 0
-            )
+            self.metrics["failure_rate"] = (len(failed) / total_pipelines * 100) if total_pipelines > 0 else 0
 
             print(f"✅ Analyzed {total_pipelines} recent pipelines:")
-            print(
-                f"   - Success: {len(success)} ({len(success)/total_pipelines*100:.1f}%)"
-            )
-            print(
-                f"   - Failed: {len(failed)} ({len(failed)/total_pipelines*100:.1f}%)"
-            )
+            print(f"   - Success: {len(success)} ({len(success)/total_pipelines*100:.1f}%)")
+            print(f"   - Failed: {len(failed)} ({len(failed)/total_pipelines*100:.1f}%)")
             print(f"   - Running: {len(running)}")
             print(f"   - Cancelled: {len(cancelled)}")
 
             # Identify issues
             if self.metrics["failure_rate"] > 20:
-                self.issues.append(
-                    f"High failure rate: {self.metrics['failure_rate']:.1f}%"
-                )
-                self.insights.append(
-                    "Review failing pipelines and fix recurring issues"
-                )
+                self.issues.append(f"High failure rate: {self.metrics['failure_rate']:.1f}%")
+                self.insights.append("Review failing pipelines and fix recurring issues")
 
             # Get details of recent failures
             if failed:
@@ -219,9 +189,7 @@ class CIHealthChecker:
                     ref = pipeline.get("ref", "unknown")
                     pipeline_id = pipeline.get("id")
                     self.warnings.append(f"  - Pipeline #{pipeline_id} on {ref}")
-                self.insights.append(
-                    f"View pipeline details: {url}/{project_id}/-/pipelines"
-                )
+                self.insights.append(f"View pipeline details: {url}/{project_id}/-/pipelines")
 
         except urllib.error.HTTPError as e:
             self.issues.append(f"API error: {e.code} - {e.reason}")
@@ -269,9 +237,7 @@ def print_report(report: Dict):
     print(f"🏥 CI/CD Health Report - {report['platform'].upper()}")
     print("=" * 60)
 
-    status_emoji = {"healthy": "✅", "degraded": "⚠️", "unhealthy": "❌"}.get(
-        report["status"], "❓"
-    )
+    status_emoji = {"healthy": "✅", "degraded": "⚠️", "unhealthy": "❌"}.get(report["status"], "❓")
     print(f"\nStatus: {status_emoji} {report['status'].upper()}")
 
     if report["metrics"]:
@@ -310,9 +276,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument(
-        "--platform", required=True, choices=["github", "gitlab"], help="CI/CD platform"
-    )
+    parser.add_argument("--platform", required=True, choices=["github", "gitlab"], help="CI/CD platform")
     parser.add_argument("--repo", help="GitHub repository (owner/repo)")
     parser.add_argument("--workflow", help="Specific workflow name to check")
     parser.add_argument("--project-id", help="GitLab project ID")

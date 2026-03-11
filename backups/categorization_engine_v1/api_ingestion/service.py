@@ -6,7 +6,6 @@ paths now produce identical fingerprints for the same transaction.
 """
 
 import hashlib
-from typing import Optional
 
 
 def generate_fingerprint(

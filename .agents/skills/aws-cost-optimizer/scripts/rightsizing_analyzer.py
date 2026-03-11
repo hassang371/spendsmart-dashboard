@@ -16,18 +16,17 @@ Requirements:
 """
 
 import argparse
-import boto3
+import sys
 from datetime import datetime, timedelta
 from typing import List, Optional
+
+import boto3
 from tabulate import tabulate
-import sys
 
 
 class RightsizingAnalyzer:
     def __init__(self, profile: str = None, region: str = None, days: int = 14):
-        self.session = (
-            boto3.Session(profile_name=profile) if profile else boto3.Session()
-        )
+        self.session = boto3.Session(profile_name=profile) if profile else boto3.Session()
         self.regions = [region] if region else self._get_all_regions()
         self.days = days
         self.findings = {"ec2": [], "rds": []}
@@ -135,9 +134,7 @@ class RightsizingAnalyzer:
                 ec2 = self.session.client("ec2", region_name=region)
                 cloudwatch = self.session.client("cloudwatch", region_name=region)
 
-                instances = ec2.describe_instances(
-                    Filters=[{"Name": "instance-state-name", "Values": ["running"]}]
-                )
+                instances = ec2.describe_instances(Filters=[{"Name": "instance-state-name", "Values": ["running"]}])
 
                 for reservation in instances["Reservations"]:
                     for instance in reservation["Instances"]:
@@ -145,17 +142,11 @@ class RightsizingAnalyzer:
                         instance_type = instance["InstanceType"]
 
                         # Skip smallest instances (already optimized)
-                        if any(
-                            size in instance_type for size in ["nano", "micro", "small"]
-                        ):
+                        if any(size in instance_type for size in ["nano", "micro", "small"]):
                             continue
 
                         name_tag = next(
-                            (
-                                tag["Value"]
-                                for tag in instance.get("Tags", [])
-                                if tag["Key"] == "Name"
-                            ),
+                            (tag["Value"] for tag in instance.get("Tags", []) if tag["Key"] == "Name"),
                             "N/A",
                         )
 
@@ -168,9 +159,7 @@ class RightsizingAnalyzer:
                             cpu_metrics = cloudwatch.get_metric_statistics(
                                 Namespace="AWS/EC2",
                                 MetricName="CPUUtilization",
-                                Dimensions=[
-                                    {"Name": "InstanceId", "Value": instance_id}
-                                ],
+                                Dimensions=[{"Name": "InstanceId", "Value": instance_id}],
                                 StartTime=start_time,
                                 EndTime=end_time,
                                 Period=3600,
@@ -180,23 +169,17 @@ class RightsizingAnalyzer:
                             if not cpu_metrics["Datapoints"]:
                                 continue
 
-                            avg_cpu = sum(
-                                [p["Average"] for p in cpu_metrics["Datapoints"]]
-                            ) / len(cpu_metrics["Datapoints"])
-                            max_cpu = max(
-                                [p["Maximum"] for p in cpu_metrics["Datapoints"]]
+                            avg_cpu = sum([p["Average"] for p in cpu_metrics["Datapoints"]]) / len(
+                                cpu_metrics["Datapoints"]
                             )
+                            max_cpu = max([p["Maximum"] for p in cpu_metrics["Datapoints"]])
 
                             # Check if underutilized
                             if avg_cpu < self.cpu_thresholds["low"] and max_cpu < 60:
-                                smaller_type = self._get_smaller_instance_type(
-                                    instance_type
-                                )
+                                smaller_type = self._get_smaller_instance_type(instance_type)
 
                                 if smaller_type:
-                                    current_cost = self._estimate_hourly_cost(
-                                        instance_type
-                                    )
+                                    current_cost = self._estimate_hourly_cost(instance_type)
                                     new_cost = self._estimate_hourly_cost(smaller_type)
                                     monthly_savings = (current_cost - new_cost) * 730
                                     annual_savings = monthly_savings * 12
@@ -260,9 +243,7 @@ class RightsizingAnalyzer:
                         cpu_metrics = cloudwatch.get_metric_statistics(
                             Namespace="AWS/RDS",
                             MetricName="CPUUtilization",
-                            Dimensions=[
-                                {"Name": "DBInstanceIdentifier", "Value": instance_id}
-                            ],
+                            Dimensions=[{"Name": "DBInstanceIdentifier", "Value": instance_id}],
                             StartTime=start_time,
                             EndTime=end_time,
                             Period=3600,
@@ -273,9 +254,7 @@ class RightsizingAnalyzer:
                         conn_metrics = cloudwatch.get_metric_statistics(
                             Namespace="AWS/RDS",
                             MetricName="DatabaseConnections",
-                            Dimensions=[
-                                {"Name": "DBInstanceIdentifier", "Value": instance_id}
-                            ],
+                            Dimensions=[{"Name": "DBInstanceIdentifier", "Value": instance_id}],
                             StartTime=start_time,
                             EndTime=end_time,
                             Period=3600,
@@ -285,26 +264,22 @@ class RightsizingAnalyzer:
                         if not cpu_metrics["Datapoints"]:
                             continue
 
-                        avg_cpu = sum(
-                            [p["Average"] for p in cpu_metrics["Datapoints"]]
-                        ) / len(cpu_metrics["Datapoints"])
+                        avg_cpu = sum([p["Average"] for p in cpu_metrics["Datapoints"]]) / len(
+                            cpu_metrics["Datapoints"]
+                        )
                         max_cpu = max([p["Maximum"] for p in cpu_metrics["Datapoints"]])
 
                         avg_conns = 0
                         max_conns = 0
                         if conn_metrics["Datapoints"]:
-                            avg_conns = sum(
-                                [p["Average"] for p in conn_metrics["Datapoints"]]
-                            ) / len(conn_metrics["Datapoints"])
-                            max_conns = max(
-                                [p["Maximum"] for p in conn_metrics["Datapoints"]]
+                            avg_conns = sum([p["Average"] for p in conn_metrics["Datapoints"]]) / len(
+                                conn_metrics["Datapoints"]
                             )
+                            max_conns = max([p["Maximum"] for p in conn_metrics["Datapoints"]])
 
                         # Check if underutilized
                         if avg_cpu < self.cpu_thresholds["low"] and max_cpu < 60:
-                            smaller_class = self._get_smaller_instance_type(
-                                instance_class
-                            )
+                            smaller_class = self._get_smaller_instance_type(instance_class)
 
                             if smaller_class:
                                 # RDS pricing is roughly 2x EC2
@@ -437,16 +412,12 @@ Examples:
 
     parser.add_argument("--region", help="AWS region (default: all regions)")
     parser.add_argument("--profile", help="AWS profile name (default: default profile)")
-    parser.add_argument(
-        "--days", type=int, default=14, help="Days of metrics to analyze (default: 14)"
-    )
+    parser.add_argument("--days", type=int, default=14, help="Days of metrics to analyze (default: 14)")
 
     args = parser.parse_args()
 
     try:
-        analyzer = RightsizingAnalyzer(
-            profile=args.profile, region=args.region, days=args.days
-        )
+        analyzer = RightsizingAnalyzer(profile=args.profile, region=args.region, days=args.days)
         analyzer.run()
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)

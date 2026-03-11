@@ -1,9 +1,9 @@
+import pytest
 import torch
-from packages.categorization.hypcd import HyperbolicEmbedder, HypCDClassifier
 from geoopt import PoincareBall
 
+from packages.categorization.hypcd import HypCDClassifier
 
-import pytest
 
 @pytest.mark.skip(reason="Mobile backend deferred to mobile phase")
 def test_hyperbolic_embedder_initialization():
@@ -120,9 +120,7 @@ def test_feature_clipping():
     """Feature clipping should prevent boundary violations."""
     from packages.categorization.hypcd import HyperbolicProjector
 
-    projector = HyperbolicProjector(
-        input_dim=10, hidden_dim=8, output_dim=5, clip_factor=0.9
-    )
+    projector = HyperbolicProjector(input_dim=10, hidden_dim=8, output_dim=5, clip_factor=0.9)
 
     # Create input that would produce large output
     x = torch.randn(1, 10) * 10
@@ -136,7 +134,6 @@ def test_feature_clipping():
 
 def test_hyperbolic_embedder_with_backend():
     """HyperbolicEmbedder should work with new backend architecture."""
-    from packages.categorization.hypcd import HyperbolicEmbedder
     from packages.categorization.backends.cloud import CloudBackend
 
     backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
@@ -153,8 +150,9 @@ def test_hyperbolic_embedder_with_backend():
 
 def test_hyp_linear_init():
     """HypLinear should initialize with correct dimensions."""
-    from packages.categorization.hypcd import HypLinear
     from geoopt import PoincareBall
+
+    from packages.categorization.hypcd import HypLinear
 
     manifold = PoincareBall(c=1.0)
     layer = HypLinear(128, 64, manifold)
@@ -165,8 +163,9 @@ def test_hyp_linear_init():
 
 def test_hyp_linear_forward():
     """HypLinear should perform Möbius matrix multiplication."""
-    from packages.categorization.hypcd import HypLinear
     from geoopt import PoincareBall
+
+    from packages.categorization.hypcd import HypLinear
 
     manifold = PoincareBall(c=1.0)
     layer = HypLinear(10, 5, manifold)
@@ -186,8 +185,9 @@ def test_hyp_linear_forward():
 
 def test_hyp_ffn_init():
     """HypFFN should initialize with correct dimensions."""
-    from packages.categorization.hypcd import HypFFN
     from geoopt import PoincareBall
+
+    from packages.categorization.hypcd import HypFFN
 
     manifold = PoincareBall(c=1.0)
     classifier = HypFFN(dim=128, num_classes=11, manifold=manifold)
@@ -199,8 +199,9 @@ def test_hyp_ffn_init():
 
 def test_hyp_ffn_forward():
     """HypFFN should classify hyperbolic embeddings."""
-    from packages.categorization.hypcd import HypFFN
     from geoopt import PoincareBall
+
+    from packages.categorization.hypcd import HypFFN
 
     manifold = PoincareBall(c=1.0)
     classifier = HypFFN(dim=128, num_classes=11, manifold=manifold)
@@ -219,8 +220,8 @@ def test_hyp_ffn_forward():
 
 def test_hypcd_classifier_with_backend():
     """HypCDClassifier should work with backend architecture."""
-    from packages.categorization.hypcd import HypCDClassifier
     from packages.categorization.backends.cloud import CloudBackend
+    from packages.categorization.hypcd import HypCDClassifier
 
     backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
     classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)
@@ -236,8 +237,8 @@ def test_hypcd_classifier_with_backend():
 
 def test_hypcd_classifier_predict_batch():
     """HypCDClassifier should handle batch predictions."""
-    from packages.categorization.hypcd import HypCDClassifier
     from packages.categorization.backends.cloud import CloudBackend
+    from packages.categorization.hypcd import HypCDClassifier
 
     backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
     classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)
@@ -253,8 +254,8 @@ def test_hypcd_classifier_predict_batch():
 
 def test_predict_batch_returns_depth_and_norm():
     """predict_batch output must include 'depth', 'norm', and 'path' keys (§3.8)."""
-    from packages.categorization.hypcd import HypCDClassifier
     from packages.categorization.backends.cloud import CloudBackend
+    from packages.categorization.hypcd import HypCDClassifier
 
     backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
     classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)
@@ -271,8 +272,9 @@ def test_predict_batch_low_confidence_routes_to_novel(monkeypatch):
     """Predictions with confidence < 0.5 must be routed to GCD (§3.7)."""
     import torch
     from geoopt import PoincareBall
-    from packages.categorization.hypcd import HypCDClassifier
+
     from packages.categorization.backends.cloud import CloudBackend
+    from packages.categorization.hypcd import HypCDClassifier
 
     backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
     classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)
@@ -293,8 +295,8 @@ def test_predict_batch_low_confidence_routes_to_novel(monkeypatch):
 
 def test_predict_batch_keyword_path_label():
     """Keyword-matched predictions must have path='keyword_rule'."""
-    from packages.categorization.hypcd import HypCDClassifier
     from packages.categorization.backends.cloud import CloudBackend
+    from packages.categorization.hypcd import HypCDClassifier
 
     backend = CloudBackend(model_name="prajjwal1/bert-tiny", dim=128)
     classifier = HypCDClassifier(backend=backend, num_classes=5, proj_dim=64)

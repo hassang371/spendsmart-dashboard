@@ -1,11 +1,12 @@
-import pandas as pd
 import io
 import logging
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 # OLE2 Compound Document magic bytes — encrypted Office files use this container
-_OLE2_MAGIC = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"
+_OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
 
 def _is_ole2(file_content: bytes) -> bool:
@@ -13,9 +14,7 @@ def _is_ole2(file_content: bytes) -> bool:
     return file_content[:8] == _OLE2_MAGIC
 
 
-def parse_excel_transaction_file(
-    file_content: bytes, password: str = None
-) -> pd.DataFrame:
+def parse_excel_transaction_file(file_content: bytes, password: str = None) -> pd.DataFrame:
     """
     Parses an encrypted (or unencrypted) Excel file into a standardized DataFrame.
     Returns columns: date, description, amount.
@@ -26,13 +25,12 @@ def parse_excel_transaction_file(
         # File is in OLE2 format — either a legacy .xls or an encrypted .xlsx
         try:
             import msoffcrypto
+
             with io.BytesIO(file_content) as f:
                 office_file = msoffcrypto.OfficeFile(f)
                 if office_file.is_encrypted():
                     if not password:
-                        raise ValueError(
-                            "File is password-protected. Please provide the password."
-                        )
+                        raise ValueError("File is password-protected. Please provide the password.")
                     decrypted_workbook = io.BytesIO()
                     office_file.load_key(password=password)
                     office_file.decrypt(decrypted_workbook)
@@ -61,9 +59,7 @@ def parse_excel_transaction_file(
     header_row_idx = -1
     for i, row in df_raw.iterrows():
         row_values = [str(x).lower() for x in row.values]
-        if "date" in row_values and (
-            "details" in row_values or "description" in row_values
-        ):
+        if "date" in row_values and ("details" in row_values or "description" in row_values):
             header_row_idx = i
             break
 
@@ -73,14 +69,10 @@ def parse_excel_transaction_file(
     # Read actual data
     decrypted_workbook.seek(0)
     try:
-        df = pd.read_excel(
-            decrypted_workbook, header=header_row_idx, dtype=object
-        )
+        df = pd.read_excel(decrypted_workbook, header=header_row_idx, dtype=object)
     except Exception:
         decrypted_workbook.seek(0)
-        df = pd.read_excel(
-            decrypted_workbook, header=header_row_idx, engine="openpyxl", dtype=object
-        )
+        df = pd.read_excel(decrypted_workbook, header=header_row_idx, engine="openpyxl", dtype=object)
 
     # Normalize Columns
     df.columns = [str(c).strip().lower() for c in df.columns]

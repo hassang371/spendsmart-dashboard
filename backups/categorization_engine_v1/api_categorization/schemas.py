@@ -3,8 +3,9 @@
 Fixes IMP-04: all endpoints use typed models instead of raw dicts.
 """
 
-from pydantic import BaseModel, Field
 from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class ClassifyRequest(BaseModel):

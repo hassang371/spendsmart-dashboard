@@ -101,11 +101,13 @@ terraform {
 ### State File Organization
 
 **Bad - Single State:**
+
 ```
 terraform.tfstate  (contains everything)
 ```
 
 **Good - Multiple States:**
+
 ```
 networking/terraform.tfstate
 compute/terraform.tfstate
@@ -170,6 +172,7 @@ Each module should do one thing well:
 
 **2. Composability**
 Modules should work together:
+
 ```hcl
 module "vpc" {
   source = "./modules/vpc"
@@ -184,6 +187,7 @@ module "eks" {
 ```
 
 **3. Sensible Defaults**
+
 ```hcl
 variable "instance_type" {
   type        = string
@@ -234,6 +238,7 @@ output "nat_gateway_ips" {
 ### Module Versioning
 
 **Use Git Tags for Versioning:**
+
 ```hcl
 module "vpc" {
   source = "git::https://github.com/company/terraform-modules.git//vpc?ref=v1.2.3"
@@ -254,6 +259,7 @@ module "vpc" {
 ### Variable Declaration
 
 **Always Include:**
+
 ```hcl
 variable "environment" {
   type        = string
@@ -276,6 +282,7 @@ secrets.auto.tfvars    # Auto-loaded (in .gitignore)
 ```
 
 **Usage:**
+
 ```bash
 terraform apply -var-file="prod.tfvars"
 ```
@@ -283,6 +290,7 @@ terraform apply -var-file="prod.tfvars"
 ### Sensitive Variables
 
 **Mark as Sensitive:**
+
 ```hcl
 variable "database_password" {
   type        = string
@@ -292,6 +300,7 @@ variable "database_password" {
 ```
 
 **Never commit secrets:**
+
 ```bash
 # .gitignore
 *.auto.tfvars
@@ -300,6 +309,7 @@ terraform.tfvars  # If contains secrets
 ```
 
 **Better: Use External Secret Management**
+
 ```hcl
 data "aws_secretsmanager_secret_version" "db_password" {
   secret_id = "prod/database/master-password"
@@ -313,6 +323,7 @@ resource "aws_db_instance" "main" {
 ### Variable Organization
 
 **Group related variables:**
+
 ```hcl
 # Network Configuration
 variable "vpc_cidr" { }
@@ -340,6 +351,7 @@ variable "tags" {
 ### Naming Conventions
 
 **Terraform Resources (snake_case):**
+
 ```hcl
 resource "aws_vpc" "main_vpc" { }
 resource "aws_subnet" "public_subnet_az1" { }
@@ -347,6 +359,7 @@ resource "aws_instance" "web_server_01" { }
 ```
 
 **AWS Resource Names (kebab-case):**
+
 ```hcl
 resource "aws_s3_bucket" "logs" {
   bucket = "company-prod-application-logs"
@@ -475,6 +488,7 @@ resource "aws_subnet" "private" {
 ### 4. Secret Management
 
 **Never in Code:**
+
 ```hcl
 # ❌ NEVER DO THIS
 resource "aws_db_instance" "bad" {
@@ -483,6 +497,7 @@ resource "aws_db_instance" "bad" {
 ```
 
 **Use AWS Secrets Manager:**
+
 ```hcl
 # ✅ CORRECT APPROACH
 data "aws_secretsmanager_secret_version" "db" {
@@ -525,38 +540,49 @@ resource "aws_instance" "web" {
 ### Pre-Deployment Validation
 
 **1. Terraform Validate**
+
 ```bash
 terraform validate
 ```
+
 Checks syntax and configuration validity.
 
 **2. Terraform Plan**
+
 ```bash
 terraform plan -out=tfplan
 ```
+
 Review changes before applying.
 
 **3. tflint**
+
 ```bash
 tflint --module
 ```
+
 Linter for catching errors and enforcing conventions.
 
 **4. checkov**
+
 ```bash
 checkov -d .
 ```
+
 Security and compliance scanning.
 
 **5. terraform-docs**
+
 ```bash
 terraform-docs markdown . > README.md
 ```
+
 Auto-generate documentation.
 
 ### Automated Testing
 
 **Terratest (Go):**
+
 ```go
 func TestVPCCreation(t *testing.T) {
     terraformOptions := terraform.WithDefaultRetryableErrors(t, &terraform.Options{
@@ -661,6 +687,7 @@ jobs:
 ## Quick Reference
 
 ### Essential Commands
+
 ```bash
 # Initialize
 terraform init
@@ -691,6 +718,7 @@ terraform output
 ```
 
 ### Useful Flags
+
 ```bash
 # Plan without color
 terraform plan -no-color

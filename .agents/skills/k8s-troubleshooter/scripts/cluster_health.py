@@ -6,16 +6,14 @@ Performs comprehensive cluster health diagnostics
 
 import json
 import subprocess
-from typing import Dict, List, Any
 from datetime import datetime
+from typing import Any, Dict, List
 
 
 def run_kubectl(args: List[str]) -> Dict[str, Any]:
     """Run kubectl command and return parsed JSON"""
     try:
-        result = subprocess.run(
-            ["kubectl"] + args, capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(["kubectl"] + args, capture_output=True, text=True, check=True)
         return json.loads(result.stdout) if result.stdout else {}
     except subprocess.CalledProcessError as e:
         return {"error": e.stderr}
@@ -49,9 +47,7 @@ def check_nodes() -> Dict[str, Any]:
         # Check other conditions
         for condition in conditions:
             if condition["type"] != "Ready" and condition["status"] == "True":
-                results["issues"].append(
-                    f"Node {name}: {condition['type']} = {condition['status']}"
-                )
+                results["issues"].append(f"Node {name}: {condition['type']} = {condition['status']}")
 
     return results
 
@@ -132,9 +128,7 @@ def check_crashloop_pods() -> Dict[str, Any]:
         container_statuses = pod.get("status", {}).get("containerStatuses", [])
         for container in container_statuses:
             state = container.get("state", {})
-            if "waiting" in state and "CrashLoopBackOff" in state["waiting"].get(
-                "reason", ""
-            ):
+            if "waiting" in state and "CrashLoopBackOff" in state["waiting"].get("reason", ""):
                 name = pod["metadata"]["name"]
                 namespace = pod["metadata"]["namespace"]
                 container_name = container["name"]

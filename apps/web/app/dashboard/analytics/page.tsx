@@ -80,7 +80,7 @@ export default function AnalyticsPage() {
         setTransactions(response.items);
         setTruncated(!!response.truncated);
         setTotalCount(response.total_count ?? null);
-        
+
         setCachedData(cacheKey, {
           items: response.items,
           truncated: response.truncated,

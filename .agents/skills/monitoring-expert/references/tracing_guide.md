@@ -11,6 +11,7 @@ Distributed tracing tracks a request as it flows through multiple services in a 
 **Context**: Metadata propagated between services (trace_id, span_id)
 
 ### Example Flow
+
 ```
 User Request → API Gateway → Auth Service → User Service → Database
                     ↓              ↓             ↓
@@ -37,6 +38,7 @@ OpenTelemetry is the industry standard for instrumentation.
 **Exporters**: Send data to backends (Jaeger, Tempo, Zipkin)
 
 ### Architecture
+
 ```
 Application → OTel SDK → OTel Collector → Backend (Jaeger/Tempo)
                                               ↓
@@ -50,6 +52,7 @@ Application → OTel SDK → OTel Collector → Backend (Jaeger/Tempo)
 ### Python (using OpenTelemetry)
 
 **Setup**:
+
 ```python
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -67,6 +70,7 @@ trace.get_tracer_provider().add_span_processor(span_processor)
 ```
 
 **Manual instrumentation**:
+
 ```python
 from opentelemetry import trace
 
@@ -89,6 +93,7 @@ def process_order(order_id):
 ```
 
 **Auto-instrumentation** (Flask example):
+
 ```python
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
@@ -107,6 +112,7 @@ SQLAlchemyInstrumentor().instrument(engine=db.engine)
 ### Node.js (using OpenTelemetry)
 
 **Setup**:
+
 ```javascript
 const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
 const { BatchSpanProcessor } = require('@opentelemetry/sdk-trace-base');
@@ -120,6 +126,7 @@ provider.register();
 ```
 
 **Manual instrumentation**:
+
 ```javascript
 const tracer = provider.getTracer('my-service');
 
@@ -142,6 +149,7 @@ async function processOrder(orderId) {
 ```
 
 **Auto-instrumentation**:
+
 ```javascript
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
 const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
@@ -160,6 +168,7 @@ registerInstrumentations({
 ### Go (using OpenTelemetry)
 
 **Setup**:
+
 ```go
 import (
     "go.opentelemetry.io/otel"
@@ -177,6 +186,7 @@ func initTracer() {
 ```
 
 **Manual instrumentation**:
+
 ```go
 import (
     "go.opentelemetry.io/otel"
@@ -213,6 +223,7 @@ func processOrder(ctx context.Context, orderID string) error {
 Follow OpenTelemetry semantic conventions for consistency:
 
 **HTTP**:
+
 ```python
 span.set_attribute("http.method", "GET")
 span.set_attribute("http.url", "https://api.example.com/users")
@@ -221,6 +232,7 @@ span.set_attribute("http.user_agent", "Mozilla/5.0...")
 ```
 
 **Database**:
+
 ```python
 span.set_attribute("db.system", "postgresql")
 span.set_attribute("db.name", "users_db")
@@ -229,6 +241,7 @@ span.set_attribute("db.operation", "SELECT")
 ```
 
 **RPC/gRPC**:
+
 ```python
 span.set_attribute("rpc.system", "grpc")
 span.set_attribute("rpc.service", "UserService")
@@ -237,6 +250,7 @@ span.set_attribute("rpc.grpc.status_code", 0)
 ```
 
 **Messaging**:
+
 ```python
 span.set_attribute("messaging.system", "kafka")
 span.set_attribute("messaging.destination", "user-events")
@@ -247,6 +261,7 @@ span.set_attribute("messaging.message_id", "msg123")
 ### Custom Attributes
 
 Add business context:
+
 ```python
 span.set_attribute("user.id", "user123")
 span.set_attribute("order.id", "ORD-456")
@@ -261,6 +276,7 @@ span.set_attribute("cache.hit", False)
 ### W3C Trace Context (Standard)
 
 Headers propagated between services:
+
 ```
 traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01
 tracestate: vendor1=value1,vendor2=value2
@@ -271,6 +287,7 @@ tracestate: vendor1=value1,vendor2=value2
 ### Implementation
 
 **Python**:
+
 ```python
 from opentelemetry.propagate import inject, extract
 import requests
@@ -286,6 +303,7 @@ ctx = extract(request.headers)
 ```
 
 **Node.js**:
+
 ```javascript
 const { propagation } = require('@opentelemetry/api');
 
@@ -299,6 +317,7 @@ const ctx = propagation.extract(context.active(), req.headers);
 ```
 
 **HTTP Example**:
+
 ```bash
 curl -H "traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" \
      https://api.example.com/users
@@ -309,6 +328,7 @@ curl -H "traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" \
 ## Sampling Strategies
 
 ### 1. Always On/Off
+
 ```python
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON, ALWAYS_OFF
@@ -321,6 +341,7 @@ provider = TracerProvider(sampler=ALWAYS_OFF)
 ```
 
 ### 2. Probability-Based
+
 ```python
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 
@@ -329,6 +350,7 @@ provider = TracerProvider(sampler=TraceIdRatioBased(0.1))
 ```
 
 ### 3. Rate Limiting
+
 ```python
 from opentelemetry.sdk.trace.sampling import ParentBased, RateLimitingSampler
 
@@ -338,6 +360,7 @@ provider = TracerProvider(sampler=sampler)
 ```
 
 ### 4. Parent-Based (Default)
+
 ```python
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
@@ -347,6 +370,7 @@ provider = TracerProvider(sampler=sampler)
 ```
 
 ### 5. Custom Sampling
+
 ```python
 from opentelemetry.sdk.trace.sampling import Sampler, Decision
 
@@ -376,6 +400,7 @@ provider = TracerProvider(sampler=ErrorSampler())
 ### Jaeger
 
 **Docker Compose**:
+
 ```yaml
 version: '3'
 services:
@@ -390,6 +415,7 @@ services:
 ```
 
 **Query traces**:
+
 ```bash
 # UI: http://localhost:16686
 
@@ -403,6 +429,7 @@ curl "http://localhost:16686/api/traces?service=my-service&limit=20"
 ### Grafana Tempo
 
 **Docker Compose**:
+
 ```yaml
 version: '3'
 services:
@@ -417,6 +444,7 @@ services:
 ```
 
 **tempo.yaml**:
+
 ```yaml
 server:
   http_listen_port: 3200
@@ -442,6 +470,7 @@ storage:
 ### AWS X-Ray
 
 **Configuration**:
+
 ```python
 from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.ext.flask.middleware import XRayMiddleware
@@ -451,6 +480,7 @@ XRayMiddleware(app, xray_recorder)
 ```
 
 **Query**:
+
 ```bash
 aws xray get-trace-summaries \
   --start-time 2024-10-28T00:00:00 \
@@ -463,6 +493,7 @@ aws xray get-trace-summaries \
 ## Analysis Patterns
 
 ### Find Slow Traces
+
 ```
 # Jaeger UI
 - Filter by service
@@ -474,6 +505,7 @@ aws xray get-trace-summaries \
 ```
 
 ### Find Error Traces
+
 ```
 # Jaeger UI
 - Filter by tag: error=true
@@ -484,6 +516,7 @@ aws xray get-trace-summaries \
 ```
 
 ### Find Traces by User
+
 ```
 # Jaeger UI
 - Filter by tag: user.id=user123
@@ -510,6 +543,7 @@ Look for:
 ### Trace ID in Logs
 
 **Python**:
+
 ```python
 from opentelemetry import trace
 
@@ -527,6 +561,7 @@ logger.info("Processing order", **add_trace_context(), order_id=order_id)
 ```
 
 **Query logs for trace**:
+
 ```
 # Elasticsearch
 GET /logs/_search
@@ -543,6 +578,7 @@ GET /logs/_search
 ### Trace from Log (Grafana)
 
 Configure derived fields in Grafana:
+
 ```yaml
 datasources:
   - name: Loki
@@ -578,6 +614,7 @@ Always include:
 - Business identifiers (user_id, order_id)
 
 ### 4. Handle Errors
+
 ```python
 try:
     result = operation()
@@ -638,6 +675,7 @@ Generate RED metrics from trace data:
 **Duration**: Span duration percentiles
 
 **Example** (using Tempo + Prometheus):
+
 ```yaml
 # Generate metrics from spans
 metrics_generator:
@@ -649,6 +687,7 @@ metrics_generator:
 ```
 
 **Query**:
+
 ```promql
 # Request rate
 rate(traces_spanmetrics_calls_total[5m])

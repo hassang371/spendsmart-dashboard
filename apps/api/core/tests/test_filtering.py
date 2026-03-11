@@ -5,9 +5,7 @@ before it exists. Tests use a mock Supabase query builder to verify
 that filters chain the correct Supabase client calls.
 """
 
-import pytest
-from unittest.mock import MagicMock, call
-from datetime import date
+from unittest.mock import MagicMock
 
 from apps.api.core.filtering import TransactionFilter, apply_filters
 

@@ -9,8 +9,6 @@ import os
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from apps.api.tasks.cleanup_tasks import (
     cleanup_old_checkpoints,
     cleanup_stale_training_jobs,
@@ -77,9 +75,7 @@ class TestCleanupOldCheckpoints:
         new_file.write_bytes(b"new model data")
         # new_file keeps current mtime (just created)
 
-        result = cleanup_old_checkpoints(
-            checkpoint_dir=str(tmp_path), max_age_days=30
-        )
+        result = cleanup_old_checkpoints(checkpoint_dir=str(tmp_path), max_age_days=30)
 
         assert result["deleted_count"] == 1
         assert not old_file.exists()
@@ -92,17 +88,13 @@ class TestCleanupOldCheckpoints:
         old_mtime = time.time() - (60 * 86400)
         os.utime(only_file, (old_mtime, old_mtime))
 
-        result = cleanup_old_checkpoints(
-            checkpoint_dir=str(tmp_path), max_age_days=30
-        )
+        result = cleanup_old_checkpoints(checkpoint_dir=str(tmp_path), max_age_days=30)
 
         assert result["deleted_count"] == 0
         assert only_file.exists()
 
     def test_returns_zero_for_missing_directory(self):
-        result = cleanup_old_checkpoints(
-            checkpoint_dir="/nonexistent/path", max_age_days=30
-        )
+        result = cleanup_old_checkpoints(checkpoint_dir="/nonexistent/path", max_age_days=30)
 
         assert result["deleted_count"] == 0
         assert result["deleted_bytes"] == 0
@@ -114,9 +106,7 @@ class TestCleanupOldCheckpoints:
         old_mtime = time.time() - (60 * 86400)
         os.utime(txt_file, (old_mtime, old_mtime))
 
-        result = cleanup_old_checkpoints(
-            checkpoint_dir=str(tmp_path), max_age_days=30
-        )
+        result = cleanup_old_checkpoints(checkpoint_dir=str(tmp_path), max_age_days=30)
 
         assert result["deleted_count"] == 0
         assert txt_file.exists()

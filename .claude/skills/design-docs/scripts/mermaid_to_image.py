@@ -23,28 +23,27 @@ Requirements:
 """
 
 import argparse
-import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 
 class MermaidRenderer:
     """Render Mermaid diagrams to images using mermaid-cli."""
 
-    VALID_THEMES = ['default', 'forest', 'dark', 'neutral', 'base']
-    VALID_FORMATS = ['png', 'svg', 'pdf']
+    VALID_THEMES = ["default", "forest", "dark", "neutral", "base"]
+    VALID_FORMATS = ["png", "svg", "pdf"]
 
     def __init__(
         self,
-        theme: str = 'default',
-        background: str = 'transparent',
+        theme: str = "default",
+        background: str = "transparent",
         width: Optional[int] = None,
         height: Optional[int] = None,
         scale: int = 1,
-        config_file: Optional[Path] = None
+        config_file: Optional[Path] = None,
     ):
         """
         Initialize Mermaid renderer.
@@ -62,7 +61,7 @@ class MermaidRenderer:
             print("Install with: npm install -g @mermaid-js/mermaid-cli", file=sys.stderr)
             sys.exit(1)
 
-        self.theme = theme if theme in self.VALID_THEMES else 'default'
+        self.theme = theme if theme in self.VALID_THEMES else "default"
         self.background = background
         self.width = width
         self.height = height
@@ -81,31 +80,26 @@ class MermaidRenderer:
             True if successful, False otherwise
         """
         # Build mmdc command
-        cmd = ['mmdc', '-i', str(input_path), '-o', str(output_path)]
+        cmd = ["mmdc", "-i", str(input_path), "-o", str(output_path)]
 
         # Add options
-        cmd.extend(['-t', self.theme])
-        cmd.extend(['-b', self.background])
+        cmd.extend(["-t", self.theme])
+        cmd.extend(["-b", self.background])
 
         if self.width:
-            cmd.extend(['-w', str(self.width)])
+            cmd.extend(["-w", str(self.width)])
 
         if self.height:
-            cmd.extend(['-H', str(self.height)])
+            cmd.extend(["-H", str(self.height)])
 
         if self.scale != 1:
-            cmd.extend(['-s', str(self.scale)])
+            cmd.extend(["-s", str(self.scale)])
 
         if self.config_file and self.config_file.exists():
-            cmd.extend(['-c', str(self.config_file)])
+            cmd.extend(["-c", str(self.config_file)])
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
             if result.returncode != 0:
                 print(f"ERROR: mmdc failed: {result.stderr}", file=sys.stderr)
@@ -122,7 +116,7 @@ class MermaidRenderer:
             return True
 
         except subprocess.TimeoutExpired:
-            print(f"ERROR: Rendering timed out after 60 seconds", file=sys.stderr)
+            print("ERROR: Rendering timed out after 60 seconds", file=sys.stderr)
             return False
 
         except Exception as e:
@@ -140,7 +134,7 @@ class MermaidRenderer:
         Returns:
             True if successful, False otherwise
         """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.mmd', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mmd", delete=False) as f:
             f.write(mermaid_code)
             temp_input = Path(f.name)
 
@@ -157,8 +151,8 @@ class MermaidRenderer:
         self,
         input_dir: Path,
         output_dir: Path,
-        output_format: str = 'png',
-        recursive: bool = False
+        output_format: str = "png",
+        recursive: bool = False,
     ) -> tuple[int, int]:
         """
         Batch render all .mmd files in a directory.
@@ -176,9 +170,9 @@ class MermaidRenderer:
 
         # Find all .mmd files
         if recursive:
-            mmd_files = list(input_dir.rglob('*.mmd'))
+            mmd_files = list(input_dir.rglob("*.mmd"))
         else:
-            mmd_files = list(input_dir.glob('*.mmd'))
+            mmd_files = list(input_dir.glob("*.mmd"))
 
         if not mmd_files:
             print(f"No .mmd files found in {input_dir}")
@@ -191,10 +185,10 @@ class MermaidRenderer:
             # Determine output path
             if recursive:
                 relative_path = input_file.relative_to(input_dir)
-                output_file = output_dir / relative_path.with_suffix(f'.{output_format}')
+                output_file = output_dir / relative_path.with_suffix(f".{output_format}")
                 output_file.parent.mkdir(parents=True, exist_ok=True)
             else:
-                output_file = output_dir / input_file.with_suffix(f'.{output_format}').name
+                output_file = output_dir / input_file.with_suffix(f".{output_format}").name
 
             print(f"  Rendering: {input_file.name} -> {output_file.name}...", end=" ")
 
@@ -211,11 +205,7 @@ class MermaidRenderer:
     def _check_mmdc_installed() -> bool:
         """Check if mermaid-cli (mmdc) is installed."""
         try:
-            result = subprocess.run(
-                ['mmdc', '--version'],
-                capture_output=True,
-                timeout=5
-            )
+            result = subprocess.run(["mmdc", "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
@@ -223,7 +213,7 @@ class MermaidRenderer:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Convert Mermaid diagrams to PNG or SVG images',
+        description="Convert Mermaid diagrams to PNG or SVG images",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -241,33 +231,52 @@ Examples:
 
 Themes:
   default, forest, dark, neutral, base
-        """
+        """,
     )
 
-    parser.add_argument('input', type=str,
-                        help='Input file (.mmd), directory, or "-" for stdin')
-    parser.add_argument('output', type=str,
-                        help='Output file or directory')
+    parser.add_argument("input", type=str, help='Input file (.mmd), directory, or "-" for stdin')
+    parser.add_argument("output", type=str, help="Output file or directory")
 
     # Rendering options
-    parser.add_argument('--theme', '-t', choices=MermaidRenderer.VALID_THEMES,
-                        default='default', help='Mermaid theme (default: default)')
-    parser.add_argument('--background', '-b', default='transparent',
-                        help='Background color (default: transparent)')
-    parser.add_argument('--width', '-w', type=int,
-                        help='Output width in pixels')
-    parser.add_argument('--height', '-H', type=int,
-                        help='Output height in pixels')
-    parser.add_argument('--scale', '-s', type=int, default=1, choices=[1, 2, 3],
-                        help='Scale factor (default: 1)')
-    parser.add_argument('--config', '-c', type=Path,
-                        help='Path to custom Mermaid config file')
+    parser.add_argument(
+        "--theme",
+        "-t",
+        choices=MermaidRenderer.VALID_THEMES,
+        default="default",
+        help="Mermaid theme (default: default)",
+    )
+    parser.add_argument(
+        "--background",
+        "-b",
+        default="transparent",
+        help="Background color (default: transparent)",
+    )
+    parser.add_argument("--width", "-w", type=int, help="Output width in pixels")
+    parser.add_argument("--height", "-H", type=int, help="Output height in pixels")
+    parser.add_argument(
+        "--scale",
+        "-s",
+        type=int,
+        default=1,
+        choices=[1, 2, 3],
+        help="Scale factor (default: 1)",
+    )
+    parser.add_argument("--config", "-c", type=Path, help="Path to custom Mermaid config file")
 
     # Batch options
-    parser.add_argument('--format', '-f', choices=MermaidRenderer.VALID_FORMATS,
-                        default='png', help='Output format for batch conversion (default: png)')
-    parser.add_argument('--recursive', '-r', action='store_true',
-                        help='Recursively process subdirectories')
+    parser.add_argument(
+        "--format",
+        "-f",
+        choices=MermaidRenderer.VALID_FORMATS,
+        default="png",
+        help="Output format for batch conversion (default: png)",
+    )
+    parser.add_argument(
+        "--recursive",
+        "-r",
+        action="store_true",
+        help="Recursively process subdirectories",
+    )
 
     args = parser.parse_args()
 
@@ -278,11 +287,11 @@ Themes:
         width=args.width,
         height=args.height,
         scale=args.scale,
-        config_file=args.config
+        config_file=args.config,
     )
 
     # Handle stdin input
-    if args.input == '-':
+    if args.input == "-":
         if not sys.stdin.isatty():
             mermaid_code = sys.stdin.read()
             output_path = Path(args.output)
@@ -304,10 +313,7 @@ Themes:
     # Handle directory (batch mode)
     if input_path.is_dir():
         success, total = renderer.batch_render(
-            input_path,
-            output_path,
-            output_format=args.format,
-            recursive=args.recursive
+            input_path, output_path, output_format=args.format, recursive=args.recursive
         )
         sys.exit(0 if success == total else 1)
 
@@ -331,5 +337,5 @@ Themes:
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

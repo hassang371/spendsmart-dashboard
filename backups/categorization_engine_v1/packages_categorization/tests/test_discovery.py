@@ -1,6 +1,8 @@
 """Tests for HyperbolicKMeans in clustering.py (replaces deleted discovery.py)."""
+
 import torch
 from geoopt import PoincareBall
+
 from packages.categorization.clustering import HyperbolicKMeans
 
 

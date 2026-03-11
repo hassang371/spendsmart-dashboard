@@ -1,8 +1,10 @@
-import pytest
-import pandas as pd
 import sys
 from unittest.mock import MagicMock, patch
-from ..excel_parser import parse_excel_transaction_file, _OLE2_MAGIC
+
+import pandas as pd
+import pytest
+
+from ..excel_parser import _OLE2_MAGIC, parse_excel_transaction_file
 
 # OLE2 magic prefix to simulate encrypted file content
 _FAKE_ENCRYPTED = _OLE2_MAGIC + b"fake_encrypted_payload"
@@ -108,7 +110,7 @@ def test_encrypted_file_without_password_raises():
     mock_file = MagicMock()
     mock_file.is_encrypted.return_value = True
     mock_msoffcrypto.OfficeFile.return_value = mock_file
-    
+
     with pytest.raises(ValueError, match="password-protected"):
         parse_excel_transaction_file(_FAKE_ENCRYPTED, password=None)
 

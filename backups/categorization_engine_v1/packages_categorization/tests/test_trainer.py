@@ -1,6 +1,8 @@
 """Tests for HypCDTrainer in training.py (replaces deleted trainer.py)."""
+
 import torch
 from geoopt import PoincareBall
+
 from packages.categorization.hypcd import HyperbolicProjector
 from packages.categorization.training import HypCDTrainer
 
@@ -44,6 +46,7 @@ def test_train_step_reduces_loss_over_steps():
 def test_lambda_schedule_ramps_then_holds():
     """Lambda must start near 0 and ramp to 0.5 over first 20% of epochs."""
     import pytest
+
     from packages.categorization.adapter_manager import _lambda_schedule
 
     # 10 epochs → warmup = int(0.2 * 10) = 2

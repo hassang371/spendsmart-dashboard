@@ -5,8 +5,8 @@ Fixes:
 - BUG-04: In-process batch classification (no N+1 Celery calls).
 """
 
-import os
 import threading
+
 import structlog
 
 logger = structlog.get_logger()
@@ -29,6 +29,7 @@ def get_classifier():
             if _classifier is None:  # Double-checked locking
                 try:
                     from packages.categorization.hypcd import HypCDClassifier
+
                     _classifier = HypCDClassifier()
                     logger.info("classifier_initialized", model="HypCDClassifier")
                 except Exception as e:
@@ -53,16 +54,20 @@ def classify_batch_in_process(descriptions: list[str]) -> list[dict]:
     results = []
     for pred in predictions:
         if isinstance(pred, dict):
-            results.append({
-                "category": str(pred.get("category", "Misc")),
-                "confidence": float(pred.get("confidence", 0.0)),
-            })
+            results.append(
+                {
+                    "category": str(pred.get("category", "Misc")),
+                    "confidence": float(pred.get("confidence", 0.0)),
+                }
+            )
         else:
             # Tuple format: (category, confidence, embedding)
-            results.append({
-                "category": str(pred[0]),
-                "confidence": float(pred[1]),
-            })
+            results.append(
+                {
+                    "category": str(pred[0]),
+                    "confidence": float(pred[1]),
+                }
+            )
     return results
 
 

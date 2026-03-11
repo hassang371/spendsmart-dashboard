@@ -11,23 +11,27 @@ is updated when a user reclassifies transactions.
 """
 
 import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
+
 try:
     import structlog
+
     logger = structlog.get_logger()
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 from typing import Optional
+
 from sentence_transformers import SentenceTransformer
 
-from packages.categorization.constants import Category, DEFAULT_CATEGORY_KEYWORDS
-from packages.categorization.rules import KeywordMatcher
 from packages.categorization.cleaner import process_description
+from packages.categorization.constants import DEFAULT_CATEGORY_KEYWORDS, Category
+from packages.categorization.rules import KeywordMatcher
 
 # Configurable confidence threshold (lowered from 0.90 to 0.75)
 CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.75"))
@@ -130,10 +134,12 @@ class TransactionClassifier:
             best_prob = probs[i][best_idx].item()
             best_category = self._category_names[best_idx]
 
-            results.append({
-                "category": best_category,
-                "confidence": round(best_prob, 4),
-            })
+            results.append(
+                {
+                    "category": best_category,
+                    "confidence": round(best_prob, 4),
+                }
+            )
 
         return results
 
@@ -150,10 +156,12 @@ class TransactionClassifier:
             best_prob = probs[i][best_idx].item()
             best_category = self._category_names[best_idx]
 
-            results.append({
-                "category": best_category,
-                "confidence": round(best_prob, 4),
-            })
+            results.append(
+                {
+                    "category": best_category,
+                    "confidence": round(best_prob, 4),
+                }
+            )
         return results
 
     def predict(self, text: str, adapter: Optional[LinearAdapter] = None) -> dict:
@@ -221,9 +229,7 @@ class TransactionClassifier:
         # Batch embed and classify remaining texts
         if remaining_texts:
             with torch.no_grad():
-                embeddings = self._model.encode(
-                    remaining_texts, convert_to_tensor=True
-                )
+                embeddings = self._model.encode(remaining_texts, convert_to_tensor=True)
                 if adapter is not None:
                     cosine_results = self._adapter_classify(embeddings, adapter)
                 else:
@@ -254,11 +260,7 @@ class TransactionClassifier:
         """
         # Map category names to indices
         cat_to_idx = {name: i for i, name in enumerate(self._category_names)}
-        valid_pairs = [
-            (t, cat_to_idx[c])
-            for t, c in zip(texts, categories)
-            if c in cat_to_idx
-        ]
+        valid_pairs = [(t, cat_to_idx[c]) for t, c in zip(texts, categories) if c in cat_to_idx]
 
         if not valid_pairs:
             logger.warning("no_valid_corrections_for_adapter")
@@ -268,17 +270,13 @@ class TransactionClassifier:
 
         # Encode texts
         with torch.no_grad():
-            embeddings = self._model.encode(
-                list(train_texts), convert_to_tensor=True
-            )
+            embeddings = self._model.encode(list(train_texts), convert_to_tensor=True)
 
         labels = torch.tensor(list(train_labels), dtype=torch.long)
 
         # Train adapter
         adapter = LinearAdapter(self.embedding_dim, len(self._category_names))
-        optimizer = torch.optim.AdamW(
-            adapter.parameters(), lr=lr, weight_decay=1e-4
-        )
+        optimizer = torch.optim.AdamW(adapter.parameters(), lr=lr, weight_decay=1e-4)
 
         adapter.train()
         for epoch in range(epochs):

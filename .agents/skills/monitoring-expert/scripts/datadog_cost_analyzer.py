@@ -5,17 +5,15 @@ Helps find waste in custom metrics, logs, APM, and infrastructure monitoring.
 """
 
 import argparse
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 try:
     import requests
 except ImportError:
-    print(
-        "⚠️  Warning: 'requests' library not found. Install with: pip install requests"
-    )
+    print("⚠️  Warning: 'requests' library not found. Install with: pip install requests")
     sys.exit(1)
 
 try:
@@ -50,9 +48,7 @@ class DatadogCostAnalyzer:
         """Make API request to Datadog."""
         try:
             url = f"{self.base_url}{endpoint}"
-            response = requests.get(
-                url, headers=self.headers, params=params, timeout=30
-            )
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -108,9 +104,7 @@ class DatadogCostAnalyzer:
                         )
 
         # Calculate billable (first 100 free)
-        metrics_summary["billable_metrics"] = max(
-            0, metrics_summary["total_custom_metrics"] - 100
-        )
+        metrics_summary["billable_metrics"] = max(0, metrics_summary["total_custom_metrics"] - 100)
 
         return metrics_summary
 
@@ -143,24 +137,12 @@ class DatadogCostAnalyzer:
         }
 
         for day in usage:
-            host_summary["total_hosts"] = max(
-                host_summary["total_hosts"], day.get("host_count", 0)
-            )
-            host_summary["agent_hosts"] = max(
-                host_summary["agent_hosts"], day.get("agent_host_count", 0)
-            )
-            host_summary["aws_hosts"] = max(
-                host_summary["aws_hosts"], day.get("aws_host_count", 0)
-            )
-            host_summary["azure_hosts"] = max(
-                host_summary["azure_hosts"], day.get("azure_host_count", 0)
-            )
-            host_summary["gcp_hosts"] = max(
-                host_summary["gcp_hosts"], day.get("gcp_host_count", 0)
-            )
-            host_summary["container_count"] = max(
-                host_summary["container_count"], day.get("container_count", 0)
-            )
+            host_summary["total_hosts"] = max(host_summary["total_hosts"], day.get("host_count", 0))
+            host_summary["agent_hosts"] = max(host_summary["agent_hosts"], day.get("agent_host_count", 0))
+            host_summary["aws_hosts"] = max(host_summary["aws_hosts"], day.get("aws_host_count", 0))
+            host_summary["azure_hosts"] = max(host_summary["azure_hosts"], day.get("azure_host_count", 0))
+            host_summary["gcp_hosts"] = max(host_summary["gcp_hosts"], day.get("gcp_host_count", 0))
+            host_summary["container_count"] = max(host_summary["container_count"], day.get("container_count", 0))
 
         return host_summary
 
@@ -249,10 +231,7 @@ class DatadogCostAnalyzer:
 
         # Infrastructure (assuming Pro tier)
         if "hosts" in usage_data:
-            costs["infrastructure"] = (
-                usage_data["hosts"].get("total_hosts", 0)
-                * self.PRICING["infrastructure_pro"]
-            )
+            costs["infrastructure"] = usage_data["hosts"].get("total_hosts", 0) * self.PRICING["infrastructure_pro"]
 
         # Custom metrics
         if "custom_metrics" in usage_data:
@@ -276,9 +255,7 @@ class DatadogCostAnalyzer:
         if "custom_metrics" in usage_data:
             billable = usage_data["custom_metrics"].get("billable_metrics", 0)
             if billable > 500:
-                savings = (billable * 0.3) * self.PRICING[
-                    "custom_metric"
-                ]  # Assume 30% reduction possible
+                savings = (billable * 0.3) * self.PRICING["custom_metric"]  # Assume 30% reduction possible
                 recommendations.append(
                     {
                         "category": "Custom Metrics",
@@ -321,9 +298,7 @@ class DatadogCostAnalyzer:
         if "logs" in usage_data:
             monthly_gb = usage_data["logs"].get("monthly_projected_gb", 0)
             if monthly_gb > 100:
-                savings = (monthly_gb * 0.4) * self.PRICING[
-                    "log_ingestion"
-                ]  # 40% reduction
+                savings = (monthly_gb * 0.4) * self.PRICING["log_ingestion"]  # 40% reduction
                 recommendations.append(
                     {
                         "category": "Logs",
@@ -336,9 +311,7 @@ class DatadogCostAnalyzer:
         # Migration recommendation if costs are high
         costs = self.calculate_costs(usage_data)
         if costs["total"] > 5000:
-            oss_cost = (
-                usage_data["hosts"].get("total_hosts", 0) * 15
-            )  # Rough estimate for self-hosted
+            oss_cost = usage_data["hosts"].get("total_hosts", 0) * 15  # Rough estimate for self-hosted
             savings = costs["total"] - oss_cost
             recommendations.append(
                 {
@@ -421,12 +394,7 @@ def print_recommendations(recommendations: List[Dict]):
         # Extract savings amount if it's a dollar value
         if "$" in rec["potential_savings"]:
             try:
-                amount = float(
-                    rec["potential_savings"]
-                    .replace("$", "")
-                    .replace("/month", "")
-                    .replace(",", "")
-                )
+                amount = float(rec["potential_savings"].replace("$", "").replace("/month", "").replace(",", ""))
                 total_savings += amount
             except:
                 pass
@@ -483,9 +451,7 @@ Required Datadog Permissions:
 
     if not args.api_key or not args.app_key:
         print("❌ Error: API key and Application key required")
-        print(
-            "   Set via --api-key and --app-key flags or DD_API_KEY and DD_APP_KEY env vars"
-        )
+        print("   Set via --api-key and --app-key flags or DD_API_KEY and DD_APP_KEY env vars")
         sys.exit(1)
 
     print("🔍 Analyzing Datadog usage...")

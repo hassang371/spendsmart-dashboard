@@ -140,6 +140,7 @@ container_scanning:
 include:
   - template: Security/Container-Scanning.gitlab-ci.yml
 
+
 # Generate SBOM (Software Bill of Materials)
 sbom:
   stage: scan
@@ -290,9 +291,3 @@ workflow:
 # Additional optimizations
 .interruptible_jobs:
   interruptible: true
-
-build:
-  extends: .interruptible_jobs
-
-trivy:scan:
-  extends: .interruptible_jobs

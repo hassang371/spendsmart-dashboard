@@ -34,9 +34,7 @@ class SecretAuditor:
 
     def _check_plain_secrets(self):
         """Check for plain Kubernetes secrets."""
-        secret_files = list(self.repo_path.rglob("*.yaml")) + list(
-            self.repo_path.rglob("*.yml")
-        )
+        secret_files = list(self.repo_path.rglob("*.yaml")) + list(self.repo_path.rglob("*.yml"))
         plain_secrets = []
 
         for sfile in secret_files:
@@ -51,10 +49,7 @@ class SecretAuditor:
                             if doc.get("type") == "kubernetes.io/service-account-token":
                                 continue
                             # Check if it's encrypted
-                            if (
-                                "sops" not in str(doc)
-                                and doc.get("kind") != "SealedSecret"
-                            ):
+                            if "sops" not in str(doc) and doc.get("kind") != "SealedSecret":
                                 plain_secrets.append(sfile.relative_to(self.repo_path))
             except:
                 pass
@@ -130,9 +125,7 @@ class SecretAuditor:
             "findings": self.findings,
             "total_issues": len(self.findings),
             "high_severity": len([f for f in self.findings if f["severity"] == "HIGH"]),
-            "medium_severity": len(
-                [f for f in self.findings if f["severity"] == "MEDIUM"]
-            ),
+            "medium_severity": len([f for f in self.findings if f["severity"] == "MEDIUM"]),
             "low_severity": len([f for f in self.findings if f["severity"] == "LOW"]),
         }
 
