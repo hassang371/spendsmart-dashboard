@@ -52,14 +52,20 @@ def _normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             "desc",
             "original description",
             "memo",
-            "merchant_category", # Used as fallback for description if real desc is missing
+            "merchant_category",  # Used as fallback for description if real desc is missing
         ],
         "merchant": ["merchant", "merchant name", "payee"],
         "amount": ["amount", "value", "amt", "amount (inr)"],
         "debit": ["debit", "withdrawal", "dr"],
         "credit": ["credit", "deposit", "cr"],
         "status": ["status", "state", "transaction status", "transaction_status"],
-        "method": ["payment method", "payment_method", "mode", "payment mode", "transaction type"],
+        "method": [
+            "payment method",
+            "payment_method",
+            "mode",
+            "payment mode",
+            "transaction type",
+        ],
         "product": ["product", "item", "product name"],
     }
 
@@ -181,7 +187,9 @@ def _parse_pdf(file_content: bytes) -> pd.DataFrame:
                         all_rows.append(row)
 
     if not all_rows or header is None:
-        raise ValueError("No table found in PDF. Ensure it is a bank statement with tabular data.")
+        raise ValueError(
+            "No table found in PDF. Ensure it is a bank statement with tabular data."
+        )
 
     df = pd.DataFrame(all_rows, columns=header)
     # Drop fully-empty rows
@@ -204,13 +212,17 @@ def parse_file(
     if filename_lower.endswith(".pdf"):
         return _parse_pdf(file_content)
 
+    def _decode_bytes(b: bytes) -> str:
+        try:
+            return b.decode("utf-8")
+        except UnicodeDecodeError:
+            return b.decode("windows-1252", errors="replace")
+
     if (
         filename_lower.endswith(".xlsx")
         or filename_lower.endswith(".xls")
         or filename_lower.endswith(".xlsm")
     ):
-        pass
-
         # Use v2 excel parser
         from packages.ingestion_engine.excel_parser import parse_excel_transaction_file
 
@@ -221,13 +233,7 @@ def parse_file(
             if col not in df.columns:
                 df[col] = "" if col != "amount" else 0.0
 
-    def _decode_bytes(b: bytes) -> str:
-        try:
-            return b.decode("utf-8")
-        except UnicodeDecodeError:
-            return b.decode("windows-1252", errors="replace")
-
-    if filename_lower.endswith(".json"):
+    elif filename_lower.endswith(".json"):
         raw = _json.loads(_decode_bytes(file_content))
         rows = raw if isinstance(raw, list) else raw.get("transactions", [])
         df = pd.DataFrame(rows)

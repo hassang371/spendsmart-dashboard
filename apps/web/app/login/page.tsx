@@ -124,39 +124,31 @@ function LoginContent() {
 
         {/* Main Content */}
         <div className="relative flex-1 flex flex-col items-center justify-center w-full max-w-[1600px] mx-auto">
-          {/* Floating Lottie Elements */}
-          <motion.div
-            animate={{ y: [-10, 10, -10], rotate: [0, 5, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute top-[15%] left-[5%] md:left-[10%] z-10 w-32 md:w-56 pointer-events-none opacity-90"
-          >
-            <Lottie animationData={rocketAnimation} loop={true} />
-          </motion.div>
+          {/* Floating Lottie Elements — CSS float animation (GPU) instead of JS keyframes */}
+          <div className="absolute top-[15%] left-[5%] md:left-[10%] z-10 w-32 md:w-56 pointer-events-none opacity-90 animate-float">
+            <Lottie animationData={rocketAnimation} loop={true} renderer={"canvas" as any} />
+          </div>
 
-          <motion.div
-            animate={{ y: [10, -10, 10], rotate: [0, -10, 0] }}
-            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute top-[20%] right-[5%] md:right-[15%] z-10 w-32 md:w-48 pointer-events-none opacity-90"
+          <div
+            className="absolute top-[20%] right-[5%] md:right-[15%] z-10 w-32 md:w-48 pointer-events-none opacity-90 animate-float"
+            style={{ animationDuration: '7s', animationDelay: '0.5s' }}
           >
-            <Lottie animationData={coinAnimation} loop={true} />
-          </motion.div>
+            <Lottie animationData={coinAnimation} loop={true} renderer={"canvas" as any} />
+          </div>
 
-          <motion.div
-            animate={{ y: [0, 20, 0] }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute bottom-[15%] left-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90"
+          <div
+            className="absolute bottom-[15%] left-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90 animate-float"
+            style={{ animationDuration: '5s', animationDelay: '1s' }}
           >
-            <Lottie animationData={walletAnimation} loop={true} />
-          </motion.div>
+            <Lottie animationData={walletAnimation} loop={true} renderer={"canvas" as any} />
+          </div>
 
-          {/* Smiley - Added as requested */}
-          <motion.div
-            animate={{ y: [0, -15, 0], rotate: [0, 10, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-            className="absolute bottom-[20%] right-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90"
+          <div
+            className="absolute bottom-[20%] right-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90 animate-float"
+            style={{ animationDuration: '6s', animationDelay: '1.5s' }}
           >
-            <Lottie animationData={smileyAnimation} loop={true} />
-          </motion.div>
+            <Lottie animationData={smileyAnimation} loop={true} renderer={"canvas" as any} />
+          </div>
 
           {/* Central Form Card */}
           <div className="relative z-20 text-center w-full max-w-md px-4">
