@@ -1,0 +1,30 @@
+
+> dashboard@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local, .env
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.9s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 7944ms
+  Running TypeScript ...
+  Collecting page data using 17 workers ...
+  Generating static pages using 17 workers (0/14) ...
+⨯ useSearchParams() should be wrapped in a suspense boundary at page "/dashboard/analytics". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+    at Q (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/.next/server/chunks/ssr/node_modules_next_c73d6895._.js:3:2111)
+    at o (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/.next/server/chunks/ssr/node_modules_next_c73d6895._.js:5:5314)
+    at au (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/.next/server/chunks/ssr/app_dashboard_analytics_page_tsx_a21b0636._.js:2:31247)
+    at an (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84360)
+    at ai (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86179)
+    at al (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:107953)
+    at as (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:105368)
+    at aa (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84712)
+    at ai (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86228)
+    at ai (/Users/mohammedhassanmohiddin/Documents/Antigravity/SCALE APP/apps/web/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:104708)
+Error occurred prerendering page "/dashboard/analytics". Read more: https://nextjs.org/docs/messages/prerender-error
+Export encountered an error on /dashboard/analytics/page: /dashboard/analytics, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
