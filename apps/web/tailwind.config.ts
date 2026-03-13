@@ -57,6 +57,9 @@ const config: Config = {
           white: '#FFFFFF',
           bg: '#E6F0FF' /* Same as light */,
         },
+        oled: '#0A0A0A',
+        glass: 'rgba(255, 255, 255, 0.03)',
+        'glass-border': 'rgba(255, 255, 255, 0.08)',
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'sans-serif'],

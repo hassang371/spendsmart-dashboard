@@ -1,105 +1,138 @@
 'use client';
 
 import { useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion } from 'framer-motion';
-import { ArrowDownRight, ArrowUpRight, TrendingUp } from 'lucide-react';
 
 interface Transaction {
   amount: number | string;
   transaction_date: string;
-  type?: 'credit' | 'debit'; // Optional if implied by amount sign
 }
 
 interface MonthlyComparisonProps {
   transactions: Transaction[];
+  yearParam?: string;
+  monthParam?: string;
+  relativeParam?: string;
+  isExpanded?: boolean;
 }
 
-export function MonthlyComparison({ transactions }: MonthlyComparisonProps) {
-  const stats = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyComparisonProps) {
+  const chartData = useMemo(() => {
+    // Process transactions into chronological buckets
+    if (!transactions || transactions.length === 0) return [];
 
-    // Calculate Previous Month
-    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonth = prevDate.getMonth();
-    const prevYear = prevDate.getFullYear();
-
-    let currentMonthSpend = 0;
-    let prevMonthSpend = 0;
+    // Grouping by date string "YYYY-MM-DD" or similar basis depending on spread.
+    // For simplicity and a smooth area chart, we'll sort chronologically and group by day.
+    const grouped = new Map<string, { dateStr: string; timestamp: number; income: number; expense: number }>();
 
     transactions.forEach(tx => {
+      const d = new Date(tx.transaction_date);
+      if (isNaN(d.getTime())) return;
+
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const amount = Number(tx.amount);
-      if (amount >= 0) return; // Ignore income
 
-      const date = new Date(tx.transaction_date);
-      const month = date.getMonth();
-      const year = date.getFullYear();
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, {
+          dateStr: dateKey,
+          timestamp: d.getTime(),
+          income: 0,
+          expense: 0
+        });
+      }
 
-      if (month === currentMonth && year === currentYear) {
-        currentMonthSpend += Math.abs(amount);
-      } else if (month === prevMonth && year === prevYear) {
-        prevMonthSpend += Math.abs(amount);
+      const entry = grouped.get(dateKey)!;
+      if (amount > 0) {
+        entry.income += amount;
+      } else {
+        entry.expense += Math.abs(amount);
       }
     });
 
-    const percentChange =
-      prevMonthSpend === 0
-        ? currentMonthSpend === 0
-          ? 0
-          : 100
-        : ((currentMonthSpend - prevMonthSpend) / prevMonthSpend) * 100;
-
-    return { currentMonthSpend, prevMonthSpend, percentChange };
+    return Array.from(grouped.values())
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map(entry => ({
+        date: new Date(entry.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        Income: entry.income,
+        Expense: entry.expense,
+      }));
   }, [transactions]);
 
-  const isSpendUp = stats.percentChange > 0;
+  if (chartData.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        No transaction data available for this range.
+      </div>
+    );
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border bg-card p-6 shadow-xl"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex h-full w-full flex-col relative"
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-
-      <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-        <TrendingUp className="h-40 w-40 text-primary rotate-12" />
-      </div>
-
-      <div className="relative z-10">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          Monthly Spend
-        </h3>
-        <div className="mt-2 flex items-baseline gap-2">
-          <h2 className="text-5xl font-black text-foreground tracking-tighter">
-            ₹{stats.currentMonthSpend.toLocaleString('en-IN')}
-          </h2>
-        </div>
-
-        <div
-          className={`mt-4 inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-bold backdrop-blur-md shadow-sm ${
-            isSpendUp
-              ? 'border-red-500/20 bg-red-500/10 text-red-500'
-              : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'
-          }`}
-        >
-          {isSpendUp ? (
-            <ArrowUpRight className="h-4 w-4" />
-          ) : (
-            <ArrowDownRight className="h-4 w-4" />
-          )}
-          {Math.abs(stats.percentChange).toFixed(1)}% vs Last Month
-        </div>
-
-        <p className="mt-4 text-xs font-medium text-muted-foreground">
-          You spent{' '}
-          <span className="text-foreground font-bold">
-            ₹{stats.prevMonthSpend.toLocaleString('en-IN')}
-          </span>{' '}
-          last month.
-        </p>
+      {/* Chart Canvas */}
+      <div className="flex-1 min-h-0 w-full relative pt-4">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
+            <XAxis
+              dataKey="date"
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+              tickLine={false}
+              axisLine={false}
+              minTickGap={30}
+            />
+            {isExpanded && (
+              <YAxis
+                tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                tickLine={false}
+                axisLine={false}
+                width={60}
+              />
+            )}
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'hsl(var(--card))',
+                borderRadius: '12px',
+                border: '1px solid hsl(var(--border))',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+              }}
+              formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
+            />
+            <Area
+              type="monotone"
+              dataKey="Income"
+              stroke="#10B981"
+              strokeWidth={3}
+              fillOpacity={1}
+              fill="url(#colorIncome)"
+              activeDot={{ r: 6, strokeWidth: 0, fill: '#10B981' }}
+            />
+            <Area
+              type="monotone"
+              dataKey="Expense"
+              stroke="#EF4444"
+              strokeWidth={3}
+              fillOpacity={1}
+              fill="url(#colorExpense)"
+              activeDot={{ r: 6, strokeWidth: 0, fill: '#EF4444' }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
     </motion.div>
   );
