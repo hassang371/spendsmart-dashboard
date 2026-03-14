@@ -37,6 +37,7 @@ __pycache__/
 .worktrees/
 .agents/
 .gemini/
+.superpowers/
 .vscode/
 /references/
 /misc/
