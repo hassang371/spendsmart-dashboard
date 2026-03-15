@@ -38,7 +38,6 @@ export function AccountSwitcher() {
     <div ref={ref} className="relative px-2 mb-2">
       <button
         onClick={() => setOpen((o) => !o)}
-        disabled={loading}
         className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
       >
         <Building2 size={16} className="shrink-0 text-primary" />

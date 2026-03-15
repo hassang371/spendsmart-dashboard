@@ -64,7 +64,9 @@ export function AccountProvider({
       // 'all' is only the initial fallback — never the desired default.
       const storage = getAppStorage();
       const persisted = storage?.getItem(STORAGE_KEY);
-      if (!persisted && data.length > 0) {
+      // Auto-select first account when no real preference is stored.
+      // Treat stored 'all' as "no preference" — 'all' is never a useful default.
+      if ((!persisted || persisted === 'all') && data.length > 0) {
         const firstId = data[0].id;
         setActiveAccountIdState(firstId);
         storage?.setItem(STORAGE_KEY, firstId);
