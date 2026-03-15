@@ -52,6 +52,10 @@ export function AccountProvider({
   }, []);
 
   const fetchAccounts = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       const data = await bankAccountsApi.list(token);
       setAccounts(data);
