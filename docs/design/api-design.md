@@ -1,7 +1,7 @@
 # API Design — HLD
 
 > **Doc ID:** api-design
-> **Last Updated:** 2026-03-06
+> **Last Updated:** 2026-03-15
 > **Status:** Current
 > **Version:** 1.0
 > **DRI:** Hassan
@@ -168,6 +168,7 @@ graph LR
         FO["📈 /forecasting"]
         AN["📊 /anomaly"]
         IN["📥 /ingestion"]
+        AG["🏦 /aggregator"]
     end
     subgraph DB["💾 Supabase"]
         PG["Postgres + RLS"]
@@ -178,7 +179,8 @@ graph LR
     FE --> FO
     FE --> AN
     FE --> IN
-    AU & TR & CA & FO & AN & IN --> PG
+    FE --> AG
+    AU & TR & CA & FO & AN & IN & AG --> PG
 ```
 
 ## Changelog
@@ -187,3 +189,4 @@ graph LR
 |---|---|---|
 | 2026-03-06 | Initial HLD | Created from archived API design and implementation plan docs |
 | 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata; added domain endpoint map diagram |
+| 2026-03-15 | Account Aggregator | Added `/aggregator` domain (bank_accounts CRUD, consent flow, sync, webhook). See docs/features/004-account-aggregator.md |

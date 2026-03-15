@@ -75,6 +75,17 @@ Tracks ML model training jobs (HypCD, TFT).
 
 Tracks file uploads for deduplication.
 
+### `bank_accounts`
+
+Bank account records for the Account Aggregator integration. One row per linked account per user; "Manual Import" is a special `is_manual=true` account created automatically.
+
+- **RLS:** Enabled — users can read/write only their own accounts; service role used by worker for auto-sync
+- **Consent:** `consent_id`, `consent_status` (none/pending/active/expired/revoked), `consent_expiry` tracked per account
+- **Sync:** `last_synced_at`, `sync_status` (idle/syncing/error)
+- **Uniqueness:** One manual account per user (`WHERE is_manual = TRUE`); provider accounts unique by `(user_id, provider_account_id)`
+
+`transactions.account_id` FK references `bank_accounts.id`. Fingerprint uniqueness moved to `(account_id, fingerprint)` partial index.
+
 ## Index Strategy
 
 ```mermaid
@@ -166,3 +177,4 @@ graph TB
 |---|---|---|
 | 2026-03-06 | Initial HLD | Created from archived database/testing docs |
 | 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata |
+| 2026-03-15 | Account Aggregator | Added bank_accounts table; transactions.account_id FK; fingerprint unique index moved to (account_id, fingerprint). See docs/features/004-account-aggregator.md |
