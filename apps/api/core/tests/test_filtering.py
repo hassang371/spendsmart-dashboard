@@ -124,3 +124,24 @@ class TestApplyFilters:
         query.eq.assert_called_once_with("category", "Food")
         query.gte.assert_any_call("amount", 5.0)
         assert result is query
+
+    def test_account_id_filter_applies_eq(self):
+        """A specific account_id adds an eq on account_id."""
+        query = self._make_mock_query()
+        f = TransactionFilter(account_id="abc-123")
+        apply_filters(query, f)
+        query.eq.assert_called_once_with("account_id", "abc-123")
+
+    def test_account_id_all_skips_filter(self):
+        """account_id='all' skips the filter (aggregate across all accounts)."""
+        query = self._make_mock_query()
+        f = TransactionFilter(account_id="all")
+        apply_filters(query, f)
+        query.eq.assert_not_called()
+
+    def test_account_id_none_skips_filter(self):
+        """account_id=None skips the filter (default behavior, backward-compat)."""
+        query = self._make_mock_query()
+        f = TransactionFilter(account_id=None)
+        apply_filters(query, f)
+        query.eq.assert_not_called()

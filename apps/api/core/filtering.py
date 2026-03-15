@@ -27,6 +27,7 @@ class TransactionFilter:
     category: Optional[str] = None
     merchant: Optional[str] = None
     type: Optional[str] = None
+    account_id: Optional[str] = None
 
 
 def apply_filters(query: Any, filters: TransactionFilter) -> Any:
@@ -56,5 +57,7 @@ def apply_filters(query: Any, filters: TransactionFilter) -> Any:
         query = query.ilike("merchant_name", f"%{filters.merchant}%")
     if filters.type is not None:
         query = query.eq("type", filters.type)
+    if filters.account_id is not None and filters.account_id != "all":
+        query = query.eq("account_id", filters.account_id)
 
     return query

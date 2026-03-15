@@ -132,6 +132,7 @@ async def list_transactions(
     category: str = Query(default=None, description="Filter: exact category match"),
     merchant: str = Query(default=None, description="Filter: merchant name (case-insensitive)"),
     type: str = Query(default=None, description="Filter: transaction type (credit/debit)"),
+    account_id: str = Query(default=None, description="Filter: account UUID or 'all' for all accounts"),
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ) -> CursorPage[dict]:
@@ -150,6 +151,7 @@ async def list_transactions(
         category=category,
         merchant=merchant,
         type=type,
+        account_id=account_id,
     )
 
     return list_user_transactions(
