@@ -3,7 +3,7 @@
 > **Doc ID:** 004-account-aggregator
 > **Date:** 2026-03-15
 > **DRI:** Claude (AI)
-> **Status:** Draft
+> **Status:** Verified
 > **Type:** Feature LLD
 
 ## Problem Statement
@@ -14,13 +14,13 @@ India's Account Aggregator (AA) framework, regulated by RBI, enables consent-bas
 
 ## Success Criteria
 
-- [ ] Users can link a bank account via Setu's AA consent flow and see transactions within 60 seconds of consent approval
-- [ ] Transactions from different bank accounts are fully isolated — no cross-account data mixing
-- [ ] Existing file-imported transactions are migrated to a "Manual Import" account without data loss
-- [ ] Auto-sync runs daily for all active consents; manual sync is available on-demand
-- [ ] Account switcher allows seamless switching between bank accounts across dashboard, transactions, and analytics pages
-- [ ] "All Accounts" aggregated view combines data from all linked accounts
-- [ ] Aggregator abstraction layer supports swapping Setu for another provider (Plaid, Finvu) without changing consumer code
+- [x] Users can link a bank account via Setu's AA consent flow and see transactions within 60 seconds of consent approval
+- [x] Transactions from different bank accounts are fully isolated — no cross-account data mixing
+- [x] Existing file-imported transactions are migrated to a "Manual Import" account without data loss
+- [x] Auto-sync runs daily for all active consents; manual sync is available on-demand
+- [x] Account switcher allows seamless switching between bank accounts across dashboard, transactions, and analytics pages
+- [x] "All Accounts" aggregated view combines data from all linked accounts
+- [x] Aggregator abstraction layer supports swapping Setu for another provider (Plaid, Finvu) without changing consumer code
 
 ## Scope
 
