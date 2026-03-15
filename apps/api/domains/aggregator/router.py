@@ -15,12 +15,15 @@ router = APIRouter(prefix="/aggregator", tags=["aggregator"])
 
 
 def _get_setu_provider() -> SetuProvider:
-    return SetuProvider(
-        client_id=os.environ["SETU_CLIENT_ID"],
-        client_secret=os.environ["SETU_CLIENT_SECRET"],
-        base_url=os.environ.get("SETU_BASE_URL", "https://fiu-sandbox.setu.co"),
-        redirect_url=os.environ.get("SETU_REDIRECT_URL", "http://localhost:3000/dashboard/accounts/callback"),
-    )
+    try:
+        return SetuProvider(
+            client_id=os.environ["SETU_CLIENT_ID"],
+            client_secret=os.environ["SETU_CLIENT_SECRET"],
+            base_url=os.environ.get("SETU_BASE_URL", "https://fiu-sandbox.setu.co"),
+            redirect_url=os.environ.get("SETU_REDIRECT_URL", "http://localhost:3000/dashboard/accounts/callback"),
+        )
+    except KeyError as e:
+        raise HTTPException(status_code=503, detail=f"Provider not configured: missing {e}") from e
 
 
 @router.get("/accounts/", response_model=list[BankAccountOut])
@@ -53,16 +56,14 @@ async def link_account(
 
 
 @router.post("/accounts/{account_id}/sync", response_model=SyncResponse)
-async def sync_account(
-    account_id: str, user_id: str = Depends(get_current_user_id), client: Client = Depends(get_user_client)
-):
+async def sync_account(account_id: str, client: Client = Depends(get_user_client)):
+    # Ownership enforced by user-scoped Supabase client (RLS)
     result = await service.sync_account(client, account_id, _get_setu_provider())
     return SyncResponse(account_id=account_id, **result)
 
 
 @router.delete("/accounts/{account_id}", status_code=204)
-async def unlink_account(
-    account_id: str, user_id: str = Depends(get_current_user_id), client: Client = Depends(get_user_client)
-):
+async def unlink_account(account_id: str, client: Client = Depends(get_user_client)):
+    # Ownership enforced by user-scoped Supabase client (RLS)
     await service.unlink_account(client, account_id, _get_setu_provider())
     return Response(status_code=204)
