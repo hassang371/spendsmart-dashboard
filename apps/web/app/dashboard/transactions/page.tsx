@@ -48,6 +48,8 @@ import {
   type UncategorizedTransaction,
 } from '../../../lib/api/client';
 import { getCachedData, setCachedData, removeCachedData } from '../../../lib/utils/cache';
+import { useAccount } from '../../../lib/contexts/AccountContext';
+import { AccountBadge } from '../../../components/accounts/AccountBadge';
 
 type TransactionRow = {
   id: string;
@@ -236,6 +238,7 @@ function monthName(index: number): string {
 
 export default function TransactionsPage() {
   const router = useRouter();
+  const { activeAccountId } = useAccount();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   // Suppresses the length-change scroll-to-top when Load More appends rows
@@ -382,7 +385,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    const cacheKey = `transactions-cache:${user.id}`;
+    const cacheKey = `transactions-cache:${user.id}:${activeAccountId}`;
     type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
     const cached = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
     if (cached && Array.isArray(cached.rows)) {
@@ -397,6 +400,7 @@ export default function TransactionsPage() {
     // Fetch first page only — user loads more on demand
     const response = await accountsApi.getTransactions(session.access_token, {
       limit: PAGE_SIZE,
+      account_id: activeAccountId,
     });
     const rows = response.items.map(mapItem);
 
@@ -408,7 +412,7 @@ export default function TransactionsPage() {
       nextCursor: response.next_cursor ?? undefined,
       hasMore: response.has_more,
     });
-  }, [router]);
+  }, [router, activeAccountId]);
 
   const fetchMoreTransactions = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -422,6 +426,7 @@ export default function TransactionsPage() {
       const response = await accountsApi.getTransactions(session.access_token, {
         limit: PAGE_SIZE,
         cursor: nextCursor,
+        account_id: activeAccountId,
       });
       const newRows = response.items.map(mapItem);
 
@@ -1065,6 +1070,7 @@ export default function TransactionsPage() {
             <h2 className="text-4xl font-black tracking-tight text-foreground">
               Transactions
               <span className="ml-2 text-lg font-medium text-muted-foreground">History</span>
+              <span className="ml-3 align-middle"><AccountBadge /></span>
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               View and manage your financial activity.

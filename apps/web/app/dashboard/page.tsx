@@ -16,6 +16,8 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie
 import { supabase } from '../../lib/supabase/client';
 import { accountsApi, type Transaction } from '../../lib/api/client';
 import { getCachedData, setCachedData } from '../../lib/utils/cache';
+import { useAccount } from '../../lib/contexts/AccountContext';
+import { AccountBadge } from '../../components/accounts/AccountBadge';
 
 function firstNameFromDisplayName(value: string): string {
   const cleaned = value.trim().replace(/\s+/g, ' ');
@@ -39,6 +41,7 @@ const OVERVIEW_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export default function OverviewPage() {
   const router = useRouter();
+  const { activeAccountId } = useAccount();
   const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +64,8 @@ export default function OverviewPage() {
       const fallbackName = user.email?.split('@')[0] ?? 'there';
       setDisplayName(firstNameFromDisplayName(fullName || fallbackName));
 
-      const cacheKey = `overview-cache:${user.id}`;
+      // Cache key includes account scope so switching invalidates stale data
+      const cacheKey = `overview-cache:${user.id}:${activeAccountId}`;
       const cachedData = getCachedData<Transaction[]>(cacheKey, OVERVIEW_CACHE_TTL_MS);
 
       if (cachedData) {
@@ -96,6 +100,7 @@ export default function OverviewPage() {
             limit: 500,
             cursor,
             date_from: thirtyDaysAgo.toISOString().split('T')[0],
+            account_id: activeAccountId,
           });
 
           allItems.push(...response.items);
@@ -119,7 +124,7 @@ export default function OverviewPage() {
     };
 
     fetchData();
-  }, [router]);
+  }, [router, activeAccountId]);
 
   const periodExpenses = (() => {
     const now = new Date();
@@ -375,7 +380,10 @@ export default function OverviewPage() {
           <h1 className="text-3xl font-black text-foreground tracking-tight">
             Hi, <span className="text-primary">{displayName}</span>
           </h1>
-          <p className="text-sm text-muted-foreground">Your {timeframe} spending snapshot.</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-muted-foreground">Your {timeframe} spending snapshot.</p>
+            <AccountBadge />
+          </div>
         </div>
         <div className="flex items-center gap-1 rounded-2xl border border-border bg-card p-1 shadow-sm">
           {(['weekly', 'monthly'] as const).map(mode => (
