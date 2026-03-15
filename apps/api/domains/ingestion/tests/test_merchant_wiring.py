@@ -11,7 +11,7 @@ def test_merchant_name_extracted_from_description_when_empty():
         "currency": "INR",
         "status": "completed",
     }
-    result = _build_transaction_row(row, "user-1", "fp123")
+    result = _build_transaction_row(row, "user-1", "fp123", "acc-1")
     # v2 cleaner preserves richer merchant name when not a known pattern
     assert "YouTube" in result["merchant_name"]
     assert result["merchant_name"] != ""
@@ -27,7 +27,7 @@ def test_payment_method_inferred_when_empty():
         "currency": "INR",
         "status": "completed",
     }
-    result = _build_transaction_row(row, "user-1", "fp456")
+    result = _build_transaction_row(row, "user-1", "fp456", "acc-1")
     assert result["payment_method"] == "UPI"
 
 
@@ -41,7 +41,7 @@ def test_payment_method_preserved_when_csv_provides_it():
         "currency": "INR",
         "status": "completed",
     }
-    result = _build_transaction_row(row, "user-1", "fp789")
+    result = _build_transaction_row(row, "user-1", "fp789", "acc-1")
     assert result["payment_method"] == "Card"
 
 
@@ -56,5 +56,5 @@ def test_google_play_gets_other_payment_method():
         "currency": "INR",
         "status": "completed",
     }
-    result = _build_transaction_row(row, "user-1", "fp999")
+    result = _build_transaction_row(row, "user-1", "fp999", "acc-1")
     assert result["payment_method"] == "Other"
