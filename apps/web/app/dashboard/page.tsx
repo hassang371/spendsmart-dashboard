@@ -45,6 +45,9 @@ export default function OverviewPage() {
   const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Tracks whether the user has ANY transactions at all (across all time).
+  // Used to distinguish "no transactions this period" from "brand new user".
+  const [hasTransactionsEver, setHasTransactionsEver] = useState(false);
   const [displayName, setDisplayName] = useState('there');
   const [timeframe, setTimeframe] = useState<'weekly' | 'monthly'>('weekly');
 
@@ -84,10 +87,14 @@ export default function OverviewPage() {
           return;
         }
 
-        // Fetch last-90-days transactions for overview charts with cursor pagination
-        // to avoid silent truncation at a fixed page size.
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 90);
+        // Fetch from the earlier of: start of current month OR 7 days ago.
+        // This ensures both the weekly view (last 7 days) and the monthly view
+        // (current calendar month) are fully covered in a single fetch.
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 6);
+        const fetchFrom = startOfMonth < sevenDaysAgo ? startOfMonth : sevenDaysAgo;
 
         const allItems: Transaction[] = [];
         let cursor: string | undefined;
@@ -99,7 +106,7 @@ export default function OverviewPage() {
           const response = await accountsApi.getTransactions(session.access_token, {
             limit: 500,
             cursor,
-            date_from: thirtyDaysAgo.toISOString().split('T')[0],
+            date_from: fetchFrom.toISOString().split('T')[0],
             account_id: activeAccountId,
           });
 
@@ -111,6 +118,18 @@ export default function OverviewPage() {
 
         if (hasMore) {
           console.warn('Overview transactions are truncated after pagination safety cap.');
+        }
+
+        // If the current period is empty, check whether the user has any
+        // transactions at all (across all time) to decide which empty state to show.
+        if (allItems.length === 0) {
+          const anyCheck = await accountsApi.getTransactions(session.access_token, {
+            limit: 1,
+            account_id: activeAccountId,
+          });
+          setHasTransactionsEver(anyCheck.items.length > 0);
+        } else {
+          setHasTransactionsEver(true);
         }
 
         setData(allItems);
@@ -403,8 +422,8 @@ export default function OverviewPage() {
         </div>
       </motion.div>
 
-      {/* Empty State Check */}
-      {data.length === 0 ? (
+      {/* True empty state: user has zero transactions ever (brand new account) */}
+      {data.length === 0 && !hasTransactionsEver ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
