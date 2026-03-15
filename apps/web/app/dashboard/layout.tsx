@@ -22,6 +22,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { supabase } from '../../lib/supabase/client';
+import { AccountProvider } from '@/lib/contexts/AccountContext';
+import { AccountSwitcher } from '@/components/accounts/AccountSwitcher';
 
 function firstNameFromDisplayName(value: string): string {
   const cleaned = value.trim().replace(/\s+/g, ' ');
@@ -66,6 +68,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const [accessToken, setAccessToken] = useState<string>('');
 
   const [savedSessions, setSavedSessions] = useState<StoredSession[]>([]);
   const [expiredSessionEmail, setExpiredSessionEmail] = useState<string | null>(null);
@@ -81,6 +84,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const avatar = data.user.user_metadata?.avatar_url as string | undefined;
       const fallback = data.user.email?.split('@')[0] || 'User';
       const userEmail = data.user.email || '';
+
+      // Capture access token for AccountProvider
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session?.access_token) {
+        setAccessToken(sessionData.session.access_token);
+      }
 
       setDisplayName(firstNameFromDisplayName(fullName || fallback));
       setEmail(userEmail);
@@ -256,6 +265,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
           </nav>
 
+          {/* Bank account switcher — only rendered once token is available */}
+          {accessToken && <AccountSwitcher />}
+
           <div ref={profileMenuRef} className="relative mt-auto">
             <AnimatePresence>
               {isProfileOpen && (
@@ -359,7 +371,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <main className="h-full min-w-0 flex-1 overflow-visible rounded-[2.5rem] border border-border bg-background shadow-xl relative transition-colors duration-300">
           <div className="h-full overflow-y-auto overflow-x-hidden p-6 custom-scrollbar relative z-10">
-            {children}
+            {accessToken ? (
+              <AccountProvider token={accessToken}>{children}</AccountProvider>
+            ) : (
+              children
+            )}
           </div>
         </main>
       </div>

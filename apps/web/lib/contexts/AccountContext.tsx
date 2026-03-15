@@ -11,7 +11,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-import { BankAccount, bankAccountsApi } from '@/lib/api/client';
+import { type BankAccount, bankAccountsApi } from '@/lib/api/client';
 import { getAppStorage } from '@/lib/utils/storage';
 
 const STORAGE_KEY = 'scale_active_account_id';
