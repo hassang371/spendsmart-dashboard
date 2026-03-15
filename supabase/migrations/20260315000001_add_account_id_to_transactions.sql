@@ -47,7 +47,11 @@ ALTER TABLE public.transactions
 DROP INDEX IF EXISTS idx_transactions_user_fingerprint;
 
 -- Create new unique partial index scoped to account_id
--- Note: PostgreSQL does not support ADD CONSTRAINT UNIQUE USING INDEX on partial indexes.
+-- Note: A named UNIQUE constraint cannot be added via ADD CONSTRAINT UNIQUE USING INDEX
+-- on a partial index. Attempting it yields:
+--   ERROR 42809: "idx_transactions_account_fingerprint" is a partial index
+--   DETAIL: Cannot create a primary key or unique constraint using such an index.
+-- This is a PostgreSQL limitation for partial indexes regardless of server version.
 -- Uniqueness is enforced by the index itself; use ON CONFLICT (account_id, fingerprint)
 -- WHERE fingerprint IS NOT NULL in application upserts.
 CREATE UNIQUE INDEX idx_transactions_account_fingerprint
