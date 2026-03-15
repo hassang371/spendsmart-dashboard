@@ -25,7 +25,7 @@ class BankAccountOut(BaseModel):
 
 
 class LinkAccountRequest(BaseModel):
-    fi_types: list[str] = Field(default=["DEPOSIT"])
+    fi_types: list[str] = Field(default_factory=lambda: ["DEPOSIT"])
 
 
 class LinkAccountResponse(BaseModel):
