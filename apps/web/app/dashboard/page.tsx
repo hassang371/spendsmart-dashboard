@@ -84,10 +84,10 @@ export default function OverviewPage() {
           return;
         }
 
-        // Fetch last-30-days transactions for overview charts with cursor pagination
+        // Fetch last-90-days transactions for overview charts with cursor pagination
         // to avoid silent truncation at a fixed page size.
         const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 90);
 
         const allItems: Transaction[] = [];
         let cursor: string | undefined;
