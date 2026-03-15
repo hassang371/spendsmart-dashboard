@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../../../lib/supabase/client';
@@ -8,7 +8,7 @@ import { bankAccountsApi } from '../../../../lib/api/client';
 
 type Status = 'loading' | 'success' | 'rejected' | 'error';
 
-export default function AccountCallbackPage() {
+function CallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<Status>('loading');
@@ -89,5 +89,19 @@ export default function AccountCallbackPage() {
         </button>
       )}
     </div>
+  );
+}
+
+export default function AccountCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <Loader2 size={48} className="animate-spin text-primary" />
+        </div>
+      }
+    >
+      <CallbackInner />
+    </Suspense>
   );
 }
