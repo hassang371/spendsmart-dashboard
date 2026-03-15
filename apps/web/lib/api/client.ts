@@ -83,6 +83,41 @@ export interface SafeToSpendResponse {
   forecast_breakdown?: any[];
 }
 
+// --- Bank Account types ---
+
+export interface BankAccount {
+  id: string;
+  user_id: string;
+  account_name: string;
+  account_type: string;
+  institution: string | null;
+  provider: string | null;
+  consent_status: 'none' | 'pending' | 'active' | 'expired' | 'revoked';
+  last_synced_at: string | null;
+  sync_status: 'idle' | 'syncing' | 'error';
+  is_primary: boolean;
+  is_manual: boolean;
+  masked_number: string | null;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LinkAccountRequest {
+  fi_types?: string[];
+}
+
+export interface LinkAccountResponse {
+  consent_id: string;
+  redirect_url: string;
+}
+
+export interface SyncAccountResponse {
+  account_id: string;
+  inserted: number;
+  skipped_duplicates: number;
+}
+
 // --- Import response ---
 
 export interface ImportResponse {
@@ -147,6 +182,8 @@ export interface TransactionListParams {
   merchant?: string;
   type?: string;
   include_total?: boolean;
+  /** Filter by account UUID. Pass 'all' or omit for all accounts. */
+  account_id?: string;
 }
 
 export interface TransactionListResponse {
@@ -358,6 +395,42 @@ export const accountsApi = {
     apiFetch<TransactionCountsResponse>('/accounts/transactions/count', { token }),
 
   getProfile: (token: string) => apiFetch('/accounts/profile', { token }),
+};
+
+export const bankAccountsApi = {
+  /** List all bank accounts for the current user */
+  list: (token: string): Promise<BankAccount[]> =>
+    apiFetch<BankAccount[]>('/aggregator/accounts/', { token }),
+
+  /** Get a single bank account by ID */
+  get: (accountId: string, token: string): Promise<BankAccount> =>
+    apiFetch<BankAccount>(`/aggregator/accounts/${accountId}`, { token }),
+
+  /** Initiate AA consent flow — returns redirect URL to send user to */
+  link: (token: string, body?: LinkAccountRequest): Promise<LinkAccountResponse> =>
+    apiFetch<LinkAccountResponse>('/aggregator/accounts/link', {
+      method: 'POST',
+      body: body ?? {},
+      token,
+    }),
+
+  /** Trigger manual sync for an account */
+  sync: (accountId: string, token: string): Promise<SyncAccountResponse> =>
+    apiFetch<SyncAccountResponse>(`/aggregator/accounts/${accountId}/sync`, {
+      method: 'POST',
+      token,
+    }),
+
+  /** Unlink (revoke consent + soft-delete) an account */
+  unlink: (accountId: string, token: string): Promise<void> =>
+    apiFetch<void>(`/aggregator/accounts/${accountId}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  /** Handle Setu consent callback — called after redirect back from Setu */
+  handleCallback: (consentId: string, token: string) =>
+    apiFetch(`/aggregator/accounts/callback?consent_id=${encodeURIComponent(consentId)}`, { token }),
 };
 
 export const healthApi = {
