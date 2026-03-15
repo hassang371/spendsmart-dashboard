@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   AlertTriangle,
+  Building2,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -256,6 +257,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               label="AI Insights"
               href="/dashboard/insights"
               active={pathname === '/dashboard/insights'}
+            />
+            <SidebarItem
+              icon={<Building2 size={20} />}
+              label="Accounts"
+              href="/dashboard/accounts"
+              active={pathname.startsWith('/dashboard/accounts')}
             />
             <SidebarItem
               icon={<Settings size={20} />}
