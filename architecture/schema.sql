@@ -7,6 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES bank_accounts(id),
     transaction_date TIMESTAMP WITH TIME ZONE NOT NULL,
     amount NUMERIC(12, 2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'INR',
@@ -35,9 +36,9 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, t
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
 -- Cursor-based pagination orders by (user_id, created_at DESC)
 CREATE INDEX IF NOT EXISTS idx_transactions_user_created ON transactions(user_id, created_at DESC);
--- Fingerprint deduplication unique constraint (used by upsert and import dedup)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_user_fingerprint
-    ON transactions(user_id, fingerprint)
+-- Fingerprint deduplication unique index scoped to account_id (used by upsert and import dedup)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_account_fingerprint
+    ON transactions(account_id, fingerprint)
     WHERE fingerprint IS NOT NULL;
 
 -- 3. RLS Policies
