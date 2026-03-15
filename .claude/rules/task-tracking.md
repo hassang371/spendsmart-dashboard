@@ -27,6 +27,9 @@ Design docs live in `docs/` and are shared by all agents and humans:
 | RFCs / decisions | `docs/rfcs/RFC-NNN-name.md` |
 | HLD (living docs) | `docs/design/*.md` |
 | Policies | `docs/policies/*.md` |
+| Implementation plans | `docs/plans/YYYY-MM-DD-name.md` |
 | Session state / notes | auto memory (`MEMORY.md`) — local to Claude only |
+
+**Implementation plans override:** When superpowers or any plugin says to save plans to `docs/superpowers/plans/`, save to `docs/plans/` instead. Do NOT create `docs/superpowers/` — plugin artifacts do not belong in project docs.
 
 **Doc format standard:** See `docs/STANDARDS.md` for required metadata, sections, naming, and status lifecycle.
