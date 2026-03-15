@@ -73,7 +73,10 @@ async def handle_callback(client: Any, consent_id: str, provider: AggregatorProv
 
 
 async def sync_account(client: Any, account_id: str, provider: AggregatorProvider) -> dict[str, int]:
-    account = client.table("bank_accounts").select("*").eq("id", account_id).execute().data[0]
+    rows_found = client.table("bank_accounts").select("*").eq("id", account_id).execute().data
+    if not rows_found:
+        raise ValueError(f"No account found for id={account_id}")
+    account = rows_found[0]
     client.table("bank_accounts").update({"sync_status": "syncing"}).eq("id", account_id).execute()
 
     try:
@@ -117,7 +120,10 @@ async def sync_account(client: Any, account_id: str, provider: AggregatorProvide
             ).execute()
             if result.data:
                 row = result.data[0] if isinstance(result.data, list) else result.data
-                inserted = int(row.get("inserted_count", 0)) if isinstance(row, dict) else len(rows)
+                if isinstance(row, dict):
+                    inserted = int(row.get("inserted_count", 0))
+                else:
+                    inserted = len(rows)  # unexpected shape: assume all inserted, skipped=0
 
         client.table("bank_accounts").update(
             {
