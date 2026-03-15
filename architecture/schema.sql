@@ -148,7 +148,67 @@ CREATE POLICY "Users can insert own training corrections"
 ON training_corrections FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
--- 8. User Model Metadata
+-- 8. Bank Accounts Table (Account Aggregator)
+CREATE TABLE IF NOT EXISTS public.bank_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    account_name TEXT NOT NULL,
+    account_type TEXT NOT NULL DEFAULT 'savings',
+    institution TEXT,
+    provider TEXT,
+    provider_account_id TEXT,
+    consent_id TEXT,
+    consent_status TEXT NOT NULL DEFAULT 'none',
+    consent_expiry TIMESTAMPTZ,
+    last_synced_at TIMESTAMPTZ,
+    sync_status TEXT NOT NULL DEFAULT 'idle',
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    is_manual BOOLEAN NOT NULL DEFAULT FALSE,
+    masked_number TEXT,
+    currency TEXT NOT NULL DEFAULT 'INR',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX idx_bank_accounts_user ON public.bank_accounts (user_id);
+
+-- Provider account uniqueness (only for non-null provider accounts)
+CREATE UNIQUE INDEX idx_bank_accounts_provider_account
+    ON public.bank_accounts (user_id, provider_account_id)
+    WHERE provider_account_id IS NOT NULL;
+
+-- Only one manual account per user
+CREATE UNIQUE INDEX idx_bank_accounts_user_manual
+    ON public.bank_accounts (user_id)
+    WHERE is_manual = TRUE;
+
+-- RLS
+ALTER TABLE public.bank_accounts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own accounts"
+    ON public.bank_accounts FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own accounts"
+    ON public.bank_accounts FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own accounts"
+    ON public.bank_accounts FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete non-manual accounts"
+    ON public.bank_accounts FOR DELETE
+    USING (auth.uid() = user_id AND is_manual = FALSE);
+
+-- Service role bypass for worker sync
+CREATE POLICY "Service role has full access to bank_accounts"
+    ON public.bank_accounts FOR ALL
+    TO service_role
+    USING (true) WITH CHECK (true);
+
+-- 9. User Model Metadata
 CREATE TABLE IF NOT EXISTS public.user_model_metadata (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     adapter_url TEXT,
