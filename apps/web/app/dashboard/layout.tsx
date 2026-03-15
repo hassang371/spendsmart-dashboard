@@ -186,6 +186,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
+    <AccountProvider token={accessToken}>
     <div className="h-screen overflow-hidden bg-background p-4 md:p-6 font-sans text-foreground selection:bg-primary/30 transition-colors duration-300">
       <AnimatePresence>
         {expiredSessionEmail && (
@@ -378,11 +379,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <main className="h-full min-w-0 flex-1 overflow-visible rounded-[2.5rem] border border-border bg-background shadow-xl relative transition-colors duration-300">
           <div className="h-full overflow-y-auto overflow-x-hidden p-6 custom-scrollbar relative z-10">
-            <AccountProvider token={accessToken}>{children}</AccountProvider>
+            {children}
           </div>
         </main>
       </div>
     </div>
+    </AccountProvider>
   );
 }
 
