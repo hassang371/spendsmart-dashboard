@@ -59,6 +59,16 @@ export function AccountProvider({
     try {
       const data = await bankAccountsApi.list(token);
       setAccounts(data);
+
+      // Auto-select first account if no persisted preference exists.
+      // 'all' is only the initial fallback — never the desired default.
+      const storage = getAppStorage();
+      const persisted = storage?.getItem(STORAGE_KEY);
+      if (!persisted && data.length > 0) {
+        const firstId = data[0].id;
+        setActiveAccountIdState(firstId);
+        storage?.setItem(STORAGE_KEY, firstId);
+      }
     } catch {
       // Accounts unavailable — degrade gracefully, context still usable
       setAccounts([]);
