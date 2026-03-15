@@ -27,7 +27,8 @@ class SetuProvider(AggregatorProvider):
         self.client_secret = client_secret
         self.base_url = base_url.rstrip("/")
         self.redirect_url = redirect_url
-        self._http_client = http_client
+        # Reuse a single client instance to avoid per-request connection leaks
+        self._http_client: httpx.AsyncClient = http_client or httpx.AsyncClient()
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -36,8 +37,8 @@ class SetuProvider(AggregatorProvider):
             "Content-Type": "application/json",
         }
 
-    async def _client(self) -> httpx.AsyncClient:
-        return self._http_client or httpx.AsyncClient()
+    def _client(self) -> httpx.AsyncClient:
+        return self._http_client
 
     async def initiate_consent(self, user_id: str, fi_types: list[str]) -> dict[str, str]:
         now = datetime.now(timezone.utc)
@@ -53,14 +54,14 @@ class SetuProvider(AggregatorProvider):
             },
             "redirectUrl": self.redirect_url,
         }
-        client = await self._client()
+        client = self._client()
         resp = await client.post(f"{self.base_url}/consents", json=payload, headers=self._headers())
         resp.raise_for_status()
         data = resp.json()
         return {"consent_id": data["id"], "redirect_url": data["url"]}
 
     async def check_consent_status(self, consent_id: str) -> dict[str, Any]:
-        client = await self._client()
+        client = self._client()
         resp = await client.get(f"{self.base_url}/consents/{consent_id}", headers=self._headers())
         resp.raise_for_status()
         data = resp.json()
@@ -75,13 +76,13 @@ class SetuProvider(AggregatorProvider):
             },
             "format": "json",
         }
-        client = await self._client()
+        client = self._client()
         resp = await client.post(f"{self.base_url}/fi/fetch", json=payload, headers=self._headers())
         resp.raise_for_status()
         return self._normalize_transactions(resp.json())
 
     async def revoke_consent(self, consent_id: str) -> None:
-        client = await self._client()
+        client = self._client()
         resp = await client.post(f"{self.base_url}/consents/{consent_id}/revoke", headers=self._headers())
         resp.raise_for_status()
 
@@ -103,7 +104,7 @@ class SetuProvider(AggregatorProvider):
                         "status": "completed",
                         "currency": "INR",
                         "reference": txn.get("reference", ""),
-                        "bank_name": account_data.get("type", ""),
+                        "bank_name": "",  # Setu response doesn't include bank name directly
                         "raw_data": txn,
                     }
                 )
