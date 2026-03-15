@@ -1,3 +1,8 @@
+-- Migration: update batch_import_transactions to accept account_id parameter
+
+-- Drop old 2-arg overload (constraint it relied on was dropped in 20260315000001)
+DROP FUNCTION IF EXISTS public.batch_import_transactions(UUID, JSONB);
+
 CREATE OR REPLACE FUNCTION public.batch_import_transactions(
     p_user_id UUID,
     p_account_id UUID,
