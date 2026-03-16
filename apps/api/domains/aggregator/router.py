@@ -1,11 +1,10 @@
 # apps/api/domains/aggregator/router.py
 """REST API for account aggregator. Mounted at /api/v1/aggregator/."""
 
-import os
-
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from apps.api.core.auth import get_current_user_id, get_user_client
+from apps.api.core.config import settings
 from apps.api.domains.aggregator import service
 from apps.api.domains.aggregator.providers.setu import SetuProvider
 from apps.api.domains.aggregator.schemas import BankAccountOut, LinkAccountRequest, LinkAccountResponse, SyncResponse
@@ -15,15 +14,19 @@ router = APIRouter(prefix="/aggregator", tags=["aggregator"])
 
 
 def _get_setu_provider() -> SetuProvider:
-    try:
-        return SetuProvider(
-            client_id=os.environ["SETU_CLIENT_ID"],
-            client_secret=os.environ["SETU_CLIENT_SECRET"],
-            base_url=os.environ.get("SETU_BASE_URL", "https://fiu-sandbox.setu.co"),
-            redirect_url=os.environ.get("SETU_REDIRECT_URL", "http://localhost:3000/dashboard/accounts/callback"),
+    if not settings.SETU_CLIENT_ID or not settings.SETU_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="Setu provider not configured: SETU_CLIENT_ID and SETU_CLIENT_SECRET must be set in .env",
         )
-    except KeyError as e:
-        raise HTTPException(status_code=503, detail=f"Provider not configured: missing {e}") from e
+    return SetuProvider(
+        client_id=settings.SETU_CLIENT_ID,
+        client_secret=settings.SETU_CLIENT_SECRET,
+        base_url=settings.SETU_BASE_URL,
+        auth_url=settings.SETU_AUTH_URL,
+        product_instance_id=settings.SETU_PRODUCT_INSTANCE_ID,
+        redirect_url=settings.SETU_REDIRECT_URL,
+    )
 
 
 @router.get("/accounts/", response_model=list[BankAccountOut])
