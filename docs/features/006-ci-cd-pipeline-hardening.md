@@ -30,6 +30,7 @@ SCALE's CI/CD pipeline has critical gaps that expose the project to undetected s
 16. **No PR dependency review** — PRs that bump a dependency to a vulnerable version are not automatically flagged.
 17. **ruff version drift** — Pre-commit pins ruff at `v0.3.3`; CI runs `pip install ruff` (unpinned). The same code can pass locally and fail in CI.
 18. **No job timeouts** — GitHub Actions default timeout is 6 hours. A hung job wastes the full quota.
+19. **Playwright E2E never runs in CI** — `apps/web/e2e/auth.spec.ts` exists and `playwright.config.ts` is fully configured with `webServer` (auto-starts `npm run dev`). It has never been wired into a CI job. The entire authentication flow is untested server-side.
 
 ---
 
@@ -55,6 +56,7 @@ SCALE's CI/CD pipeline has critical gaps that expose the project to undetected s
 - [ ] All CI jobs have `timeout-minutes` set (≤20 minutes each), including the `dependency-review` job.
 - [ ] `dependabot.yml` exists and generates weekly PRs for npm, pip, and github-actions deps.
 - [ ] `dependency-review-action` runs on all PRs to `main` and fails if a bumped dependency introduces a known CVE.
+- [ ] Playwright E2E runs in CI against a local dev server (`npm run dev` via `webServer` config). `e2e/auth.spec.ts` passes. CI fails if any E2E test fails.
 
 ---
 
@@ -69,12 +71,13 @@ SCALE's CI/CD pipeline has critical gaps that expose the project to undetected s
 - `.commitlintrc.json` — create new file
 - `apps/web/package.json` — add `@commitlint/cli` and `@commitlint/config-conventional` as dev dependencies
 - `docs/design/system-architecture.md` — add GHCR registry as a new infrastructure component; update Changelog
+- `apps/web/playwright.config.ts` — add `webServer.timeout: 120_000` (default 60s is too short for cold Next.js start in CI)
+- `.github/workflows/ci.yml` — add `test-e2e` job
 - GitHub repository secrets: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (manual setup step, not a code change)
 
 ### Out of Scope
 
 - CD implementation (Railway deploy steps) — LLD 007
-- Playwright E2E in CI — LLD 007 (requires a deployed environment)
 - SBOM generation (Syft) — LLD 007
 - Artifact signing (cosign) — LLD 007
 - Rollback procedure — LLD 007
@@ -111,13 +114,17 @@ flowchart TD
 
     lint --> test_backend
     lint --> test_frontend
+    lint --> test_e2e
 
     test_backend["⚙️ test-backend\n• pytest --cov=apps,packages\n• --cov-fail-under=60\ntimeout: 15m"]
 
     test_frontend["⚙️ test-frontend\n• tsc --noEmit\n• next build\n• vitest --coverage\ntimeout: 15m"]
 
+    test_e2e["⚙️ test-e2e\n• playwright install chromium\n• npx playwright test\n• webServer: npm run dev\ntimeout: 15m"]
+
     test_backend --> build
     test_frontend --> build
+    test_e2e --> build
     sast --> build
     codeql --> build
 
@@ -190,6 +197,47 @@ The `GITHUB_TOKEN` automatically has write access to GHCR for the same repositor
 
 60% is the initial floor — intentionally low to avoid breaking CI immediately. The floor should be ratcheted up as test coverage improves.
 
+### 4.6 Playwright E2E Job Design
+
+`playwright.config.ts` already has a `webServer` block:
+
+```typescript
+webServer: {
+  command: 'npm run dev',
+  url: 'http://localhost:3000',
+  reuseExistingServer: !process.env.CI,
+}
+```
+
+In CI (`process.env.CI=true`), `reuseExistingServer` is `false` — Playwright starts a fresh Next.js dev server on every run. No deployed environment needed.
+
+```
+test-e2e job:
+  needs: [lint]           ← runs in parallel with test-backend and test-frontend
+  runs-on: ubuntu-latest
+  timeout-minutes: 15
+  defaults:
+    run:
+      working-directory: apps/web   ← all steps run from apps/web/
+  env:
+    NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    ← job-level env is inherited by all steps AND by child processes (including the
+      Next.js dev server spawned by webServer), so the vars reach the dev server correctly
+  steps:
+    1. actions/checkout
+    2. actions/setup-node (node 20, cache-dependency-path: apps/web/package-lock.json)
+    3. npm ci
+    4. npx playwright install --with-deps chromium   ← chromium only (fastest; ~200MB vs ~600MB all)
+    5. npx playwright test                           ← webServer auto-starts Next.js at localhost:3000
+```
+
+Note: `e2e/auth.spec.ts` currently tests that `/login`, `/signup`, and `/dashboard` render correctly
+and that `/dashboard` redirects unauthenticated users. It does not make authenticated Supabase calls.
+The env vars are still required because `next dev` validates them at startup.
+
+The `test-e2e` job gates `build-push-images` — images are only pushed if E2E passes.
+
 ---
 
 ## 5. API Changes
@@ -226,6 +274,9 @@ The 60% floor may immediately fail CI if the current coverage is below 60%. Befo
 
 **ruff version pin drift over time.**
 When ruff releases a new version, both `.pre-commit-config.yaml` (rev field) and `ci.yml` (`pip install ruff==X.Y.Z`) must be updated together. Dependabot will open a PR for the pre-commit hook update automatically. The CI pin must be updated manually in the same PR. Document this in the PR template (out of scope for this LLD).
+
+**Playwright `webServer` startup timeout in CI.**
+Playwright's default `webServer.timeout` is 60 seconds. A cold `npm run dev` in CI (no cache, heavy deps including `@react-three/fiber`, `framer-motion`) can take 90–120 seconds. If `localhost:3000` does not respond within the timeout, Playwright aborts with a timeout error — not a test failure, making it hard to diagnose. Fix: set `webServer.timeout: 120_000` in `playwright.config.ts`. This is included in scope.
 
 **Concurrency cancellation and deploy.yml.**
 `deploy.yml` already has `concurrency: cancel-in-progress: true` scoped to `deploy-${{ github.ref }}`. The new concurrency group in `ci.yml` is scoped to `ci-${{ github.ref }}` — separate groups, no interference.
@@ -281,6 +332,7 @@ This feature is CI/CD configuration — the tests are the CI runs themselves.
 | Feature branch CI | Push to any non-main branch | CI runs |
 | Concurrency cancel | Push twice quickly to same branch | Second run cancels first |
 | Dependabot PRs | GitHub → Pull Requests (after one week) | Auto-PRs from Dependabot appear |
+| E2E test results | GitHub Actions → `test-e2e` job | `e2e/auth.spec.ts` passes; job is green |
 
 ---
 
@@ -303,3 +355,4 @@ This feature is CI/CD configuration — the tests are the CI runs themselves.
 | Date | Entry |
 |---|---|
 | 2026-03-16 | Draft created. Full gap list compiled via two-pass CI/CD and DevSecOps skill analysis. Design approved through brainstorming session. |
+| 2026-03-16 | CORRECTION: Playwright E2E moved from Out of Scope to In Scope. Gap check revealed `playwright.config.ts` has `webServer` config that auto-starts `npm run dev` — no deployed environment required. Problem 19 added to Problem Statement. Section 4.6 added. `test-e2e` job added to pipeline diagram. Implementation not yet started; this is a design correction, not a deviation. |
