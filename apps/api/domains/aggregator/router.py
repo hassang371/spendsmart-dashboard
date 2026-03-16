@@ -55,7 +55,7 @@ async def get_account(
 async def link_account(
     body: LinkAccountRequest, user_id: str = Depends(get_current_user_id), client: Client = Depends(get_user_client)
 ):
-    return await service.link_account(client, user_id, _get_setu_provider(), body.fi_types)
+    return await service.link_account(client, user_id, _get_setu_provider(), body.fi_types, body.vua)
 
 
 @router.post("/accounts/{account_id}/sync", response_model=SyncResponse)

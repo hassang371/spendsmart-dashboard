@@ -133,12 +133,11 @@ class SetuProvider(AggregatorProvider):
     def _client(self) -> httpx.AsyncClient:
         return self._http_client
 
-    async def initiate_consent(self, user_id: str, fi_types: list[str]) -> dict[str, str]:
+    async def initiate_consent(self, user_id: str, fi_types: list[str], vua: str) -> dict[str, str]:
         now = datetime.now(timezone.utc)
         payload = {
             "consentDuration": {"unit": "MONTH", "value": "12"},
-            # In sandbox, Setu expects a valid VUA like 9999999999@onemoney, not an internal UUID
-            "vua": "9999999999@onemoney",
+            "vua": vua,
             "dataRange": {
                 "from": (now - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "to": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
