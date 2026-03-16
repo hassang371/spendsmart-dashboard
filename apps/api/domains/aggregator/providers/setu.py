@@ -136,7 +136,7 @@ class SetuProvider(AggregatorProvider):
     async def initiate_consent(self, user_id: str, fi_types: list[str], vua: str) -> dict[str, str]:
         now = datetime.now(timezone.utc)
         payload = {
-            "consentDuration": {"unit": "MONTH", "value": "12"},
+            "consentDuration": {"unit": "MONTH", "value": 12},
             "vua": vua,
             "dataRange": {
                 "from": (now - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -178,11 +178,10 @@ class SetuProvider(AggregatorProvider):
     async def fetch_transactions(self, consent_id: str, from_date: datetime, to_date: datetime) -> list[dict[str, Any]]:
         payload = {
             "consentId": consent_id,
-            "DataRange": {
+            "dataRange": {
                 "from": from_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "to": to_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
             },
-            "format": "json",
         }
         client = self._client()
         headers = await self._headers()

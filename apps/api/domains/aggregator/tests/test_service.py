@@ -50,7 +50,7 @@ async def test_get_or_create_manual_creates_new():
 async def test_link_account():
     provider = AsyncMock()
     provider.initiate_consent.return_value = {"consent_id": "c-1", "redirect_url": "https://setu.co/c-1"}
-    result = await service.link_account(_mock_supabase([]), "user-1", provider, ["DEPOSIT"])
+    result = await service.link_account(_mock_supabase([]), "user-1", provider, ["DEPOSIT"], "9876543210@onemoney")
     assert result["consent_id"] == "c-1"
     provider.initiate_consent.assert_called_once()
 
@@ -89,6 +89,39 @@ async def test_sync_account():
     ]
     result = await service.sync_account(_mock_supabase([account]), "acc-1", provider)
     assert "inserted" in result
+
+
+@pytest.mark.asyncio
+async def test_unlink_deletes_account():
+    """unlink_account must DELETE the record from bank_accounts, not update it."""
+    account = {"id": "acc-1", "is_manual": False, "consent_id": None, "consent_status": "pending"}
+    client = _mock_supabase([account])
+    await service.unlink_account(client, "acc-1", AsyncMock())
+    client.table.return_value.delete.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_unlink_active_calls_revoke_then_deletes():
+    """Active consent: revoke with Setu first, then DELETE the DB row."""
+    account = {"id": "acc-1", "is_manual": False, "consent_id": "c-1", "consent_status": "active"}
+    provider = AsyncMock()
+    client = _mock_supabase([account])
+    await service.unlink_account(client, "acc-1", provider)
+    provider.revoke_consent.assert_called_once_with("c-1")
+    client.table.return_value.delete.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_callback_non_active_statuses_delete_account():
+    """handle_callback for non-ACTIVE statuses (REVOKED, PAUSED, EXPIRED) must DELETE the row."""
+    for setu_status in ("REVOKED", "PAUSED", "EXPIRED"):
+        account = {"id": "acc-1", "user_id": "user-1"}
+        provider = AsyncMock()
+        provider.check_consent_status.return_value = {"status": setu_status, "detail": {}}
+        client = _mock_supabase([account])
+        result = await service.handle_callback(client, "c-1", provider)
+        assert result["status"] == setu_status.lower(), f"Wrong status for {setu_status}"
+        client.table.return_value.delete.assert_called(), f"DELETE not called for status {setu_status}"
 
 
 @pytest.mark.asyncio

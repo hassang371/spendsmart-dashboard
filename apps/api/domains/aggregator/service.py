@@ -66,11 +66,9 @@ async def handle_callback(client: Any, consent_id: str, provider: AggregatorProv
             }
         ).eq("id", account["id"]).execute()
         return {"account_id": account["id"], "status": "active"}
-    elif status == "REJECTED":
-        client.table("bank_accounts").delete().eq("id", account["id"]).execute()
-        return {"account_id": account["id"], "status": "rejected"}
     else:
-        client.table("bank_accounts").update({"consent_status": status.lower()}).eq("id", account["id"]).execute()
+        # REJECTED, REVOKED, PAUSED, EXPIRED — consent is not usable, remove the record
+        client.table("bank_accounts").delete().eq("id", account["id"]).execute()
         return {"account_id": account["id"], "status": status.lower()}
 
 
@@ -145,6 +143,4 @@ async def unlink_account(client: Any, account_id: str, provider: AggregatorProvi
         raise ValueError("Cannot unlink Manual Import account")
     if account.get("consent_id") and account["consent_status"] == "active":
         await provider.revoke_consent(account["consent_id"])
-    client.table("bank_accounts").update({"consent_status": "revoked", "sync_status": "idle"}).eq(
-        "id", account_id
-    ).execute()
+    client.table("bank_accounts").delete().eq("id", account_id).execute()
