@@ -137,7 +137,8 @@ class SetuProvider(AggregatorProvider):
         now = datetime.now(timezone.utc)
         payload = {
             "consentDuration": {"unit": "MONTH", "value": "12"},
-            "vua": user_id,
+            # In sandbox, Setu expects a valid VUA like 9999999999@onemoney, not an internal UUID
+            "vua": "9999999999@onemoney",
             "dataRange": {
                 "from": (now - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "to": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
