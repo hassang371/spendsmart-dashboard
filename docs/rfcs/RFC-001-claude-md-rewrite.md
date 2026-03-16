@@ -209,3 +209,12 @@ Level 3: skills/design-docs/references/ (loaded per decision tree)
 > **Decision:** Approved
 > **Date:** 2026-03-07
 > **Rationale:** Eliminates Gemini/Claude config conflicts, enforces brainstorming gate, restores missing upstream files, reduces CLAUDE.md to manageable size.
+
+---
+
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-07 | Initial draft, decision Approved |
+| 2026-03-08 | Implemented — CLAUDE.md rewritten, 6 rule files created, design-docs skill restored, committed cd63a8e |

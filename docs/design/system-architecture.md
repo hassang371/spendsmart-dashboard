@@ -24,11 +24,12 @@ graph TB
 
         subgraph Domains["📦 Domain Modules"]
             Ing["📥 Ingestion<br/>import, parse, dedup"]
-            Cat["🏷️ Categorization<br/>classify, feedback"]
+            Cat["🏷️ Categorization<br/>classify, feedback, adapter"]
             Fore["📈 Forecasting<br/>predict, TFT train"]
             Train["🔧 Training<br/>model jobs, status"]
             Anom["🚨 Anomaly<br/>TDA detection"]
-            Acc["👤 Accounts<br/>profile, settings"]
+            Acc["👤 Accounts<br/>profile, transactions, reclassify"]
+            Agg["🏦 Aggregator<br/>AA consent, sync, webhooks"]
         end
     end
 
@@ -54,11 +55,12 @@ graph TB
 apps/api/
 ├── domains/
 │   ├── ingestion/       ← Smart Import, file parsing, fingerprinting
-│   ├── categorization/  ← HypCD classifier, feedback loop
+│   ├── categorization/  ← MiniLM + cosine-sim classifier, feedback, LinearAdapter
 │   ├── forecasting/     ← TFT model, predictions
 │   ├── training/        ← Model training jobs, FL aggregation
 │   ├── anomaly/         ← TDA anomaly detection (future)
-│   └── accounts/        ← User profile, settings, transactions
+│   ├── accounts/        ← Transactions (paginated), profile, reclassification
+│   └── aggregator/      ← Bank account linking (Setu AA), consent, sync, webhooks
 ├── core/                ← Auth, logging, errors, middleware
 ├── main.py              ← FastAPI app, registers all domain routers
 └── worker.py            ← Celery worker, imports domain tasks
@@ -162,3 +164,5 @@ sequenceDiagram
 |---|---|---|
 | 2026-03-06 | Initial HLD | Created from archived architecture docs |
 | 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata; added data flow diagram |
+| 2026-03-15 | Account Aggregator | Added Aggregator domain (Setu AA consent + sync); updated Accounts domain description; see docs/features/004-account-aggregator.md |
+| 2026-03-16 | v2 Classifier | Updated Categorization domain to reflect MiniLM + LinearAdapter (not HypCD); updated domain module structure |

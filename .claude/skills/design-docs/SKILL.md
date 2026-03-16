@@ -64,13 +64,17 @@ Every doc needs at least one diagram. Load ONLY the guide you need:
 2. High-contrast colors (accessible)
 3. Descriptive labels ("Auth Service (JWT)" not "Service A")
 
-## Step 4: HLD Sync Check
+## Step 4: HLD Sync Check + Changelog
 
 After any LLD, check if HLD needs updating:
 
 1. Read `references/hld-sync-protocol.md`
 2. Identify affected HLD files in `docs/design/`
 3. Update affected sections + add changelog entry at bottom
+
+**All docs require a Changelog section** (Feature LLDs, Bug Reports, RFCs, Policies, HLDs).
+Add an entry when the doc is first written and whenever the implementation deviates from the
+original design. See `docs/STANDARDS.md` for the required format per doc type.
 
 ## Step 5: Commit Docs Before Code
 

@@ -278,5 +278,13 @@ sequenceDiagram
 
 ## Related Documents
 
-- HLD: `docs/design/database-design.md` — needs update for `bank_accounts` table
-- HLD: `docs/design/api-design.md` — needs update for new endpoints
+- HLD: `docs/design/database-design.md` — updated 2026-03-15 with `bank_accounts` table
+- HLD: `docs/design/api-design.md` — updated 2026-03-15 with `/aggregator` endpoints
+
+---
+
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-15 | Initial draft — full AA integration design, Setu provider, bank_accounts schema, status Verified |
