@@ -20,7 +20,7 @@ from apps.api.domains.aggregator.provider import AggregatorProvider
 logger = logging.getLogger(__name__)
 
 
-def _handle_setu_error(exc: httpx.HTTPStatusError, operation: str) -> None:
+def _handle_setu_error(exc: httpx.HTTPStatusError | httpx.RequestError, operation: str) -> None:
     """Convert httpx errors into FastAPI HTTPException.
 
     Without this, unhandled httpx exceptions propagate through the
@@ -29,6 +29,13 @@ def _handle_setu_error(exc: httpx.HTTPStatusError, operation: str) -> None:
     error response. The browser then reports a CORS error instead
     of showing the real problem.
     """
+    if isinstance(exc, httpx.RequestError) and not isinstance(exc, httpx.HTTPStatusError):
+        logger.error("setu_%s_request_failed error=%s", operation, str(exc))
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to communicate with Setu API during {operation}: {type(exc).__name__}",
+        ) from exc
+
     body = exc.response.text
     status = exc.response.status_code
     logger.error("setu_%s_failed status=%s body=%s", operation, status, body)
@@ -77,7 +84,7 @@ class SetuProvider(AggregatorProvider):
         self.auth_url = auth_url
         self.product_instance_id = product_instance_id
         self.redirect_url = redirect_url
-        self._http_client: httpx.AsyncClient = http_client or httpx.AsyncClient()
+        self._http_client: httpx.AsyncClient = http_client or httpx.AsyncClient(timeout=30.0)
 
         # Cached token + expiry
         self._access_token: str | None = None
@@ -102,6 +109,8 @@ class SetuProvider(AggregatorProvider):
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            _handle_setu_error(exc, "auth_token")
+        except httpx.RequestError as exc:
             _handle_setu_error(exc, "auth_token")
 
         data = resp.json()
@@ -148,6 +157,8 @@ class SetuProvider(AggregatorProvider):
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
             _handle_setu_error(exc, "initiate_consent")
+        except httpx.RequestError as exc:
+            _handle_setu_error(exc, "initiate_consent")
         data = resp.json()
         return {"consent_id": data["id"], "redirect_url": data["url"]}
 
@@ -158,6 +169,8 @@ class SetuProvider(AggregatorProvider):
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            _handle_setu_error(exc, "check_consent_status")
+        except httpx.RequestError as exc:
             _handle_setu_error(exc, "check_consent_status")
         data = resp.json()
         return {"status": data["status"], "detail": data.get("detail")}
@@ -178,6 +191,8 @@ class SetuProvider(AggregatorProvider):
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
             _handle_setu_error(exc, "fetch_transactions")
+        except httpx.RequestError as exc:
+            _handle_setu_error(exc, "fetch_transactions")
         return self._normalize_transactions(resp.json())
 
     async def revoke_consent(self, consent_id: str) -> None:
@@ -187,6 +202,8 @@ class SetuProvider(AggregatorProvider):
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            _handle_setu_error(exc, "revoke_consent")
+        except httpx.RequestError as exc:
             _handle_setu_error(exc, "revoke_consent")
 
     def _normalize_transactions(self, setu_response: dict[str, Any]) -> list[dict[str, Any]]:

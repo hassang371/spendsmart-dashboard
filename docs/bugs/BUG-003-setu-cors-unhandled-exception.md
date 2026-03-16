@@ -32,3 +32,8 @@ The CORS error was a secondary symptom.
 - Verified Token generation against `https://auth-v2.setu.co/realms/setu/protocol/openid-connect/token` returns 200 OK.
 - Verified `/v2/consents` creation with Bearer token & `x-product-instance-id` returns 201 Created.
 - All 5 aggregator domain tests (`test_router.py`) pass successfully.
+
+## Addendum (2026-03-16)
+After the initial Auth flow fix, the user encountered another CORS error. The log revealed it was an `httpcore.ReadTimeout` exception (raised as `httpx.ReadTimeout`).
+Because the timeout is a network-level error, it raises `httpx.RequestError` rather than `httpx.HTTPStatusError`, so it bypassed the new `_handle_setu_error` interceptor, triggering the exact same CORS stripping behavior.
+- **Fix:** Updated the interceptor to catch the base `httpx.RequestError` class, logging the network error and raising a 502 Bad Gateway to preserve CORS headers. Also explicitly increased the Setu `httpx.AsyncClient` timeout to 30 seconds to prevent premature timeouts on the sandbox API.
