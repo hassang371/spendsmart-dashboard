@@ -16,6 +16,20 @@
 dashboard. All classification calls use the base cosine-similarity model regardless of how
 many corrections have been made.
 
+Representative errors observed:
+
+- `POST /training/train` and `POST /training/upload` fail at the DB insert step with:
+
+  ```
+  ERROR: new row for relation "training_jobs" violates check constraint "training_jobs_status_check"
+  DETAIL: Failing row contains (... queued ...).
+  ```
+
+- No log output from `_run_supervised_finetuning_bg` for `user_model_metadata` writes — the
+  write never executes.
+- `load_latest()` returns `None` for all users — Storage lists `users/{user_id}/adapter.pt`
+  but the function only scans for `{user_id}/v_*` prefixes, finding nothing.
+
 ---
 
 ## 2. Expected Behavior
@@ -97,14 +111,19 @@ sequenceDiagram
 **File:** `packages/categorization/model_registry.py:28-65`
 
 `save_version()` uploads the `.pt` file to Storage and returns a `ModelVersion` dataclass
-but **never writes to `user_model_metadata`**.
+but **never writes to `user_model_metadata`**. This also means `apps/api/tasks/training_tasks.py:74-96`
+(which calls `save_version()` in the Celery training path) silently skips the metadata write — it
+uses the correct storage path but the downstream table write is never executed.
 
 **File:** `packages/categorization/adapter_manager.py:68-88`
 
 `save_user_adapter()` saves to Storage but also **never writes to `user_model_metadata`**.
 
 The table was defined in migration `20260301000000_user_model_metadata.sql` to serve as the
-canonical pointer to a user's adapter. No code populates it.
+canonical pointer to a user's adapter. No code populates it. Additionally, the migration
+comment at line 6 of that file reads `-- Supabase Storage path: users/{user_id}/adapter.pt`,
+which enshrines the wrong (AdapterManager) path. This must also be corrected to
+`{user_id}/v_{timestamp}/adapter.pt` as part of Fix 1.
 
 ---
 
@@ -123,7 +142,10 @@ The background task triggered by user corrections uses `AdapterManager`, which s
 and filters for folders starting with `v_` — it will never find anything saved under `users/`.
 Adapters from the background task are permanently unreachable.
 
-**Files:** `apps/api/domains/accounts/router.py:39-71`, `packages/categorization/model_registry.py:68-100`
+**Files:**
+- `apps/api/domains/accounts/router.py:39-71` (background task using `AdapterManager`, wrong save path)
+- `packages/categorization/model_registry.py:28-65` (`save_version()` — correct save path, but `load_latest()` expects this prefix)
+- `packages/categorization/model_registry.py:68-100` (`load_latest()` — expects `{user_id}/v_*`, never finds `users/{user_id}/` entries)
 
 ---
 
@@ -135,7 +157,7 @@ Additionally, `AdapterManager.fine_tune_supervised()` creates a brand-new
 `TransactionClassifier()` from scratch, loading the full 22M-parameter MiniLM model into
 memory, while the FastAPI process already holds a singleton.
 
-**Files:** `packages/categorization/adapter_manager.py:103-125`, `apps/api/domains/accounts/router.py:54-63`
+**Files:** `packages/categorization/adapter_manager.py:103-125`, `apps/api/domains/accounts/router.py:39-71`
 
 ---
 
@@ -167,7 +189,10 @@ Every `POST /training/train` and `POST /training/upload` will fail at the
 `INSERT INTO training_jobs` step with a CHECK constraint violation.
 
 **File:** `apps/api/domains/training/router.py:143-151` (insert with `"queued"`),
-`architecture/schema.sql:157-159` (constraint definition).
+`architecture/schema.sql:157-159` (constraint definition — note: this file is the schema
+reference copy; the live constraint enforcement is in the Supabase database applied via
+`supabase/migrations/`. Fix 4 must add a new migration — editing `architecture/schema.sql`
+alone will not fix the running database).
 
 ---
 
@@ -206,16 +231,22 @@ and triggers Fix 1 to populate `user_model_metadata`.
 
 ### Fix 3 — Connect `training_corrections` to the training pipeline (Bug 4)
 
-Option A (preferred): When `POST /categorization/feedback` is called, also update
-matching `transactions` rows with `is_manual=True` and the corrected category.
-This keeps `POST /training/train` working as-is.
+**Decision: Option A.**
 
-Option B: Change `POST /training/train` to also query `training_corrections` and merge
-with `is_manual=True` transactions before training.
+When `POST /categorization/feedback` is called (`apps/api/domains/categorization/router.py:138`),
+also upsert the matching `transactions` row with `is_manual=True` and `category` set to the
+corrected value. This keeps `POST /training/train` working as-is — it already reads
+`transactions WHERE is_manual=True`, so no changes to the training router are needed.
+
+Option B (read from both `training_corrections` and `is_manual` transactions in the training
+router) was rejected: it would require reading and deduplicating two disjoint sources on every
+training run, and the merge ordering (which source wins on conflict) is ambiguous.
 
 ---
 
 ### Fix 4 — Add `"queued"` to the `training_jobs` status constraint (Bug 5)
+
+**Migration file:** `supabase/migrations/20260316000001_fix_training_jobs_status_constraint.sql`
 
 ```sql
 ALTER TABLE training_jobs DROP CONSTRAINT training_jobs_status_check;
@@ -224,6 +255,8 @@ ALTER TABLE training_jobs ADD CONSTRAINT training_jobs_status_check
         'pending','queued','running','processing','completed','failed'
     ]));
 ```
+
+Also update the reference copy at `architecture/schema.sql:157-159` to stay in sync.
 
 ---
 
@@ -256,7 +289,7 @@ Tests to add **before** implementing any fix (TDD — write failing test first):
 | `docs/design/system-architecture.md` | ML pipeline — needs update to reflect v2 classifier + adapter training flow |
 | `packages/categorization/classifier.py` | `LinearAdapter`, `train_adapter()`, `predict_batch()` |
 | `packages/categorization/model_registry.py` | `save_version()`, `load_latest()` — fix targets |
-| `apps/api/tasks/training_tasks.py` | `train_adapter_task` — uses correct path, missing `user_model_metadata` write |
+| `apps/api/tasks/training_tasks.py:74-96` | `train_adapter_task` — uses correct storage path via `save_version()`, but inherits Bug 1 (missing `user_model_metadata` write) |
 | `apps/api/domains/accounts/router.py` | `_run_supervised_finetuning_bg` — uses wrong path |
 
 ---
@@ -265,4 +298,4 @@ Tests to add **before** implementing any fix (TDD — write failing test first):
 
 | Date | Change |
 |---|---|
-| 2026-03-16 | Initial report — 5 root causes identified, fix strategy documented |
+| 2026-03-16 | Initial report — 5 root causes identified (Bugs 1–5: missing metadata write, storage path split-brain, AdapterManager dead code, training_corrections not consumed, training_jobs status constraint); fix strategy documented in §6 (Fixes 1–5) |
