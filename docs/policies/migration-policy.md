@@ -89,3 +89,11 @@ For any `DROP TABLE`, `DROP COLUMN`, or data-destructive `UPDATE`/`DELETE`:
 3. Require explicit sign-off from tech lead
 4. Confirm staging test + rollback drill completed
 5. Schedule during maintenance window with < 5 min expected downtime
+
+---
+
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-08 | Initial policy — pre-migration checklist, rollback template, destructive change protocol (from Feature 002 Rec DB-1) |

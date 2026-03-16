@@ -568,3 +568,11 @@ This review covered the application backend, frontend, shared packages, ingestio
 - This report combines static review + available runtime checks; findings are prioritized for engineering action.
 - Some infra risks (network exposure, deployment guardrails) depend on environment settings and should be validated against actual production/staging configuration.
 - Historical backup folders were not the primary deployment target but were useful for pattern detection.
+
+---
+
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-08 | Initial consolidated audit — 35 findings, 12 critical, status Resolved |

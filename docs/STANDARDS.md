@@ -2,7 +2,7 @@
 
 > **Canonical source of truth for all agents (Claude, Gemini) and humans.**
 > When any agent's internal doc-standards file conflicts with this file, this file wins.
-> Last Updated: 2026-03-08
+> Last Updated: 2026-03-16
 
 ---
 
@@ -84,6 +84,7 @@ Additional fields by doc type:
 8. Security Considerations
 9. Testing Strategy
 10. Related Documents (HLD links, RFC links)
+11. Changelog (append-only — add an entry when the doc is created and whenever reality diverges from the original design)
 
 ### Bug Report (all required)
 
@@ -95,6 +96,7 @@ Additional fields by doc type:
 6. Fix Description (files changed + why it works)
 7. Regression Prevention (test added, guard added)
 8. Related Documents
+9. Changelog (append-only — add an entry at creation; add entries as status transitions)
 
 ### RFC — Full (all required)
 
@@ -107,6 +109,7 @@ Additional fields by doc type:
 7. Timeline
 8. Decision (approved/rejected/deferred + rationale)
 9. Related Documents
+10. Changelog (append-only — add entries as decision status changes)
 
 ### RFC — Short (for small decisions, all required)
 
@@ -114,6 +117,7 @@ Additional fields by doc type:
 2. Decision (what was chosen and why)
 3. Alternatives Considered (1–2, brief)
 4. Impact (what changes as a result)
+5. Changelog (append-only — add entries as decision status changes)
 
 ### HLD — Living Document (all required)
 
@@ -122,6 +126,13 @@ Additional fields by doc type:
 3. Domain/Module/Endpoint Details
 4. Key Decisions
 5. Changelog (append-only, newest at top)
+
+### Policy (all required)
+
+1. Policy Statement (what this policy governs)
+2. Rules / Checklist
+3. Examples or templates (where applicable)
+4. Changelog (append-only — add entries when policy is created or updated)
 
 ---
 

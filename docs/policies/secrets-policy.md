@@ -1,5 +1,10 @@
 # SCALE App: Secrets Management Policy
 
+> **Doc ID:** secrets-policy
+> **Date:** 2026-03-08
+> **Status:** Current
+> **DRI:** Hassan
+
 ## Approved Secrets Stores
 
 1. **GitHub Actions Secrets**: Dedicated to CI/CD runtime needs (e.g., `SUPABASE_SERVICE_ROLE_KEY` for integration tests, deploy tags).
@@ -24,3 +29,11 @@
 2. **Update CI/CD**: Update GitHub Actions Secrets with the new keys.
 3. **Scrub History**: If a secret was leaked in Git commit history, use `git filter-repo` to completely excise the leaked secret from the repository tree.
 4. **Notify Users**: If database infrastructure was compromised, initiate an incident report and notify affected users.
+
+---
+
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-08 | Initial policy — approved stores, Gitleaks CI enforcement, key rotation schedule, emergency revocation steps |

@@ -54,6 +54,10 @@ Based on work type:
 
 Must include at least one Mermaid diagram. HLD sync check required after every LLD.
 
+**Every doc requires a Changelog section** (Feature LLDs, Bug Reports, RFCs, Policies, HLDs).
+Add an entry when the doc is first created and whenever the implementation deviates from the
+original design. See `docs/STANDARDS.md` for changelog format per doc type.
+
 **Commit docs before any code:**
 
 ```bash

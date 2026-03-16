@@ -118,3 +118,11 @@ graph TD
 
 - HLD: N/A
 - RFC: N/A
+
+---
+
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-13 | Initial draft — Bento Box layout, ExpandableCard, cinematic expansion, status Verified |
