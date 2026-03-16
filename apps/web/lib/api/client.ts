@@ -105,6 +105,7 @@ export interface BankAccount {
 
 export interface LinkAccountRequest {
   fi_types?: string[];
+  vua?: string;
 }
 
 export interface LinkAccountResponse {

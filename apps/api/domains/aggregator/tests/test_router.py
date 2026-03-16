@@ -65,7 +65,9 @@ def test_link_account(http):
         p = AsyncMock()
         p.initiate_consent.return_value = {"consent_id": "c-1", "redirect_url": "https://setu.co/c-1"}
         mp.return_value = p
-        resp = http.post("/api/v1/aggregator/accounts/link", json={"fi_types": ["DEPOSIT"]})
+        resp = http.post(
+            "/api/v1/aggregator/accounts/link", json={"fi_types": ["DEPOSIT"], "vua": "9999999999@onemoney"}
+        )
         assert resp.status_code == 200
         assert resp.json()["consent_id"] == "c-1"
 

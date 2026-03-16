@@ -26,6 +26,7 @@ class BankAccountOut(BaseModel):
 
 class LinkAccountRequest(BaseModel):
     fi_types: list[str] = Field(default_factory=lambda: ["DEPOSIT"])
+    vua: str = Field(..., description="Virtual User Address (e.g. 9999999999@onemoney)")
 
 
 class LinkAccountResponse(BaseModel):

@@ -32,8 +32,10 @@ async def get_or_create_manual_account(client: Any, user_id: str) -> dict:
     return result.data[0]
 
 
-async def link_account(client: Any, user_id: str, provider: AggregatorProvider, fi_types: list[str]) -> dict[str, str]:
-    consent = await provider.initiate_consent(user_id, fi_types)
+async def link_account(
+    client: Any, user_id: str, provider: AggregatorProvider, fi_types: list[str], vua: str
+) -> dict[str, str]:
+    consent = await provider.initiate_consent(user_id, fi_types, vua)
     client.table("bank_accounts").insert(
         {
             "user_id": user_id,

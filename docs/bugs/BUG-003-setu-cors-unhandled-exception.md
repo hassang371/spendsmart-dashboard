@@ -37,3 +37,12 @@ The CORS error was a secondary symptom.
 After the initial Auth flow fix, the user encountered another CORS error. The log revealed it was an `httpcore.ReadTimeout` exception (raised as `httpx.ReadTimeout`).
 Because the timeout is a network-level error, it raises `httpx.RequestError` rather than `httpx.HTTPStatusError`, so it bypassed the new `_handle_setu_error` interceptor, triggering the exact same CORS stripping behavior.
 - **Fix:** Updated the interceptor to catch the base `httpx.RequestError` class, logging the network error and raising a 502 Bad Gateway to preserve CORS headers. Also explicitly increased the Setu `httpx.AsyncClient` timeout to 30 seconds to prevent premature timeouts on the sandbox API.
+
+## Addendum 2 (2026-03-16): 400 Bad Request (Invalid Customer Address)
+After fixing the timeouts and CORS issues, the Setu Sandbox API started returning a `400 Bad Request` with the error `Invalid customer address` or indicating that the `vua` field cannot be null.
+- **Root Cause:** The Setu v2 `/v2/consents` endpoint strictly requires a valid Virtual User Address (`vua`) to identify the user making the request. We were incorrectly passing the internal Supabase UUID (`user_id`). The Setu Sandbox specifically requires a phone number handle formatted like `9999999999@onemoney`.
+- **Fix:**
+  1. Updated the frontend Accounts page to prompt the user to input their 10-digit mobile number before initializing the link flow.
+  2. Modified the `bankAccountsApi` client to pipe the number to the backend route payload.
+  3. Expanded the `LinkAccountRequest` schema to accept the `vua` parameter.
+  4. Updated the `SetuProvider.initiate_consent` method to accept the dynamic `vua` and inject it into the raw payload (as `<number>@onemoney`).

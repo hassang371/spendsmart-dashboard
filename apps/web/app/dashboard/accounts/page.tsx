@@ -43,6 +43,8 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
+  const [showVuaPrompt, setShowVuaPrompt] = useState(false);
+  const [mobileNumber, setMobileNumber] = useState('');
   const [syncing, setSyncing] = useState<string | null>(null);
   const [unlinking, setUnlinking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,11 +80,25 @@ export default function AccountsPage() {
     }
   }
 
-  async function handleLink() {
+  function initiateLinkPrompt() {
+    setError(null);
+    setShowVuaPrompt(true);
+  }
+
+  async function handleLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mobileNumber || mobileNumber.length < 10) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
     setLinking(true);
+    setShowVuaPrompt(false);
     setError(null);
     try {
-      const res = await bankAccountsApi.link(token);
+      // For sandbox/OneMoney, the VUA format is exactly `<number>@onemoney`
+      const vua = `${mobileNumber}@onemoney`;
+      const res = await bankAccountsApi.link(token, { vua, fi_types: ['DEPOSIT'] });
       // Redirect user to Setu consent page
       window.location.href = res.redirect_url;
     } catch {
@@ -129,7 +145,7 @@ export default function AccountsPage() {
           </p>
         </div>
         <button
-          onClick={handleLink}
+          onClick={initiateLinkPrompt}
           disabled={linking}
           className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity shadow-lg shadow-primary/20"
         >
@@ -137,6 +153,41 @@ export default function AccountsPage() {
           Link Account
         </button>
       </div>
+
+      {showVuaPrompt && (
+        <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
+          <p className="text-sm font-medium">Link a new bank account</p>
+          <p className="text-xs text-muted-foreground">
+            Please enter your mobile number registered with your bank. You will receive an OTP from our Account Aggregator partner (OneMoney).
+          </p>
+          <form onSubmit={handleLink} className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground pl-2">+91</span>
+            <input
+              type="text"
+              autoFocus
+              placeholder="9876543210"
+              value={mobileNumber}
+              onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              required
+            />
+            <button
+              type="submit"
+              disabled={linking || mobileNumber.length !== 10}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              Continue
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowVuaPrompt(false)}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-muted"
+            >
+              Cancel
+            </button>
+          </form>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-2.5 text-sm text-destructive">
