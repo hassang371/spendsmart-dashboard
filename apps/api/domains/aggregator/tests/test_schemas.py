@@ -35,7 +35,8 @@ def test_bank_account_out_from_db_row():
 
 
 def test_link_account_request_defaults():
-    assert LinkAccountRequest().fi_types == ["DEPOSIT"]
+    req = LinkAccountRequest(vua="9876543210@onemoney")
+    assert req.fi_types == ["DEPOSIT"]
 
 
 def test_link_account_response():

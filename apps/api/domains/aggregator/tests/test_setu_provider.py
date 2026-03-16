@@ -24,13 +24,18 @@ def mock_http():
 
 @pytest.fixture
 def setu(mock_http):
-    return SetuProvider(
+    provider = SetuProvider(
         client_id="test-id",
         client_secret="test-secret",
         base_url="https://fiu-sandbox.setu.co",
         redirect_url="http://localhost:3000/dashboard/accounts/callback",
+        product_instance_id="test-product-id",
         http_client=mock_http,
     )
+    # Pre-seed a valid token so _get_token() returns immediately without an HTTP call
+    provider._access_token = "test-bearer-token"
+    provider._token_expires_at = float("inf")
+    return provider
 
 
 @pytest.mark.asyncio
@@ -43,7 +48,7 @@ async def test_initiate_consent(setu, mock_http):
             "status": "PENDING",
         },
     )
-    result = await setu.initiate_consent("user-1", ["DEPOSIT"])
+    result = await setu.initiate_consent("user-1", ["DEPOSIT"], "9876543210@onemoney")
     assert result["consent_id"] == "consent-123"
     assert "anumati.setu.co" in result["redirect_url"]
 
@@ -108,4 +113,4 @@ async def test_raises_on_error(setu, mock_http):
     error_resp.raise_for_status.side_effect = Exception("500 Server Error")
     mock_http.post.return_value = error_resp
     with pytest.raises(Exception, match="500"):
-        await setu.initiate_consent("user-1", ["DEPOSIT"])
+        await setu.initiate_consent("user-1", ["DEPOSIT"], "9876543210@onemoney")

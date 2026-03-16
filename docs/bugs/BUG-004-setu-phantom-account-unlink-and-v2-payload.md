@@ -2,7 +2,7 @@
 
 > **Doc ID:** BUG-004-setu-phantom-account-unlink-and-v2-payload
 > **Date:** 2026-03-16
-> **Status:** Root Cause Found
+> **Status:** Verified
 > **DRI:** Hassan
 > **Severity:** High
 
@@ -185,3 +185,4 @@ Should be `"value": 12` (integer). Setu currently accepts this in sandbox but it
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-16 | Hassan | Initial bug report — phantom account, broken unlink, v2 payload mismatch |
+| 2026-03-17 | Hassan | Implemented all fixes. 34/34 aggregator tests pass. Status → Verified |
