@@ -188,3 +188,40 @@ After writing any Feature LLD or Bug Report, always check if an HLD needs updati
 | Architecture / service topology | `docs/design/system-architecture.md` |
 
 Add a changelog entry at the bottom of any HLD you update.
+
+---
+
+## Spec Review Rule
+
+After writing or updating ANY doc, run a spec review before committing:
+
+1. Dispatch `superpowers:code-reviewer` with the doc content + type + review focus
+2. Fix all issues found
+3. Re-run until clean (max 3 iterations)
+4. Commit only after spec review passes
+
+This applies to all doc types: Feature LLDs, Bug Reports, RFCs, HLDs, Policies.
+
+---
+
+## Deviation Log Rule
+
+When implementation diverges from a design doc, record it in the Changelog:
+
+```markdown
+| YYYY-MM-DD | DEVIATION: [what changed from original design] — [why it changed] |
+```
+
+This is distinct from a status-change entry. Its purpose is to explain WHY reality
+diverged from the documented intent. A doc without deviation entries that describes
+something that no longer matches the code is a silent lie.
+
+---
+
+## Planned Automation (not yet implemented — tracked for future Feature LLDs)
+
+| Item | Description | Status |
+|---|---|---|
+| Pre-commit Refs: check | Shell hook that blocks `fix:`/`feat:` commits without a `Refs:` line pointing to a real `docs/` file | Planned |
+| CI doc-gate job | GitHub Action that requires every `fix:`/`feat:` PR to also modify a file in `docs/bugs/` or `docs/features/` | Planned |
+| Stale doc detector | `make check-docs` script: finds docs with `Status: In Progress` and no recent commits referencing them | Planned |
