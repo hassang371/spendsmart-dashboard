@@ -27,12 +27,20 @@ const renderActiveShape = (props: any) => {
   return (
     <g>
       <text x={cx} y={cy} textAnchor="middle" fill={fill} className="text-sm md:text-xl font-black">
-        {payload.name.length > 12 ? (
-          <>
-            <tspan x={cx} dy="-4">{payload.name.substring(0, 12)}</tspan>
-            <tspan x={cx} dy="20">{payload.name.substring(12, 22) + (payload.name.length > 22 ? '...' : '')}</tspan>
-          </>
-        ) : (
+        {payload.name.length > 12 ? (() => {
+          const words = payload.name.split(' ');
+          const mid = Math.ceil(words.length / 2);
+          const line1 = words.slice(0, mid).join(' ');
+          const line2 = words.slice(mid).join(' ');
+          return line2 ? (
+            <>
+              <tspan x={cx} dy="-4">{line1}</tspan>
+              <tspan x={cx} dy="20">{line2.length > 10 ? line2.substring(0, 10) + '...' : line2}</tspan>
+            </>
+          ) : (
+            <tspan x={cx} dy={8}>{line1.length > 12 ? line1.substring(0, 12) + '...' : line1}</tspan>
+          );
+        })() : (
           <tspan x={cx} dy={8}>{payload.name}</tspan>
         )}
       </text>
@@ -128,7 +136,7 @@ export function CategoryDistribution({ transactions, isExpanded = false }: { tra
       <div className={`relative z-10 w-full flex-1 min-h-0 mt-2 flex ${isExpanded ? 'flex-col md:flex-row gap-8 items-center' : 'flex-col'}`}>
 
         {/* Chart Area */}
-        <div className={`${isExpanded ? 'w-full md:flex-1 h-[300px] md:h-full min-h-[300px] min-w-0' : 'w-full h-full min-h-[250px] min-w-0'}`}>
+        <div className={`${isExpanded ? 'w-full md:flex-1 h-[300px] md:h-full min-h-[300px] min-w-0' : 'w-full h-[250px] min-w-0'}`}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
