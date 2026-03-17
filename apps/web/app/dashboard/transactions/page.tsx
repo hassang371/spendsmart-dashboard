@@ -551,7 +551,7 @@ export default function TransactionsPage() {
       setMessage('Category saved.');
       // Invalidate caches so next navigation picks up server state
       if (userId) {
-        removeCachedData(`transactions-cache:${userId}`);
+        removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
         removeCachedData(`uncategorized-cache:${userId}`);
       }
       fetchTransactions();
@@ -570,9 +570,9 @@ export default function TransactionsPage() {
     [4000, 10000].forEach(delay =>
       setTimeout(() => {
         if (userId) {
-          removeCachedData(`transactions-cache:${userId}`);
+          removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
           removeCachedData(`uncategorized-cache:${userId}`);
-          removeCachedData(`overview-cache:${userId}`);
+          removeCachedData(`overview-cache:${userId}:${activeAccountId}`);
         }
         fetchTransactions();
         fetchTotalCounts(); // also refresh Review badge count after classification
@@ -866,7 +866,7 @@ export default function TransactionsPage() {
       await accountsApi.updateTransaction(txId, updates, accessToken);
       setMessage('Category updated.');
       // Invalidate cache so fetchTransactions fetches fresh data (not cached stale rows)
-      if (userId) removeCachedData(`transactions-cache:${userId}`);
+      if (userId) removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
       // Refresh in background to sync any additional batch updates from server
       fetchTransactions();
 
@@ -934,7 +934,7 @@ export default function TransactionsPage() {
     const result = await ingestionApi.importFile(file, accessToken, password);
 
     // Clear local caches so that immediately subsequent UI fetch requests retrieve fresh data
-    removeCachedData(`transactions-cache:${userId}`);
+    removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
     removeCachedData(`uncategorized-cache:${userId}`);
 
     setImportProgress(100);
