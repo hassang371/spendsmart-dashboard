@@ -2,7 +2,7 @@
 
 > **Doc ID:** BUG-005-dashboard-empty-state-on-client-navigation
 > **Date:** 2026-03-17
-> **Status:** Root Cause Found
+> **Status:** Verified
 > **DRI:** Hassan
 > **Severity:** High
 
@@ -234,3 +234,4 @@ When `activeAccountId = UUID` and no transactions match, `{ rows: [] }` is cache
 | Date | Author | Change |
 |---|---|---|
 | 2026-03-17 | Hassan | Initial bug report — 4 root causes identified and documented |
+| 2026-03-17 | Hassan | Implementation complete — all 5 defects fixed, 2 regression tests passing (80/80 suite green). Status → Verified |
