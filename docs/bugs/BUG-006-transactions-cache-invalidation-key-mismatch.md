@@ -2,7 +2,7 @@
 
 > **Doc ID:** BUG-006-transactions-cache-invalidation-key-mismatch
 > **Date:** 2026-03-17
-> **Status:** Root Cause Found
+> **Status:** Verified
 > **DRI:** Hassan
 > **Severity:** High
 
@@ -186,3 +186,4 @@ fetch, which returns the current (post-categorization) rows from the database.
 | Date | Author | Change |
 |---|---|---|
 | 2026-03-17 | Hassan | Initial bug report — cache key mismatch identified at 5 call sites |
+| 2026-03-17 | Hassan | Implementation complete — all 5 call sites fixed, 2 regression tests passing (82/82 suite green). Status → Verified |
