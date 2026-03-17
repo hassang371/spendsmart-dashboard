@@ -40,16 +40,12 @@ export function AccountProvider({
 }) {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeAccountId, setActiveAccountIdState] = useState<string>('all');
-
-  // Restore persisted selection on mount
-  useEffect(() => {
+  // Lazy initializer reads storage synchronously on first render, eliminating
+  // the 'all'→UUID state transition that caused concurrent overview fetches.
+  const [activeAccountId, setActiveAccountIdState] = useState<string>(() => {
     const storage = getAppStorage();
-    const persisted = storage?.getItem(STORAGE_KEY);
-    if (persisted) {
-      setActiveAccountIdState(persisted);
-    }
-  }, []);
+    return storage?.getItem(STORAGE_KEY) || 'all';
+  });
 
   const fetchAccounts = useCallback(async () => {
     if (!token) {

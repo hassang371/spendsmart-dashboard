@@ -407,11 +407,14 @@ export default function TransactionsPage() {
     setTransactions(rows);
     setNextCursor(response.next_cursor ?? undefined);
     setHasMore(response.has_more);
-    setCachedData<TxCache>(cacheKey, {
-      rows,
-      nextCursor: response.next_cursor ?? undefined,
-      hasMore: response.has_more,
-    });
+    // Only cache non-empty results — storing [] poisons the cache for navigation back.
+    if (rows.length > 0) {
+      setCachedData<TxCache>(cacheKey, {
+        rows,
+        nextCursor: response.next_cursor ?? undefined,
+        hasMore: response.has_more,
+      });
+    }
   }, [router, activeAccountId]);
 
   const fetchMoreTransactions = useCallback(async () => {
