@@ -74,7 +74,7 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
       className="flex h-full w-full flex-col relative"
     >
       {/* Chart Canvas */}
-      <div className="flex-1 min-h-0 w-full relative pt-4">
+      <div className={`${isExpanded ? 'flex-1 min-h-0' : 'h-[300px]'} w-full relative pt-4`}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>

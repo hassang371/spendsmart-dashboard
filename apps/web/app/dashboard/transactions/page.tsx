@@ -516,7 +516,14 @@ export default function TransactionsPage() {
     }
   }, []);
 
-  // Fetch uncategorized when review tab is selected
+  // Fetch uncategorized eagerly on mount so the Review badge shows the
+  // deduplicated merchant count from the start (not the raw server count).
+  // Refs: docs/bugs/BUG-007-review-badge-wrong-count.md
+  useEffect(() => {
+    fetchUncategorized();
+  }, [fetchUncategorized]);
+
+  // Keep fetching on tab switch in case the cache was invalidated
   useEffect(() => {
     if (tab === 'review') fetchUncategorized();
   }, [tab, fetchUncategorized]);

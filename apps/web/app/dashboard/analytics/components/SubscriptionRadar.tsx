@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { type Transaction } from '../../../../lib/api/client';
@@ -17,6 +17,18 @@ const SUBSCRIPTION_KEYWORDS = [
 ];
 
 export function SubscriptionRadar({ transactions, isExpanded = false }: SubscriptionRadarProps) {
+  // Guard window.innerWidth for SSR safety using useSyncExternalStore.
+  // Server snapshot returns false (desktop default) — no window access on server.
+  // Refs: docs/bugs/BUG-010-subscriptionradar-window-ssr-crash.md
+  const isSmall = useSyncExternalStore(
+    (cb) => {
+      window.addEventListener('resize', cb);
+      return () => window.removeEventListener('resize', cb);
+    },
+    () => window.innerWidth < 640,
+    () => false, // server snapshot: default to desktop
+  );
+
   const { recurring, discretionary, recurringList } = useMemo(() => {
     let rec = 0;
     let disc = 0;
@@ -174,7 +186,7 @@ export function SubscriptionRadar({ transactions, isExpanded = false }: Subscrip
       ) : (
         // Compact View: Horizontal Radial/Bar
         <div className="flex-1 w-full min-h-[200px] flex items-center justify-center px-4 pb-4 mt-2">
-           <ResponsiveContainer width="100%" height="80%">
+           <ResponsiveContainer width="100%" height={200}>
              <PieChart>
               <Pie
                 data={chartData}
@@ -182,8 +194,8 @@ export function SubscriptionRadar({ transactions, isExpanded = false }: Subscrip
                 cy="100%"
                 startAngle={180}
                 endAngle={0}
-                innerRadius={window.innerWidth < 640 ? 90 : 110}
-                outerRadius={window.innerWidth < 640 ? 120 : 140}
+                innerRadius={isSmall ? 90 : 110}
+                outerRadius={isSmall ? 120 : 140}
                 paddingAngle={4}
                 dataKey="value"
                 stroke="none"
