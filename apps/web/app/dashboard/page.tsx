@@ -73,6 +73,7 @@ export default function OverviewPage() {
 
       if (cachedData) {
         setData(cachedData);
+        if (cachedData.length > 0) setHasTransactionsEver(true);
         setLoading(false);
         return;
       }
@@ -123,9 +124,9 @@ export default function OverviewPage() {
         // If the current period is empty, check whether the user has any
         // transactions at all (across all time) to decide which empty state to show.
         if (allItems.length === 0) {
+          // Omit account_id to check globally — backend treats omission same as 'all'.
           const anyCheck = await accountsApi.getTransactions(session.access_token, {
             limit: 1,
-            account_id: activeAccountId,
           });
           setHasTransactionsEver(anyCheck.items.length > 0);
         } else {
@@ -133,7 +134,10 @@ export default function OverviewPage() {
         }
 
         setData(allItems);
-        setCachedData(cacheKey, allItems);
+        // Only cache non-empty results — storing [] poisons the cache for navigation back.
+        if (allItems.length > 0) {
+          setCachedData(cacheKey, allItems);
+        }
       } catch (err) {
         console.error('Error fetching transactions:', err);
         setError('Unable to load financial data.');
