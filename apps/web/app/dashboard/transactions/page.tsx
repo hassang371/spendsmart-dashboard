@@ -438,14 +438,11 @@ export default function TransactionsPage() {
         const combined = [...prev, ...newRows];
         if (userId) {
           const ck = `transactions-cache:${userId}`;
-          type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
-          // Preserve existing cached counts so they survive Load More rewrites
-          const existingCache = getCachedData<TxCache>(ck, TRANSACTIONS_CACHE_TTL_MS);
+          type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean };
           setCachedData<TxCache>(ck, {
             rows: combined,
             nextCursor: response.next_cursor ?? undefined,
             hasMore: response.has_more,
-            ...(existingCache?.counts ? { counts: existingCache.counts } : {}),
           });
         }
         return combined;
@@ -467,24 +464,22 @@ export default function TransactionsPage() {
     } = await supabase.auth.getSession();
     if (!session?.access_token) return;
 
-    const cacheKey = `transactions-cache:${user.id}`;
-    type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
+    // Dedicated counts-only cache key — independent of the row cache so counts are
+    // always persisted after the first API call, regardless of Load More history.
+    // Refs: docs/bugs/BUG-011-transactions-badge-stale-counts-and-slow-load.md
+    const cacheKey = `transaction-counts:${user.id}`;
+    type CountsCache = { counts: TransactionCountsResponse };
 
-    // Use cached counts if still within TTL
-    const cachedForCounts = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
-    if (cachedForCounts?.counts) {
-      setServerCounts(cachedForCounts.counts);
+    const cachedCounts = getCachedData<CountsCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
+    if (cachedCounts?.counts) {
+      setServerCounts(cachedCounts.counts);
       return;
     }
 
     try {
       const counts = await accountsApi.getTransactionCounts(session.access_token);
       setServerCounts(counts);
-      // Merge counts into the existing cache entry so the next navigation is free
-      const existing = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
-      if (existing) {
-        setCachedData<TxCache>(cacheKey, { ...existing, counts });
-      }
+      setCachedData<CountsCache>(cacheKey, { counts });
     } catch {
       // non-critical — tab headers fall back to local counts
     }
@@ -580,6 +575,7 @@ export default function TransactionsPage() {
           removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
           removeCachedData(`uncategorized-cache:${userId}`);
           removeCachedData(`overview-cache:${userId}:${activeAccountId}`);
+          removeCachedData(`transaction-counts:${userId}`);
         }
         fetchTransactions();
         fetchTotalCounts(); // also refresh Review badge count after classification
@@ -600,9 +596,10 @@ export default function TransactionsPage() {
 
     (async () => {
       try {
-        await fetchTransactions();
-        // Fetch server-side total counts in background (non-blocking for main UI)
+        // Fetch counts concurrently so All/Debit/Credit badges arrive alongside Review.
+        // Refs: docs/bugs/BUG-011-transactions-badge-stale-counts-and-slow-load.md
         fetchTotalCounts();
+        await fetchTransactions();
       } catch (fetchError) {
         if (mounted) {
           setError(

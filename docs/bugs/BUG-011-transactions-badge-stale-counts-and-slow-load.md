@@ -2,7 +2,7 @@
 
 > **Doc ID:** BUG-011-transactions-badge-stale-counts-and-slow-load
 > **Date:** 2026-03-18
-> **Status:** Root Cause Found
+> **Status:** Implemented
 > **DRI:** Hassan
 > **Severity:** Low
 
