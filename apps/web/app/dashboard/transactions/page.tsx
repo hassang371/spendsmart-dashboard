@@ -596,10 +596,12 @@ export default function TransactionsPage() {
 
     (async () => {
       try {
-        // Fetch counts concurrently so All/Debit/Credit badges arrive alongside Review.
+        await fetchTransactions();
+        // Fetch server-side total counts in background (non-blocking for main UI).
+        // Must run after fetchTransactions — both call supabase.auth APIs that share
+        // an internal lock; concurrent calls cause AbortError.
         // Refs: docs/bugs/BUG-011-transactions-badge-stale-counts-and-slow-load.md
         fetchTotalCounts();
-        await fetchTransactions();
       } catch (fetchError) {
         if (mounted) {
           setError(
