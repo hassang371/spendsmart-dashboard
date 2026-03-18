@@ -110,9 +110,11 @@ The mount `useEffect` (lines 601–616) runs:
 
 `fetchUncategorized` runs in a **separate** `useEffect` (lines 522–524) — concurrently with the above, independent of the async chain. It has its own dedicated cache key (`uncategorized-cache:${userId}`) with no dependency on the transactions fetch.
 
-Result: on a fresh load where `fetchTransactions` makes an API call, `fetchTotalCounts` starts only after that round-trip completes. `fetchUncategorized` starts at mount and uses a simpler cache hit path. Review badge arrives first.
+Result: on a cold load where `fetchTransactions` makes an API call, `fetchTotalCounts` starts only after that round-trip completes. `fetchUncategorized` starts at mount and uses a simpler cache hit path. Review badge arrives first on cold load.
 
 This delay is only observable on cold loads (empty cache). On cache-hit navigations, `fetchTransactions` returns synchronously, so `fetchTotalCounts` starts with negligible delay — in that case, the flash is caused entirely by Root Cause 1 (counts never cached), not by the sequential ordering.
+
+**The sequential ordering is intentional and must be preserved.** Both functions call `supabase.auth` APIs that share an internal lock in Supabase auth-js v2. Running them concurrently causes `AbortError: signal is aborted without reason` — which can abort `fetchTransactions`'s `getSession()` call, returning `session = null` and triggering `router.replace('/login')`. The cold-load delay is an acceptable trade-off to avoid this instability.
 
 ### Root Cause 3 — `tabCounts` falls back to first-page row count
 
@@ -140,7 +142,6 @@ const tabCounts = useMemo(() => {
 |---|---|---|
 | `apps/web/app/dashboard/transactions/page.tsx` | 470 | Change `fetchTotalCounts` cache key from `transactions-cache:${user.id}` to `transaction-counts:${user.id}` (dedicated counts-only key) |
 | `apps/web/app/dashboard/transactions/page.tsx` | 484–487 | Remove the `if (existing)` guard — always write counts after a successful API call |
-| `apps/web/app/dashboard/transactions/page.tsx` | 603–605 | Run `fetchTotalCounts` concurrently with `fetchTransactions` — remove `await` dependency |
 | `apps/web/app/dashboard/transactions/page.tsx` | 580 | Add `removeCachedData('transaction-counts:${userId}')` inside `refreshAfterImport` so stale counts are evicted alongside rows after import |
 | `apps/web/app/dashboard/transactions/page.tsx` | 443–448 | Remove the `...(existingCache?.counts ? { counts: existingCache.counts } : {})` spread and its comment in `fetchMoreTransactions` — after Fix 1, counts live in `transaction-counts:${userId}` and this spread always evaluates to `{}` (harmless but stale dead logic) |
 
@@ -165,28 +166,10 @@ setCachedData<CountsCache>(cacheKey, { counts });
 
 A dedicated key has no dependency on Load More having run. On every successful API call, counts are stored. On the next navigation (within TTL), counts are read immediately from cache, `setServerCounts` is called before any render, and the flash never appears.
 
-### Fix 2 — Concurrent execution
-
-```tsx
-(async () => {
-  try {
-    fetchTotalCounts();        // ← start immediately (non-awaited)
-    await fetchTransactions();
-  } catch (fetchError) {
-    ...
-  } finally {
-    finished = true;
-    if (mounted) setLoading(false);
-  }
-})();
-```
-
-Starting `fetchTotalCounts` at the same time as `fetchTransactions` means — on a cold load — both API calls are in-flight concurrently. All/Debit/Credit now arrive no later than Review (which is already concurrent).
-
 ### Why This Fix Works
 
 - **Near-instant counts on cache hit:** On second navigation, `getCachedData('transaction-counts:${userId}')` returns a hit → `setServerCounts` is called in the first post-mount effect cycle → React applies the state update after the first render, reducing the flash from a full network round-trip to a sub-millisecond flicker that is imperceptible in practice. (True zero-flash would require synchronous server state loaded before mount — out of scope here.)
-- **No more slower badges (cold load):** `fetchTotalCounts` starts at mount alongside `fetchUncategorized`, not after `fetchTransactions` completes → equal or better arrival time.
+- **Sequential ordering preserved:** `fetchTotalCounts` still runs after `await fetchTransactions()`. Both functions call `supabase.auth` APIs that share an internal lock in Supabase auth-js v2; concurrent calls cause `AbortError: signal is aborted without reason`. Sequential ordering avoids lock contention.
 - **No regression on Load More:** The dedicated `transaction-counts` key is separate from the transactions row cache — `fetchMoreTransactions` still writes to `transactions-cache:${userId}` for rows; the counts key is unaffected. Note: `fetchMoreTransactions` currently spreads `existingCache?.counts` when writing rows (line 448) — after Fix 1 this evaluates to `{}` (counts are now in `transaction-counts:${userId}`, not in `transactions-cache:${userId}`). This is harmless; the counts spread in `fetchMoreTransactions` is cleaned up as part of this fix.
 
 ## Regression Prevention
