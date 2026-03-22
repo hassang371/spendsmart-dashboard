@@ -69,7 +69,7 @@ export default function SettingsPage() {
   // Toast States
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-useEffect(() => {
+  useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 5000);
       return () => clearTimeout(timer);
@@ -168,7 +168,6 @@ useEffect(() => {
         const str = sanitizeFormula(value ?? '');
         if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
           return `"${str.replace(/"/g, '""')}"`;
-
         }
         return str;
       };

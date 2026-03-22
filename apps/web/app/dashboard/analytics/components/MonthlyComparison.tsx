@@ -1,7 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { motion } from 'framer-motion';
 
 interface Transaction {
@@ -24,7 +32,10 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
 
     // Grouping by date string "YYYY-MM-DD" or similar basis depending on spread.
     // For simplicity and a smooth area chart, we'll sort chronologically and group by day.
-    const grouped = new Map<string, { dateStr: string; timestamp: number; income: number; expense: number }>();
+    const grouped = new Map<
+      string,
+      { dateStr: string; timestamp: number; income: number; expense: number }
+    >();
 
     transactions.forEach(tx => {
       const d = new Date(tx.transaction_date);
@@ -38,7 +49,7 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
           dateStr: dateKey,
           timestamp: d.getTime(),
           income: 0,
-          expense: 0
+          expense: 0,
         });
       }
 
@@ -53,7 +64,10 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
     return Array.from(grouped.values())
       .sort((a, b) => a.timestamp - b.timestamp)
       .map(entry => ({
-        date: new Date(entry.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: new Date(entry.timestamp).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }),
         Income: entry.income,
         Expense: entry.expense,
       }));
@@ -87,7 +101,12 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
                 <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="hsl(var(--border))"
+              opacity={0.4}
+            />
             <XAxis
               dataKey="date"
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
@@ -97,7 +116,7 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
             />
             {isExpanded && (
               <YAxis
-                tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
+                tickFormatter={val => `₹${(val / 1000).toFixed(0)}k`}
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
@@ -109,7 +128,7 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
                 backgroundColor: 'hsl(var(--card))',
                 borderRadius: '12px',
                 border: '1px solid hsl(var(--border))',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
               }}
               formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
             />

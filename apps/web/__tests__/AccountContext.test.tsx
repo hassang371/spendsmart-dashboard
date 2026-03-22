@@ -6,9 +6,15 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const mockStorageData: Record<string, string> = {};
 const mockStorage = {
   getItem: vi.fn((key: string) => mockStorageData[key] ?? null),
-  setItem: vi.fn((key: string, value: string) => { mockStorageData[key] = value; }),
-  removeItem: vi.fn((key: string) => { delete mockStorageData[key]; }),
-  clear: vi.fn(() => { Object.keys(mockStorageData).forEach(k => delete mockStorageData[k]); }),
+  setItem: vi.fn((key: string, value: string) => {
+    mockStorageData[key] = value;
+  }),
+  removeItem: vi.fn((key: string) => {
+    delete mockStorageData[key];
+  }),
+  clear: vi.fn(() => {
+    Object.keys(mockStorageData).forEach(k => delete mockStorageData[k]);
+  }),
 };
 
 vi.mock('../lib/utils/storage', () => ({
@@ -31,7 +37,9 @@ describe('AccountContext — activeAccountId initialization', () => {
     Object.keys(mockStorageData).forEach(k => delete mockStorageData[k]);
     // Re-wire mock fns (cleared by clearAllMocks)
     mockStorage.getItem.mockImplementation((key: string) => mockStorageData[key] ?? null);
-    mockStorage.setItem.mockImplementation((key: string, value: string) => { mockStorageData[key] = value; });
+    mockStorage.setItem.mockImplementation((key: string, value: string) => {
+      mockStorageData[key] = value;
+    });
   });
 
   it('reads activeAccountId from storage synchronously on first render without waiting for effects', () => {
@@ -39,9 +47,7 @@ describe('AccountContext — activeAccountId initialization', () => {
     mockStorageData['scale_active_account_id'] = 'stored-uuid-456';
 
     const { result } = renderHook(() => useAccount(), {
-      wrapper: ({ children }) => (
-        <AccountProvider token="">{children}</AccountProvider>
-      ),
+      wrapper: ({ children }) => <AccountProvider token="">{children}</AccountProvider>,
     });
 
     // With current code (useState('all') + restore useEffect):

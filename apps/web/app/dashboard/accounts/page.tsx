@@ -49,12 +49,14 @@ export default function AccountsPage() {
   const [unlinking, setUnlinking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedAccount = accounts.find((a) => a.id === selectedId) ?? null;
+  const selectedAccount = accounts.find(a => a.id === selectedId) ?? null;
 
   // Auth + initial fetch
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.access_token) {
         router.replace('/login');
         return;
@@ -62,7 +64,7 @@ export default function AccountsPage() {
       setToken(session.access_token);
       await fetchAccounts(session.access_token);
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchAccounts(t: string = token) {
@@ -158,7 +160,8 @@ export default function AccountsPage() {
         <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
           <p className="text-sm font-medium">Link a new bank account</p>
           <p className="text-xs text-muted-foreground">
-            Please enter your mobile number registered with your bank. You will receive an OTP from our Account Aggregator partner (OneMoney).
+            Please enter your mobile number registered with your bank. You will receive an OTP from
+            our Account Aggregator partner (OneMoney).
           </p>
           <form onSubmit={handleLink} className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground pl-2">+91</span>
@@ -167,7 +170,7 @@ export default function AccountsPage() {
               autoFocus
               placeholder="9876543210"
               value={mobileNumber}
-              onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              onChange={e => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
               className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               required
             />
@@ -212,7 +215,7 @@ export default function AccountsPage() {
               <p className="text-sm text-muted-foreground">No accounts linked yet.</p>
             </div>
           ) : (
-            accounts.map((account) => (
+            accounts.map(account => (
               <button
                 key={account.id}
                 onClick={() => setSelectedId(account.id)}
@@ -329,9 +332,7 @@ export default function AccountsPage() {
                     },
                     {
                       label: 'Sync Status',
-                      value: (
-                        <SyncStatusIndicator status={selectedAccount.sync_status} />
-                      ),
+                      value: <SyncStatusIndicator status={selectedAccount.sync_status} />,
                     },
                     {
                       label: 'Linked',

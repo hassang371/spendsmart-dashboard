@@ -10,7 +10,13 @@ interface Transaction {
   description?: string;
 }
 
-export function MerchantLeaderboard({ transactions, isExpanded = false }: { transactions: Transaction[], isExpanded?: boolean }) {
+export function MerchantLeaderboard({
+  transactions,
+  isExpanded = false,
+}: {
+  transactions: Transaction[];
+  isExpanded?: boolean;
+}) {
   const { data, maxAmount, totalSpend } = useMemo(() => {
     const map = new Map<string, { amount: number; count: number }>();
     let total = 0;
@@ -61,10 +67,12 @@ export function MerchantLeaderboard({ transactions, isExpanded = false }: { tran
       )}
 
       {isExpanded && (
-         <div className="relative z-10 mb-6 flex flex-col gap-1">
-             <h3 className="text-xl font-black text-foreground">Merchant Leaderboard</h3>
-             <p className="text-sm text-muted-foreground">Detailed breakdown of your spending by merchant.</p>
-         </div>
+        <div className="relative z-10 mb-6 flex flex-col gap-1">
+          <h3 className="text-xl font-black text-foreground">Merchant Leaderboard</h3>
+          <p className="text-sm text-muted-foreground">
+            Detailed breakdown of your spending by merchant.
+          </p>
+        </div>
       )}
 
       {data.length === 0 ? (
@@ -77,39 +85,46 @@ export function MerchantLeaderboard({ transactions, isExpanded = false }: { tran
           {isExpanded ? (
             // Expanded Rich Data Table View
             <div className="w-full text-sm">
-                <div className="grid grid-cols-12 gap-4 pb-3 border-b border-border/50 text-muted-foreground font-semibold px-4">
-                    <div className="col-span-1 text-center">#</div>
-                    <div className="col-span-5">Merchant</div>
-                    <div className="col-span-3">Spend Volume</div>
-                    <div className="col-span-3 text-right">Total Amount</div>
-                </div>
-                <div className="flex flex-col gap-2 mt-3">
-                    {data.map((merchant, index) => (
-                        <div key={merchant.name} className="grid grid-cols-12 gap-4 py-3 px-4 items-center rounded-xl hover:bg-muted/30 transition-colors">
-                            <div className="col-span-1 text-center font-bold text-muted-foreground">
-                                {index + 1}
-                            </div>
-                            <div className="col-span-5 flex flex-col">
-                                <span className="font-bold text-foreground text-base truncate">{merchant.name}</span>
-                                <span className="text-xs text-muted-foreground">{merchant.count} transactions</span>
-                            </div>
-                            <div className="col-span-3 flex flex-col justify-center gap-1.5">
-                                <div className="w-full bg-muted rounded-full h-2 overflow-hidden flex">
-                                    <div
-                                        className="bg-amber-500 rounded-full h-full"
-                                        style={{ width: `${(merchant.amount / maxAmount) * 100}%` }}
-                                    />
-                                </div>
-                                <span className="text-[10px] text-muted-foreground font-mono">
-                                    {((merchant.amount / totalSpend) * 100).toFixed(1)}% of total
-                                </span>
-                            </div>
-                            <div className="col-span-3 text-right font-black text-foreground">
-                                ₹{merchant.amount.toLocaleString('en-IN')}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+              <div className="grid grid-cols-12 gap-4 pb-3 border-b border-border/50 text-muted-foreground font-semibold px-4">
+                <div className="col-span-1 text-center">#</div>
+                <div className="col-span-5">Merchant</div>
+                <div className="col-span-3">Spend Volume</div>
+                <div className="col-span-3 text-right">Total Amount</div>
+              </div>
+              <div className="flex flex-col gap-2 mt-3">
+                {data.map((merchant, index) => (
+                  <div
+                    key={merchant.name}
+                    className="grid grid-cols-12 gap-4 py-3 px-4 items-center rounded-xl hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="col-span-1 text-center font-bold text-muted-foreground">
+                      {index + 1}
+                    </div>
+                    <div className="col-span-5 flex flex-col">
+                      <span className="font-bold text-foreground text-base truncate">
+                        {merchant.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {merchant.count} transactions
+                      </span>
+                    </div>
+                    <div className="col-span-3 flex flex-col justify-center gap-1.5">
+                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden flex">
+                        <div
+                          className="bg-amber-500 rounded-full h-full"
+                          style={{ width: `${(merchant.amount / maxAmount) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {((merchant.amount / totalSpend) * 100).toFixed(1)}% of total
+                      </span>
+                    </div>
+                    <div className="col-span-3 text-right font-black text-foreground">
+                      ₹{merchant.amount.toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             // Compact List View

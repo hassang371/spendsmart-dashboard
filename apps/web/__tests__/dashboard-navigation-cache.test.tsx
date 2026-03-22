@@ -58,8 +58,32 @@ vi.mock('recharts', () => ({
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, variants: _v, initial: _i, animate: _a, whileHover: _wh, whileTap: _wt, transition: _t, exit: _e, ...p }: React.HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => <div {...p}>{children}</div>,
-    section: ({ children, variants: _v, initial: _i, animate: _a, whileHover: _wh, whileTap: _wt, transition: _t, exit: _e, ...p }: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <section {...p}>{children}</section>,
+    div: ({
+      children,
+      variants: _v,
+      initial: _i,
+      animate: _a,
+      whileHover: _wh,
+      whileTap: _wt,
+      transition: _t,
+      exit: _e,
+      ...p
+    }: React.HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => (
+      <div {...p}>{children}</div>
+    ),
+    section: ({
+      children,
+      variants: _v,
+      initial: _i,
+      animate: _a,
+      whileHover: _wh,
+      whileTap: _wt,
+      transition: _t,
+      exit: _e,
+      ...p
+    }: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => (
+      <section {...p}>{children}</section>
+    ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -159,10 +183,9 @@ describe('Overview page — empty state on client-side navigation back (BUG-005)
     render(<OverviewPage />);
 
     // The h1 greeting ("Hi, Test") only renders when loading=false — wait for it
-    await waitFor(
-      () => expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument(),
-      { timeout: 5000 }
-    );
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument(), {
+      timeout: 5000,
+    });
 
     // Must NOT show "Welcome to SCALE! Add first transaction"
     // (user has transactions globally, just not for this specific account in this period)

@@ -126,28 +126,28 @@ function LoginContent() {
         <div className="relative flex-1 flex flex-col items-center justify-center w-full max-w-[1600px] mx-auto">
           {/* Floating Lottie Elements — CSS float animation (GPU) instead of JS keyframes */}
           <div className="absolute top-[15%] left-[5%] md:left-[10%] z-10 w-32 md:w-56 pointer-events-none opacity-90 animate-float">
-            <Lottie animationData={rocketAnimation} loop={true} renderer={"canvas" as any} />
+            <Lottie animationData={rocketAnimation} loop={true} renderer={'canvas' as any} />
           </div>
 
           <div
             className="absolute top-[20%] right-[5%] md:right-[15%] z-10 w-32 md:w-48 pointer-events-none opacity-90 animate-float"
             style={{ animationDuration: '7s', animationDelay: '0.5s' }}
           >
-            <Lottie animationData={coinAnimation} loop={true} renderer={"canvas" as any} />
+            <Lottie animationData={coinAnimation} loop={true} renderer={'canvas' as any} />
           </div>
 
           <div
             className="absolute bottom-[15%] left-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90 animate-float"
             style={{ animationDuration: '5s', animationDelay: '1s' }}
           >
-            <Lottie animationData={walletAnimation} loop={true} renderer={"canvas" as any} />
+            <Lottie animationData={walletAnimation} loop={true} renderer={'canvas' as any} />
           </div>
 
           <div
             className="absolute bottom-[20%] right-[10%] z-10 w-28 md:w-40 pointer-events-none opacity-90 animate-float"
             style={{ animationDuration: '6s', animationDelay: '1.5s' }}
           >
-            <Lottie animationData={smileyAnimation} loop={true} renderer={"canvas" as any} />
+            <Lottie animationData={smileyAnimation} loop={true} renderer={'canvas' as any} />
           </div>
 
           {/* Central Form Card */}
