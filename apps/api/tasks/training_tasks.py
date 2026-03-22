@@ -86,6 +86,7 @@ def train_adapter_task(
                 "learning_rate": learning_rate,
                 "samples": len(texts),
             },
+            correction_count_delta=len(texts),
         )
 
         logger.info(f"Adapter training job {job_id} completed successfully")
