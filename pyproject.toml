@@ -37,4 +37,4 @@ known-first-party = ["apps", "packages", "architecture", "tools"]
 targets = ["apps/api"]
 severity = "medium"
 confidence = "medium"
-skips = []
+skips = ["B101"]
