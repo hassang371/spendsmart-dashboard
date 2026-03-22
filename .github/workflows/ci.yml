@@ -184,34 +184,51 @@ jobs:
         with:
           fail-on-severity: high
 
-  build-scan-images:
-    name: Build & Container Scan
+  build-push-images:
+    name: Build, Scan & Push Images
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, security-sast]
     timeout-minutes: 20
+    needs: [test-backend, test-frontend, test-e2e, security-sast, codeql]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build API Image
+      - name: Build API Image (local for scan)
         uses: docker/build-push-action@v5
         with:
           context: .
           target: api
           load: true
-          tags: scale-api:latest
+          push: false
+          tags: scale-api:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner on API image
-        # BUG-009 fix: Pinned to immutable SHA (v0.29.0 — 2026-03)
         uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
         with:
-          image-ref: 'scale-api:latest'
+          image-ref: 'scale-api:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag scale-api:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
