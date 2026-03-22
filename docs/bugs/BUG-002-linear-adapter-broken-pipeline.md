@@ -2,7 +2,7 @@
 
 > **Doc ID:** BUG-002-linear-adapter-broken-pipeline
 > **Date:** 2026-03-16
-> **Status:** Root Cause Found
+> **Status:** Fix Applied
 > **Severity:** High
 > **DRI:** Hassan
 > **Type:** Bug Report
@@ -299,3 +299,4 @@ Tests to add **before** implementing any fix (TDD — write failing test first):
 | Date | Change |
 |---|---|
 | 2026-03-16 | Initial report — 5 root causes identified (Bugs 1–5: missing metadata write, storage path split-brain, AdapterManager dead code, training_corrections not consumed, training_jobs status constraint); fix strategy documented in §6 (Fixes 1–5) |
+| 2026-03-22 | Fix Applied — Bug 5: migration 20260316000001; Bug 1: migration 20260316000002 + save_version RPC call; Bugs 2+3: bg task rewrite + correction_count_delta in Celery task; Bug 4: feedback→transactions propagation; cleanup: AdapterManager deleted |
