@@ -4,8 +4,9 @@ Tests the MiniLM + Cosine Similarity + Linear Adapter classifier.
 """
 
 import pytest
+import torch
 
-from packages.categorization.classifier import TransactionClassifier
+from packages.categorization.classifier import LinearAdapter, TransactionClassifier
 from packages.categorization.constants import Category
 
 
@@ -108,3 +109,56 @@ class TestEdgeCases:
     def test_single_predict(self, classifier):
         result = classifier.predict("Swiggy food order")
         assert result["category"] == Category.FOOD.value
+
+
+# ── Device Consistency Tests ─────────────────────────────────────────────
+
+
+def test_train_adapter_moves_adapter_to_embedding_device():
+    """Adapter and labels must be on the same device as the embeddings tensor.
+
+    On Apple Silicon, SentenceTransformer auto-selects MPS. Without the fix,
+    LinearAdapter is created on CPU, causing a RuntimeError on forward pass.
+    This test verifies device co-location regardless of the available hardware.
+    """
+    clf = TransactionClassifier()
+    device = next(clf._model.parameters()).device
+
+    adapter = clf.train_adapter(
+        texts=["amazon purchase", "grocery store"],
+        categories=["Shopping", "Groceries"],
+    )
+
+    # Adapter parameters must live on the same device as the embedding model
+    adapter_device = next(adapter.parameters()).device
+    assert adapter_device.type == device.type, (
+        f"Adapter is on {adapter_device} but embeddings are on {device}. "
+        "LinearAdapter must be moved to the embedding device after construction."
+    )
+
+
+def test_adapter_classify_no_device_mismatch():
+    """_adapter_classify must move a CPU-resident adapter to the embedding device.
+
+    When an adapter is loaded from storage it arrives on CPU (map_location='cpu').
+    If the embedding model is on MPS, calling adapter(embeddings) crashes without
+    the explicit .to(embeddings.device) call in _adapter_classify.
+    """
+    clf = TransactionClassifier()
+
+    # Simulate an adapter loaded from storage — always arrives on CPU
+    cpu_adapter = LinearAdapter(clf.embedding_dim, len(clf._category_names))
+    # Confirm it really is on CPU before the call
+    assert next(cpu_adapter.parameters()).device.type == "cpu"
+
+    # Embeddings will be on whatever device the model chose (CPU, CUDA, or MPS)
+    embeddings = clf._model.encode(["grocery purchase"], convert_to_tensor=True)
+
+    # Must not raise RuntimeError regardless of device combination
+    results = clf._adapter_classify(embeddings, cpu_adapter)
+
+    assert len(results) == 1
+    assert "category" in results[0]
+    assert "confidence" in results[0]
+    assert isinstance(results[0]["category"], str)
+    assert 0.0 <= results[0]["confidence"] <= 1.0
