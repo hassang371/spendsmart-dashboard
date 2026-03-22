@@ -12,6 +12,7 @@ CREATE OR REPLACE FUNCTION public.upsert_model_metadata(
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
     INSERT INTO public.user_model_metadata
         (user_id, adapter_url, adapter_updated_at, correction_count)
