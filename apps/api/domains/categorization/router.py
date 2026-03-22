@@ -139,6 +139,21 @@ async def submit_feedback(
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to store feedback")
 
+    # Propagate corrections to transactions so POST /training/train can consume them.
+    # training/router.py reads transactions WHERE is_manual=True.
+    for row in rows_to_insert:
+        try:
+            client.table("transactions").update({"is_manual": True, "category": row["corrected_category"]}).eq(
+                "user_id", user_id
+            ).eq("description", row["description"]).execute()
+        except Exception as e:
+            # Non-fatal: correction stored; transaction update failure logged only.
+            logger.warning(
+                "feedback_transaction_update_failed",
+                description=row["description"],
+                error=str(e),
+            )
+
     updated_categories = sorted({row["corrected_category"] for row in rows_to_insert if row["corrected_category"]})
     return {"status": "ok", "updated_categories": updated_categories}
 
