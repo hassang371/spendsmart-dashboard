@@ -11,6 +11,9 @@ repos:
         args: [--multi]
       - id: check-toml
       - id: check-added-large-files
+      - id: detect-private-key
+      - id: detect-aws-credentials
+        args: [--allow-missing-credentials]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.3.3
