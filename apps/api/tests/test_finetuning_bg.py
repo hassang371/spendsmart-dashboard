@@ -22,6 +22,8 @@ def test_background_task_does_not_use_adapter_manager():
 
 def test_background_task_calls_save_version_with_correct_args():
     """save_version is called with user_id and correction_count_delta=len(texts)."""
+    from apps.api.domains.accounts.router import _run_supervised_finetuning_bg  # moved up
+
     # These patches work because the function uses module-level imports
     with (
         patch("apps.api.domains.accounts.router.get_classifier") as mock_gc,
@@ -33,8 +35,6 @@ def test_background_task_calls_save_version_with_correct_args():
         mock_gc.return_value.train_adapter.return_value = mock_adapter
         mock_sv.return_value = MagicMock(storage_path="user-xyz/v_1/adapter.pt")
 
-        from apps.api.domains.accounts.router import _run_supervised_finetuning_bg
-
         _run_supervised_finetuning_bg(
             user_id="user-xyz",
             texts=["lunch", "swiggy"],
@@ -45,6 +45,7 @@ def test_background_task_calls_save_version_with_correct_args():
     kwargs = mock_sv.call_args.kwargs
     assert kwargs["user_id"] == "user-xyz"
     assert kwargs["correction_count_delta"] == 2  # len(texts)
+    assert kwargs["adapter_state_dict"] == {"w": "data"}
 
 
 def test_training_tasks_passes_correction_count_delta():
@@ -55,3 +56,33 @@ def test_training_tasks_passes_correction_count_delta():
 
     source = inspect.getsource(training_tasks.train_adapter_task)
     assert "correction_count_delta" in source, "train_adapter_task must pass correction_count_delta to save_version()."
+
+
+def test_train_adapter_task_passes_correction_count_delta_to_save_version():
+    """Behavioral: train_adapter_task calls save_version with correction_count_delta=len(texts) at runtime."""
+    # Patch at source module level — training_tasks imports these lazily inside the function body.
+    with (
+        patch("apps.api.domains.categorization.service.get_classifier") as mock_gc,
+        patch("packages.categorization.model_registry.save_version") as mock_sv,
+        patch("apps.api.core.auth.get_service_client") as mock_client,
+    ):
+        mock_adapter = MagicMock()
+        mock_adapter.state_dict.return_value = {"w": "data"}
+        mock_gc.return_value.train_adapter.return_value = mock_adapter
+        mock_sv.return_value = MagicMock(storage_path="user-abc/v_1/adapter.pt")
+        mock_client.return_value = MagicMock()
+
+        from apps.api.tasks.training_tasks import train_adapter_task
+
+        # __wrapped__ is the original function without Celery machinery (no self needed)
+        train_adapter_task.__wrapped__(
+            texts=["coffee", "uber", "grocery"],
+            categories=["Food", "Transport", "Food"],
+            user_id="user-abc",
+            job_id="job-001",
+        )
+
+    mock_sv.assert_called_once()
+    kwargs = mock_sv.call_args.kwargs
+    assert kwargs["user_id"] == "user-abc"
+    assert kwargs["correction_count_delta"] == 3  # len(texts)
