@@ -39,3 +39,17 @@ repos:
         types_or: [javascript, jsx, ts, tsx]
         pass_filenames: false
         stages: [pre-commit]
+      - id: frontend-typecheck
+        name: Frontend TypeScript Check
+        entry: bash -c 'cd apps/web && npx tsc --noEmit'
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: prettier-check
+        name: Prettier Format Check
+        entry: bash -c 'cd apps/web && npx prettier --check .'
+        language: system
+        types_or: [javascript, jsx, ts, tsx, css, json]
+        pass_filenames: false
+        stages: [pre-commit]

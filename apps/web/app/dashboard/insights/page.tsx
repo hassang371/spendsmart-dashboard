@@ -630,7 +630,8 @@ export default function AIInsightsPage() {
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Upload categorized transaction history (CSV or Excel) to train your personal
-                categorization adapter. At least 5 non-Uncategorized rows are required to queue training.
+                categorization adapter. At least 5 non-Uncategorized rows are required to queue
+                training.
               </p>
 
               <div className="space-y-2">

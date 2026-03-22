@@ -105,7 +105,6 @@ const defaultFilters: FilterState = {
   paymentMethod: 'all',
 };
 
-
 const TRANSACTIONS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const UNCATEGORIZED_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const PAGE_SIZE = 100;
@@ -118,7 +117,6 @@ function normalizeStatus(value: string): string {
   if (status.includes('complete') || status.includes('success')) return 'completed';
   return status || 'completed';
 }
-
 
 function categoryIcon(category: string) {
   const cat = category.toLowerCase().trim();
@@ -386,7 +384,12 @@ export default function TransactionsPage() {
     }
 
     const cacheKey = `transactions-cache:${user.id}:${activeAccountId}`;
-    type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
+    type TxCache = {
+      rows: TransactionRow[];
+      nextCursor?: string;
+      hasMore?: boolean;
+      counts?: TransactionCountsResponse;
+    };
     const cached = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
     if (cached && Array.isArray(cached.rows)) {
       setTransactions(cached.rows);
@@ -1079,7 +1082,9 @@ export default function TransactionsPage() {
             <h2 className="text-4xl font-black tracking-tight text-foreground">
               Transactions
               <span className="ml-2 text-lg font-medium text-muted-foreground">History</span>
-              <span className="ml-3 align-middle"><AccountBadge /></span>
+              <span className="ml-3 align-middle">
+                <AccountBadge />
+              </span>
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               View and manage your financial activity.
@@ -1428,7 +1433,9 @@ export default function TransactionsPage() {
                   const amount = Number(tx.amount || 0);
                   const isCredit = amount >= 0;
                   const confidencePct =
-                    tx.confidence_score !== null && tx.confidence_score !== undefined ? Math.round(tx.confidence_score * 100) : null;
+                    tx.confidence_score !== null && tx.confidence_score !== undefined
+                      ? Math.round(tx.confidence_score * 100)
+                      : null;
                   const isEditing = reviewEditId === tx.id;
                   const isSaving = savingReviewId === tx.id;
 

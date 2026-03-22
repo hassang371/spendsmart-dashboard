@@ -31,13 +31,7 @@ interface AccountContextValue {
 
 const AccountContext = createContext<AccountContextValue | null>(null);
 
-export function AccountProvider({
-  children,
-  token,
-}: {
-  children: React.ReactNode;
-  token: string;
-}) {
+export function AccountProvider({ children, token }: { children: React.ReactNode; token: string }) {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   // Lazy initializer reads storage synchronously on first render, eliminating
@@ -85,7 +79,7 @@ export function AccountProvider({
     storage?.setItem(STORAGE_KEY, id);
   }, []);
 
-  const activeAccount = accounts.find((a) => a.id === activeAccountId) ?? null;
+  const activeAccount = accounts.find(a => a.id === activeAccountId) ?? null;
 
   return (
     <AccountContext.Provider

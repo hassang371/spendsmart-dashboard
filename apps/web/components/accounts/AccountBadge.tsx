@@ -19,9 +19,7 @@ export function AccountBadge({ onClick }: AccountBadgeProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   const label =
-    activeAccountId === 'all'
-      ? 'All Accounts'
-      : activeAccount?.account_name ?? activeAccountId;
+    activeAccountId === 'all' ? 'All Accounts' : (activeAccount?.account_name ?? activeAccountId);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -39,7 +37,7 @@ export function AccountBadge({ onClick }: AccountBadgeProps) {
     if (onClick) {
       onClick();
     } else {
-      setOpen((v) => !v);
+      setOpen(v => !v);
     }
   }
 
@@ -56,7 +54,10 @@ export function AccountBadge({ onClick }: AccountBadgeProps) {
       >
         <span className="h-1.5 w-1.5 rounded-full bg-primary" />
         {label}
-        <ChevronDown size={12} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
+        <ChevronDown
+          size={12}
+          className={open ? 'rotate-180 transition-transform' : 'transition-transform'}
+        />
       </button>
 
       {open && (
@@ -68,7 +69,7 @@ export function AccountBadge({ onClick }: AccountBadgeProps) {
             <span className="h-1.5 w-1.5 rounded-full bg-primary/40 shrink-0" />
             All Accounts
           </button>
-          {accounts.map((acct) => (
+          {accounts.map(acct => (
             <button
               key={acct.id}
               onClick={() => handleSelect(acct.id)}

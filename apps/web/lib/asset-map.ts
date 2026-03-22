@@ -35,16 +35,22 @@ export const ASSET_MAP = {
  */
 export const CDN_TO_LOCAL_MAP: Record<string, string> = {
   // Video
-  'https://sui-dev.b-cdn.net/SuiPlay/Slush%20-%20WEBSITE%20VIDEO%20-%20V03-hevc-safari.mp4': '/slush/hero-video.mp4',
+  'https://sui-dev.b-cdn.net/SuiPlay/Slush%20-%20WEBSITE%20VIDEO%20-%20V03-hevc-safari.mp4':
+    '/slush/hero-video.mp4',
 
   // Lottie Animations
-  'https://cdn.prod.website-files.com/67d9fcb123f67f0f34dd8fd1/67fec9c2e7d76beccecdd1cf_GetStashed%20-%20Onboarding%20-%20Icon%20Rocket%20-%20V01.json': '/slush/rocket.json',
-  'https://cdn.prod.website-files.com/67d9fcb123f67f0f34dd8fd1/67fec9c215412ef64f152118_GetStashed%20-%20Onboarding%20-%20Icon%20Wallet%20-%20V01.json': '/slush/wallet.json',
-  'https://cdn.prod.website-files.com/67d9fcb123f67f0f34dd8fd1/67fec9c205180e5c013941f7_GetStashed%20-%20Onboarding%20-%20Icon%20Coin%20-%20V01.json': '/slush/coin.json',
+  'https://cdn.prod.website-files.com/67d9fcb123f67f0f34dd8fd1/67fec9c2e7d76beccecdd1cf_GetStashed%20-%20Onboarding%20-%20Icon%20Rocket%20-%20V01.json':
+    '/slush/rocket.json',
+  'https://cdn.prod.website-files.com/67d9fcb123f67f0f34dd8fd1/67fec9c215412ef64f152118_GetStashed%20-%20Onboarding%20-%20Icon%20Wallet%20-%20V01.json':
+    '/slush/wallet.json',
+  'https://cdn.prod.website-files.com/67d9fcb123f67f0f34dd8fd1/67fec9c205180e5c013941f7_GetStashed%20-%20Onboarding%20-%20Icon%20Coin%20-%20V01.json':
+    '/slush/coin.json',
 
   // Open Graph
-  'https://cdn.prod.website-files.com/680905cfdc450738383648a6/6870e4e53832c8115a855885_slush_opengraph.jpg': '/slush/6870e4e53832c8115a855885_slush_opengraph.jpg',
+  'https://cdn.prod.website-files.com/680905cfdc450738383648a6/6870e4e53832c8115a855885_slush_opengraph.jpg':
+    '/slush/6870e4e53832c8115a855885_slush_opengraph.jpg',
 
   // Hero background
-  'https://cdn.prod.website-files.com/680905cfdc450738383648a6/6870becddb972b0b143dfe65_Slush_Logo_3D_Blue.avif': '/slush/6870becddb972b0b143dfe65_Slush_Logo_3D_Blue.avif',
+  'https://cdn.prod.website-files.com/680905cfdc450738383648a6/6870becddb972b0b143dfe65_Slush_Logo_3D_Blue.avif':
+    '/slush/6870becddb972b0b143dfe65_Slush_Logo_3D_Blue.avif',
 };

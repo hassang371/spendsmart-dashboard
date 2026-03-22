@@ -262,7 +262,6 @@ async function apiFetch<T = any>(path: string, options: ApiOptions = {}): Promis
       contentType.includes('application/json');
 
     return hasBody ? await response.json() : (undefined as unknown as T);
-
   } catch (error) {
     if (!(error instanceof ApiError)) {
       // Capture pure network errors or JSON parse errors
@@ -431,7 +430,9 @@ export const bankAccountsApi = {
 
   /** Handle Setu consent callback — called after redirect back from Setu */
   handleCallback: (consentId: string, token: string) =>
-    apiFetch(`/aggregator/accounts/callback?consent_id=${encodeURIComponent(consentId)}`, { token }),
+    apiFetch(`/aggregator/accounts/callback?consent_id=${encodeURIComponent(consentId)}`, {
+      token,
+    }),
 };
 
 export const healthApi = {

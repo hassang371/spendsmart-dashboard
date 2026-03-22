@@ -32,16 +32,18 @@ export function AccountSwitcher() {
   const activeLabel =
     activeAccountId === 'all'
       ? 'All Accounts'
-      : accounts.find((a) => a.id === activeAccountId)?.account_name ?? 'All Accounts';
+      : (accounts.find(a => a.id === activeAccountId)?.account_name ?? 'All Accounts');
 
   return (
     <div ref={ref} className="relative px-2 mb-2">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
       >
         <Building2 size={16} className="shrink-0 text-primary" />
-        <span className="flex-1 truncate text-left text-xs">{loading ? 'Loading…' : activeLabel}</span>
+        <span className="flex-1 truncate text-left text-xs">
+          {loading ? 'Loading…' : activeLabel}
+        </span>
         <ChevronDown
           size={14}
           className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -58,7 +60,10 @@ export function AccountSwitcher() {
           >
             {/* All Accounts option */}
             <button
-              onClick={() => { setActiveAccountId('all'); setOpen(false); }}
+              onClick={() => {
+                setActiveAccountId('all');
+                setOpen(false);
+              }}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${
                 activeAccountId === 'all'
                   ? 'bg-muted text-foreground'
@@ -70,10 +75,13 @@ export function AccountSwitcher() {
             </button>
 
             {/* Per-account options */}
-            {accounts.map((account) => (
+            {accounts.map(account => (
               <button
                 key={account.id}
-                onClick={() => { setActiveAccountId(account.id); setOpen(false); }}
+                onClick={() => {
+                  setActiveAccountId(account.id);
+                  setOpen(false);
+                }}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors ${
                   activeAccountId === account.id
                     ? 'bg-muted text-foreground'

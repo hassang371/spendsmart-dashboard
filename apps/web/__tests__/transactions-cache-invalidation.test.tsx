@@ -56,10 +56,58 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, variants: _v, initial: _i, animate: _a, whileHover: _wh, whileTap: _wt, transition: _t, exit: _e, ...p }: React.HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => <div {...p}>{children}</div>,
-    section: ({ children, variants: _v, initial: _i, animate: _a, whileHover: _wh, whileTap: _wt, transition: _t, exit: _e, ...p }: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => <section {...p}>{children}</section>,
-    button: ({ children, variants: _v, initial: _i, animate: _a, whileHover: _wh, whileTap: _wt, transition: _t, exit: _e, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & Record<string, unknown>) => <button {...p}>{children}</button>,
-    span: ({ children, variants: _v, initial: _i, animate: _a, whileHover: _wh, whileTap: _wt, transition: _t, exit: _e, ...p }: React.HTMLAttributes<HTMLSpanElement> & Record<string, unknown>) => <span {...p}>{children}</span>,
+    div: ({
+      children,
+      variants: _v,
+      initial: _i,
+      animate: _a,
+      whileHover: _wh,
+      whileTap: _wt,
+      transition: _t,
+      exit: _e,
+      ...p
+    }: React.HTMLAttributes<HTMLDivElement> & Record<string, unknown>) => (
+      <div {...p}>{children}</div>
+    ),
+    section: ({
+      children,
+      variants: _v,
+      initial: _i,
+      animate: _a,
+      whileHover: _wh,
+      whileTap: _wt,
+      transition: _t,
+      exit: _e,
+      ...p
+    }: React.HTMLAttributes<HTMLElement> & Record<string, unknown>) => (
+      <section {...p}>{children}</section>
+    ),
+    button: ({
+      children,
+      variants: _v,
+      initial: _i,
+      animate: _a,
+      whileHover: _wh,
+      whileTap: _wt,
+      transition: _t,
+      exit: _e,
+      ...p
+    }: React.ButtonHTMLAttributes<HTMLButtonElement> & Record<string, unknown>) => (
+      <button {...p}>{children}</button>
+    ),
+    span: ({
+      children,
+      variants: _v,
+      initial: _i,
+      animate: _a,
+      whileHover: _wh,
+      whileTap: _wt,
+      transition: _t,
+      exit: _e,
+      ...p
+    }: React.HTMLAttributes<HTMLSpanElement> & Record<string, unknown>) => (
+      <span {...p}>{children}</span>
+    ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -185,7 +233,9 @@ describe('Transactions cache invalidation key (BUG-006)', () => {
     fireEvent.click(screen.getByRole('button', { name: /accept/i }));
 
     // Wait for updateTransaction to be called
-    await waitFor(() => expect(accountsApi.updateTransaction).toHaveBeenCalled(), { timeout: 3000 });
+    await waitFor(() => expect(accountsApi.updateTransaction).toHaveBeenCalled(), {
+      timeout: 3000,
+    });
 
     // CRITICAL: removeCachedData must be called with the account-scoped key
     // With bug: called as `transactions-cache:USER` — assertion fails
@@ -241,24 +291,25 @@ describe('Transactions cache invalidation key (BUG-006)', () => {
     );
 
     // Wait for transaction row to appear
-    await waitFor(
-      () => expect(screen.getByText('Zomato')).toBeInTheDocument(),
-      { timeout: 3000 }
-    );
+    await waitFor(() => expect(screen.getByText('Zomato')).toBeInTheDocument(), { timeout: 3000 });
 
     // Click the edit (pencil) button on the transaction row
     const editButton = screen.getByTitle('Edit category');
     fireEvent.click(editButton);
 
     // A category select should appear — pick any category
-    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument(), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument(), {
+      timeout: 3000,
+    });
 
     // Click the save (checkmark) button inside the inline editor
     const saveButton = screen.getByTitle('Save category');
     fireEvent.click(saveButton);
 
     // Wait for updateTransaction to be called
-    await waitFor(() => expect(accountsApi.updateTransaction).toHaveBeenCalled(), { timeout: 3000 });
+    await waitFor(() => expect(accountsApi.updateTransaction).toHaveBeenCalled(), {
+      timeout: 3000,
+    });
 
     // CRITICAL: removeCachedData must be called with the account-scoped key
     expect(removeCachedData).toHaveBeenCalledWith(
