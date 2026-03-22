@@ -1,0 +1,46 @@
+{
+  "skill_name": "website-cloner",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to clone the Stripe homepage so I can run it locally for design reference. I've got Playwright MCP set up. How should I approach this?",
+      "expected_output": "The skill should guide through all 8 phases. Phase 1 should use the stack detection script. Should explicitly recommend DOM capture via Playwright over wget. Should warn about JS base URL variables. Should recommend absolute paths. Should verify file sizes after download.",
+      "files": [],
+      "expectations": [
+        "Recommends Playwright DOM capture (document.documentElement.outerHTML) over wget or HTTrack",
+        "Mentions searching JS files for CDN base URL variables, not just grepping for full URLs",
+        "Warns about referrer-protected CDNs and recommends verifying file sizes with wc -c",
+        "Recommends using absolute paths (/css/, /js/) rather than relative paths",
+        "Covers all 8 phases or a meaningful subset of them in logical order",
+        "Mentions repairing Playwright JSON pipeline corruption (escaped quotes, literal \\t)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I want a local copy of this Webflow agency site. It's got Three.js 3D models, Rive animations, and GSAP scroll effects throughout. The site has about 6 pages. What do I need to do?",
+      "expected_output": "Should detect the Webflow + Three.js + Rive stack and adapt advice. Should mention: .glb model files, .riv animation files, WASM runtimes (draco, basis, rive.wasm), HDR environment maps, w-embed CSS block fragility. Should warn NOT to run broad CSS regex cleaning.",
+      "files": [],
+      "expectations": [
+        "Mentions the need to find and download .glb 3D model files",
+        "Mentions .riv binary animation files and the Rive WASM runtime",
+        "Warns about w-embed CSS blocks embedded in body and their fragility to regex cleaning",
+        "Mentions searching minified JS for base URL variable assignments (the CDN pattern)",
+        "Mentions HDR environment maps or binary assets beyond standard CSS/JS",
+        "Recommends verifying all downloaded files are not 32-byte access-denied responses"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "can you download this website for me so i can have it locally, i basically just want the whole thing on my machine",
+      "expected_output": "Even with a vague request, skill should trigger. Should not suggest wget or simple curl. Should start with Phase 1 reconnaissance. Should explain why DOM capture is needed for modern sites. Should ask for the target URL if not provided.",
+      "files": [],
+      "expectations": [
+        "Skill triggers and engages with the cloning task rather than suggesting simple wget/curl",
+        "Explains why DOM capture is necessary (JS-rendered content, dynamic asset URLs)",
+        "Asks for the target URL if not provided, or proceeds with reconnaissance if URL given",
+        "Mentions the 8-phase approach or at minimum the key phases",
+        "Does not immediately write a wget or HTTrack command"
+      ]
+    }
+  ]
+}
