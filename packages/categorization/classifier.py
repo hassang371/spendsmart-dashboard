@@ -266,7 +266,8 @@ class TransactionClassifier:
 
         if not valid_pairs:
             logger.warning("no_valid_corrections_for_adapter")
-            return LinearAdapter(self.embedding_dim, len(self._category_names))
+            model_device = next(self._model.parameters()).device
+            return LinearAdapter(self.embedding_dim, len(self._category_names)).to(model_device)
 
         train_texts, train_labels = zip(*valid_pairs)
 
