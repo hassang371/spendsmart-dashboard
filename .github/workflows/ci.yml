@@ -88,8 +88,8 @@ jobs:
           cache: "pip"
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Run pytest
-        run: python -m pytest apps/ packages/ -v --tb=short
+      - name: Run pytest with coverage
+        run: python -m pytest apps/ packages/ -v --tb=short --cov=apps --cov=packages --cov-report=term-missing --cov-fail-under=60
 
   test-frontend:
     name: Frontend Tests & Type Check
@@ -107,8 +107,13 @@ jobs:
         run: cd apps/web && npm ci
       - name: TypeScript check
         run: cd apps/web && npx tsc --noEmit
-      - name: Run Vitest
-        run: cd apps/web && npm test -- --passWithNoTests
+      - name: Run Vitest with coverage
+        run: cd apps/web && npx vitest run --coverage --passWithNoTests
+      - name: Build Next.js
+        run: cd apps/web && npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
   build-scan-images:
     name: Build & Container Scan
