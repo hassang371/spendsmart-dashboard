@@ -14,7 +14,9 @@ def test_status_constraint_migration_adds_queued():
         "Migration 20260316000001_fix_training_jobs_status_constraint.sql " "must exist to fix Bug 5."
     )
     content = migration.read_text()
-    assert "'queued'" in content, "Migration must include 'queued' in the status constraint."
+    # Verify all six status values are present in the constraint body
+    for status in ("'pending'", "'queued'", "'running'", "'processing'", "'completed'", "'failed'"):
+        assert status in content, f"Migration must include {status!r} in the status constraint."
 
 
 def test_training_router_uses_queued_status_string():
