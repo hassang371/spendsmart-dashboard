@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Recommends Playwright DOM capture (document.documentElement.outerHTML) over wget or HTTrack",
+      "passed": true,
+      "evidence": "Response explicitly states: 'Traditional approaches like wget --mirror or HTTrack won't work... The approach that works: Playwright DOM capture + manual asset download' and shows browser_evaluate with outerHTML"
+    },
+    {
+      "text": "Mentions searching JS files for CDN base URL variables, not just grepping for full URLs",
+      "passed": true,
+      "evidence": "Response explicitly describes the base URL variable pattern: 'var vQ = \"https://cdn.stripe.com/v3/fingerprinted/assets\"' and explains 'You must download the JS bundles, grep for the CDN domain to find the base variable, then find all concatenations'"
+    },
+    {
+      "text": "Warns about referrer-protected CDNs and recommends verifying file sizes (e.g. wc -c)",
+      "passed": true,
+      "evidence": "Phase 1 shows explicit curl test with and without Referer header and wc -c to check file sizes"
+    },
+    {
+      "text": "Recommends using absolute paths (/css/, /js/) rather than relative paths",
+      "passed": true,
+      "evidence": "Response states: 'Use absolute paths (/assets/...), not relative ones. This is critical for subdirectory pages.'"
+    },
+    {
+      "text": "Covers multiple phases of the cloning process in logical order",
+      "passed": true,
+      "evidence": "Response covers all 8 phases in order: Reconnaissance, HTML Capture, Asset Discovery, URL Rewriting, Corruption Repair, CSS Restoration, Routing, Validation"
+    },
+    {
+      "text": "Mentions repairing Playwright JSON pipeline corruption artifacts",
+      "passed": true,
+      "evidence": "Phase 5 includes the full repair Python script covering JSON wrapper, escaped quotes, literal \\t sequences, and broken @media tags"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

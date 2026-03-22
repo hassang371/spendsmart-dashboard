@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Skill triggers and engages with the cloning task (does not just say it cannot help)",
+      "passed": true,
+      "evidence": "Baseline engaged with the task, asked for the URL, and provided tool recommendations"
+    },
+    {
+      "text": "Explains why DOM capture is necessary rather than simple wget/curl",
+      "passed": false,
+      "evidence": "Baseline recommended wget --mirror and HTTrack as primary tools. While it noted JS-heavy sites are a problem, it did not explain DOM capture as the solution or explain why browser execution is required."
+    },
+    {
+      "text": "Asks for the target URL if not provided, OR outlines the general process",
+      "passed": true,
+      "evidence": "Baseline correctly asked for the missing URL before proceeding"
+    },
+    {
+      "text": "Mentions the multi-phase approach to cloning",
+      "passed": false,
+      "evidence": "Baseline mentioned basic steps (choose tool, run, handle JS) but not the systematic 8-phase cloning process. The phases listed are the wget workflow, not the DOM-capture approach."
+    },
+    {
+      "text": "Does not immediately suggest only wget or HTTrack as the solution",
+      "passed": false,
+      "evidence": "Baseline immediately recommended 'wget --mirror' with example command and HTTrack as primary tools for the task."
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "failed": 3,
+    "total": 5,
+    "pass_rate": 0.4
+  }
+}

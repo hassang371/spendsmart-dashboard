@@ -1,0 +1,22 @@
+{
+  "skill_files_read": [],
+  "phases_covered": [
+    "Capture the rendered HTML with Playwright",
+    "Download static assets via network request interception",
+    "Rewrite asset paths to local relative URLs",
+    "Serve locally with a static HTTP server",
+    "Visual spot-check via screenshot comparison"
+  ],
+  "key_warnings_mentioned": [
+    "Stripe uses heavy JS rendering — simple wget/curl won't capture full fidelity",
+    "Animations (GSAP/custom) won't run in a static clone",
+    "Authenticated CDN tokens may cause 403s on some assets",
+    "Web fonts may not load due to strict CORS headers on CDN",
+    "Anti-scraping detection may block headless browsers",
+    "Dynamic content varies by viewport and A/B test bucket",
+    "Legal/ToS: do not republish or redistribute Stripe's copyrighted assets",
+    "Inline JS makes external API calls that will silently fail locally",
+    "file:// protocol will hit CORS restrictions — must use a local HTTP server",
+    "Conditional assets (video backgrounds, WebGL) may require multiple capture passes"
+  ]
+}

@@ -8,7 +8,7 @@ description: docs-driven development — the master workflow for building featur
 
 Every code change starts with documentation and ends with a version update. This master workflow orchestrates the full development lifecycle.
 
-**Iron Rule:** No code without a design doc. No commit without documentation. No merge without verification.
+**Iron Rule:** Brainstorm → Document → Plan → Execute → Verify → Commit. In that order. Always.
 
 ## When to Use
 
@@ -18,20 +18,44 @@ Use this workflow for ANY of:
 - Fixing a bug
 - Making an architectural decision
 - Any work that changes code
+- Also fires when investigation reveals a defect — see Phase 0
 
 ## The Pipeline
 
 ```
-Step 1: Brainstorm (extensive, user-driven)
-    ↓
-Step 2: Document (LLD + update HLD)
-    ↓
-Step 3: Plan (Epic → Story → Task breakdown)
-    ↓
-Step 4: Execute (TDD — implement with tests)
-    ↓
-Step 5: Version Update (commit, push, update docs, update Linear)
+Phase 0: Investigate  →  discovery gate (fires when defect found during research)
+Step 1: Brainstorm    →  brainstorm.md (no round limit)
+Step 2: Document      →  design-docs skill (LLD / bug report / RFC) + SPEC REVIEW
+Step 3: Plan          →  write-plan.md
+Step 4: Execute       →  tdd.md + execute-plan.md
+Step 4.5: Doc Sync    →  re-read LLD, record deviations, update changelog
+Step 5: Version Update →  verify.md + commit + push + Linear
 ```
+
+---
+
+## Phase 0: Investigation (fires when research reveals a defect)
+
+This phase fires DURING any research or investigation task — not only when code is about to change.
+
+**If you find a defect during investigation:**
+
+1. **STOP** — do not continue the analysis, do not discuss solutions, do not propose fixes
+2. Immediately create the Bug Report (`docs/bugs/BUG-NNN-name.md`) via the design-docs skill
+3. Run **spec review** on the bug report (read `request-code-review.md` and apply to the doc)
+4. Commit the bug report: `git commit -m "docs: add BUG-NNN — <name>"`
+5. Only THEN proceed to Step 1 (Brainstorm the fix)
+
+**Investigation output contract:**
+
+Every investigation concludes with a structured output:
+- Findings summary
+- For each confirmed defect: a `BUG-NNN` doc committed (before discussing solutions)
+- For each suspected issue (not yet confirmed): a note in `docs/investigations/` (lightweight, unreviewed)
+- For each missing feature identified: note only — create Feature LLD only if user confirms to build it
+
+`docs/investigations/` is a scratch directory for unreviewed findings. Notes here graduate to proper
+`docs/bugs/` or `docs/features/` once confirmed. They are never committed as formal docs.
 
 ---
 
@@ -63,14 +87,21 @@ Based on the work type:
 - All sections filled (no TODOs)
 - HLD sync check (update `docs/design/*.md` if needed)
 
-**Commit docs before code:**
+**Every doc requires a Changelog section** (Feature LLDs, Bug Reports, RFCs, Policies, HLDs).
+Add an entry when the doc is first created and whenever the implementation deviates from the
+original design. See `docs/STANDARDS.md` for changelog format per doc type.
+
+**Run spec review before committing:**
+After writing the doc, read `request-code-review.md` and apply it to the doc content. Fix all issues. Re-run until no issues remain (max 3 iterations; surface to user if still failing). No commit until spec review passes.
+
+**Commit docs before any code:**
 
 ```
 git add docs/
 git commit -m "docs: add LLD for <name>"
 ```
 
-**Exit criteria:** User approves the documentation.
+**Exit criteria:** User approves the documentation AND spec review passes.
 
 ---
 
@@ -98,9 +129,53 @@ Execute the plan following TDD (Red → Green → Refactor).
 
 - Commit after each logical unit: `feat:`, `fix:`, `test:`, `refactor:`
 - Mid-feature commits are allowed if a sub-task is independently useful
-- Always include the feature/bug doc number in commit body
+- **Mandatory `Refs:` line** for `fix:` and `feat:` commits — no exceptions:
+
+```
+fix: write user_model_metadata after adapter training
+
+Upserts user_model_metadata on training completion so the classifier
+can discover the adapter URL on next request.
+Refs: docs/bugs/BUG-002-linear-adapter-broken-pipeline.md
+```
+
+```
+feat: add transaction categorization confidence filter
+
+Implements confidence threshold filtering for the categorization pipeline.
+Refs: docs/features/002-confidence-filter.md
+```
+
+**No Refs: = orphan commit.** A `fix:` or `feat:` commit with no `Refs:` line is NOT ALLOWED. Create the doc first.
+`refactor:`, `test:`, `chore:`, `docs:` commits: `Refs:` is optional but recommended.
+
 - **Rule:** Before final implementation commit → update doc metadata `**Status:** Implemented`
 - Status update must happen before or alongside the commit, never after
+
+---
+
+## Step 4.5: Implementation Doc Sync (before Version Update)
+
+Before running verification, re-read the design doc and reconcile it against what was actually built.
+
+**Check for deviations:**
+- Did you use a different storage path, table name, or approach than the doc specifies?
+- Did you add or remove something from scope during execution?
+- Did you discover something that changes the design?
+
+**If yes — update the doc changelog with a Deviation entry:**
+
+```markdown
+| YYYY-MM-DD | DEVIATION: [what changed from the design] — [why it changed] |
+```
+
+**If no deviations** — add a confirmation entry:
+
+```markdown
+| YYYY-MM-DD | Implementation matches design. Status → Implemented |
+```
+
+Commit the doc update before running verification.
 
 ---
 
