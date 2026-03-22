@@ -12,5 +12,11 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './'),
     },
+    coverage: {
+      provider: 'v8',
+      thresholds: {
+        lines: 60,
+      },
+    },
   },
 });
