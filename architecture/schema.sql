@@ -154,9 +154,9 @@ CREATE TABLE IF NOT EXISTS training_jobs (
     transaction_count INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    -- status values: pending → running → completed | failed
+    -- status values: pending → queued → running → completed | failed
     CONSTRAINT training_jobs_status_check
-        CHECK (status = ANY (ARRAY['pending'::text, 'running'::text, 'processing'::text, 'completed'::text, 'failed'::text]))
+        CHECK (status = ANY (ARRAY['pending'::text, 'queued'::text, 'running'::text, 'processing'::text, 'completed'::text, 'failed'::text]))
 );
 
 ALTER TABLE training_jobs ENABLE ROW LEVEL SECURITY;
