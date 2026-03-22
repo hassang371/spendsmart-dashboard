@@ -137,6 +137,30 @@ def test_train_adapter_moves_adapter_to_embedding_device():
     )
 
 
+def test_train_adapter_empty_valid_pairs_returns_device_consistent_adapter():
+    """Early-return adapter (no valid corrections) must also be on the model device.
+
+    When all provided categories are unknown, valid_pairs is empty and train_adapter
+    returns a fresh LinearAdapter early. Without .to(model_device), that adapter lands
+    on CPU even when the embedding model is on MPS, producing a device mismatch on the
+    first inference call.
+    """
+    clf = TransactionClassifier()
+    model_device = next(clf._model.parameters()).device
+
+    # Use a category label that cannot match any known category — forces early return
+    adapter = clf.train_adapter(
+        texts=["some transaction"],
+        categories=["__not_a_real_category__"],
+    )
+
+    adapter_device = next(adapter.parameters()).device
+    assert adapter_device.type == model_device.type, (
+        f"Empty-path adapter is on {adapter_device} but model is on {model_device}. "
+        "Early-return LinearAdapter must be moved to model device."
+    )
+
+
 def test_adapter_classify_no_device_mismatch():
     """_adapter_classify must move a CPU-resident adapter to the embedding device.
 
