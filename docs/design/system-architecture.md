@@ -166,3 +166,4 @@ sequenceDiagram
 | 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata; added data flow diagram |
 | 2026-03-15 | Account Aggregator | Added Aggregator domain (Setu AA consent + sync); updated Accounts domain description; see docs/features/004-account-aggregator.md |
 | 2026-03-16 | v2 Classifier | Updated Categorization domain to reflect MiniLM + LinearAdapter (not HypCD); updated domain module structure |
+| 2026-03-22 | BUG-002 fix | AdapterManager removed; single save path is model_registry.save_version(). upsert_model_metadata RPC ensures atomic metadata write. |
