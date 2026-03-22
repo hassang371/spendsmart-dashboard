@@ -2,7 +2,7 @@
 
 > **Doc ID:** BUG-011-transactions-badge-stale-counts-and-slow-load
 > **Date:** 2026-03-18
-> **Status:** Implemented
+> **Status:** Verified
 > **DRI:** Hassan
 > **Severity:** Low
 
@@ -188,3 +188,5 @@ A dedicated key has no dependency on Load More having run. On every successful A
 |---|---|---|
 | 2026-03-18 | Hassan | Initial bug report — root cause confirmed from code reading of `fetchTotalCounts` and `fetchTransactions` |
 | 2026-03-18 | Hassan | Pass 2 & 3: cold-load qualification, refreshAfterImport regression fix, flash precision, test recommendation, fetchMoreTransactions key inconsistency documented, dead counts spread added to fix table |
+
+| 2026-03-22 | Verification passed — 325 backend / 83 frontend tests pass, tsc clean, lint clean. Status: Verified. |

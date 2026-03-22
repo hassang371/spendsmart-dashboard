@@ -2,7 +2,7 @@
 
 > **Doc ID:** BUG-010-subscriptionradar-window-ssr-crash
 > **Date:** 2026-03-17
-> **Status:** Implemented
+> **Status:** Verified
 > **DRI:** Hassan
 > **Severity:** Medium
 
@@ -125,3 +125,5 @@ outerRadius={isSmall ? 120 : 140}
 |---|---|---|
 | 2026-03-17 | Hassan | Initial bug report — discovered during spec review of BUG-008 |
 | 2026-03-17 | Hassan | Implemented. DEVIATION: used `useSyncExternalStore` instead of `useState + useEffect` — `react-hooks/set-state-in-effect` lint rule flags setState inside effect bodies. `useSyncExternalStore` is the idiomatic React 18 API for subscribing to external (browser) state and avoids the lint violation. Also adds live resize responsiveness as a side effect. |
+
+| 2026-03-22 | Verification passed — 325 backend / 83 frontend tests pass, tsc clean, lint clean. Status: Verified. |
