@@ -29,6 +29,7 @@ def test_save_version_calls_upsert_model_metadata_rpc():
     version = save_version(client, "user-abc", state_dict, metrics={"samples": 3})
 
     client.rpc.assert_called_once()
+    client.rpc.return_value.execute.assert_called_once()
     rpc_name = client.rpc.call_args.args[0]
     assert rpc_name == "upsert_model_metadata", f"Expected RPC 'upsert_model_metadata', got '{rpc_name}'"
 

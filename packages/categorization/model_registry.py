@@ -23,6 +23,7 @@ class ModelVersion:
     created_at: str
     metrics: Dict[str, Any]
     storage_path: str
+    metadata_written: bool = True
 
 
 def save_version(
@@ -57,6 +58,7 @@ def save_version(
 
     # Atomically update user_model_metadata (url + timestamp + count increment).
     # Non-fatal: if the RPC fails, the adapter is still saved to Storage.
+    metadata_written = True
     try:
         client.rpc(
             "upsert_model_metadata",
@@ -79,6 +81,7 @@ def save_version(
             storage_path=storage_path,
             error=str(e),
         )
+        metadata_written = False
 
     return ModelVersion(
         version_id=version_id,
@@ -86,6 +89,7 @@ def save_version(
         created_at=datetime.utcnow().isoformat(),
         metrics=metrics or {},
         storage_path=storage_path,
+        metadata_written=metadata_written,
     )
 
 
