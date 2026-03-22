@@ -32,3 +32,9 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["apps", "packages", "architecture", "tools"]
+
+[tool.bandit]
+targets = ["apps/api"]
+severity = "medium"
+confidence = "medium"
+skips = []
