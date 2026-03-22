@@ -86,6 +86,7 @@ const MOCK_UNCATEGORIZED_TX = {
   merchant_name: 'Amazon',
   payment_method: 'UPI',
   type: 'debit',
+  currency: 'INR',
   created_at: '2026-03-17T00:00:00Z',
 };
 
@@ -222,6 +223,7 @@ describe('Transactions cache invalidation key (BUG-006)', () => {
           merchant_name: 'Zomato',
           status: 'completed',
           type: 'debit',
+          currency: 'INR',
           user_id: MOCK_USER_ID,
           created_at: '2026-03-17T00:00:00Z',
         },
