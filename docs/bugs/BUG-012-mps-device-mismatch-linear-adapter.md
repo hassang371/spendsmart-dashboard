@@ -3,7 +3,7 @@
 > **Doc ID:** BUG-012-mps-device-mismatch-linear-adapter
 > **Date:** 2026-03-22
 > **Severity:** High
-> **Status:** Root Cause Found
+> **Status:** Implemented
 > **Type:** Bug Report
 > **DRI:** Mohammed Hassan Mohiddin
 
@@ -225,3 +225,4 @@ the need for live reproduction to diagnose the issue.
 |---|---|
 | 2026-03-22 | BUG-012 created. Status: Investigating. |
 | 2026-03-22 | Root cause identified via live reproduction on Apple Silicon M-chip. Three device mismatches documented. Status: Root Cause Found. |
+| 2026-03-22 | Fix applied — commits `6faf052` and `3827e9d`. `device = embeddings.device` + `.to(device)` added in `train_adapter()`; `adapter.to(embeddings.device)` added in `_adapter_classify()`; early-return path fixed. 3 device-consistency tests added. DEVIATION: early-return `LinearAdapter` path also needed `.to(model_device)` — not captured in original Fix Description; added as a separate commit. Status: Implemented. |
