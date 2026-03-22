@@ -87,6 +87,7 @@ const TRANSACTION_ON_DIFFERENT_ACCOUNT = {
   merchant_name: 'Test Merchant',
   status: 'completed',
   type: 'debit',
+  currency: 'INR',
   user_id: MOCK_USER_ID,
   created_at: '2020-01-15T00:00:00Z',
 };
