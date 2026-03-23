@@ -36,8 +36,9 @@ graph TB
     subgraph Infra["🗄️ Infrastructure"]
         DB["💾 Supabase<br/>(Postgres + RLS)"]
         Redis["⚡ Upstash Redis<br/>(Cache + Queue)"]
-        Worker["⚙️ Celery Worker<br/>(Async Tasks)"]
+        Worker["⚙️ Celery Worker<br/>(scale-worker on Railway)"]
         GHCR["📦 GHCR<br/>(Container Registry)"]
+        Railway["🚂 Railway<br/>(scale-api + scale-worker)"]
     end
 
     Web -->|REST| Core
@@ -48,6 +49,7 @@ graph TB
     Domains -->|Queue| Worker
     Worker --> DB
     Worker --> Redis
+    GHCR -->|deploy by SHA| Railway
 ```
 
 ## Domain Module Structure
@@ -159,6 +161,22 @@ sequenceDiagram
     W-->>U: Dashboard refreshes
 ```
 
+## CI/CD Artifact Pipeline (LLD 007)
+
+Every push to `main` that passes CI triggers the following artifact and deploy sequence:
+
+| Step | What happens |
+|---|---|
+| CI passes | `build-push-images` job builds `scale-api:<sha>` and pushes to GHCR |
+| SBOM | Syft scans the pushed image and generates an SPDX JSON bill of materials — attached as a workflow artifact (30-day retention) |
+| cosign | Image is signed keylessly via Sigstore OIDC — no private key stored; signature recorded in Sigstore's Rekor transparency log; verifiable with `cosign verify ghcr.io/<owner>/scale-api:<sha>` |
+| DB migrations | `supabase db push` applies any pending migrations before the container is swapped |
+| Staging deploy | `railway up --service scale-api --image <sha>` — same for scale-worker |
+| Smoke test | `GET /health` retried 18×10s (180s); CI fails if not 200 |
+| Manual approval | GitHub Environment `production` protection rule gates the production deploy |
+| Production deploy | Same image SHA deployed to production Railway services |
+| Rollback | Trigger `workflow_dispatch` on deploy.yml with a previous SHA to re-deploy |
+
 ## Changelog
 
 | Date | Feature | Change |
@@ -169,3 +187,4 @@ sequenceDiagram
 | 2026-03-16 | v2 Classifier | Updated Categorization domain to reflect MiniLM + LinearAdapter (not HypCD); updated domain module structure |
 | 2026-03-22 | BUG-002 fix | AdapterManager removed; single save path is model_registry.save_version(). upsert_model_metadata RPC ensures atomic metadata write. |
 | 2026-03-23 | CI/CD Hardening (LLD 006) | Added GHCR container registry to Infrastructure subgraph. CI pushes scale-api:<sha> to GHCR on every main branch push. Refs: docs/features/006-ci-cd-pipeline-hardening.md |
+| 2026-03-23 | CD Implementation (LLD 007) | Added Railway (scale-api + scale-worker) to Infrastructure subgraph. Added CI/CD Artifact Pipeline section covering SBOM (Syft), cosign signing, migration step, Railway staging + production deploy, smoke tests, and rollback. Refs: docs/features/007-cd-implementation.md |

@@ -2,7 +2,7 @@
 
 > **Doc ID:** 007-cd-implementation
 > **Date:** 2026-03-16
-> **Status:** Draft
+> **Status:** Implemented
 > **DRI:** Mohammed Hassan
 > **Type:** Feature LLD
 
@@ -382,3 +382,4 @@ The GitHub Environment protection rule for `production` must require at least on
 | Date | Entry |
 |---|---|
 | 2026-03-16 | Draft created. Scope confirmed via brainstorming session: Railway (API + Worker), GHCR→Railway pipeline, SBOM (Syft), cosign (keyless), Docker actions SHA pins, smoke tests, rollback, migration coordination. Railway chosen as target platform. |
+| 2026-03-23 | Implemented. Docker SHA pins, SBOM (Syft, SPDX JSON, 30-day retention), cosign (keyless Sigstore OIDC) added to ci.yml. deploy.yml fully wired: run-migrations → deploy-staging → smoke-test-staging → deploy-production (needs: [smoke-test-staging, run-migrations], manual approval gate) → smoke-test-production. Rollback job (workflow_dispatch). railway.toml created for scale-api and scale-worker. system-architecture.md updated. DEVIATION: all image references use `github.repository_owner` (matching existing ci.yml Push to GHCR step) rather than `github.repository` as written in Section 4.4 — `github.repository_owner` is the correct form for GHCR image paths (`ghcr.io/<owner>/<image>`). |
