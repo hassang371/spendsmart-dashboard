@@ -88,6 +88,7 @@ class TransactionClassifier:
             categories=len(self._category_names),
             threshold=self.confidence_threshold,
         )
+        logger.info("classifier_device", device=str(next(self._model.parameters()).device))
 
     def _build_category_anchors(self) -> None:
         """Pre-compute mean embeddings for each category from seed phrases."""
@@ -146,6 +147,7 @@ class TransactionClassifier:
     def _adapter_classify(self, embeddings: torch.Tensor, adapter: LinearAdapter) -> list[dict]:
         """Classify embeddings using a user-specific trained adapter."""
         adapter.eval()
+        adapter.to(embeddings.device)
         with torch.no_grad():
             logits = adapter(embeddings)
             probs = F.softmax(logits, dim=1)
@@ -264,7 +266,8 @@ class TransactionClassifier:
 
         if not valid_pairs:
             logger.warning("no_valid_corrections_for_adapter")
-            return LinearAdapter(self.embedding_dim, len(self._category_names))
+            model_device = next(self._model.parameters()).device
+            return LinearAdapter(self.embedding_dim, len(self._category_names)).to(model_device)
 
         train_texts, train_labels = zip(*valid_pairs)
 
@@ -272,10 +275,13 @@ class TransactionClassifier:
         with torch.no_grad():
             embeddings = self._model.encode(list(train_texts), convert_to_tensor=True)
 
+        device = embeddings.device
         labels = torch.tensor(list(train_labels), dtype=torch.long)
+        labels = labels.to(device)
 
         # Train adapter
         adapter = LinearAdapter(self.embedding_dim, len(self._category_names))
+        adapter = adapter.to(device)
         optimizer = torch.optim.AdamW(adapter.parameters(), lr=lr, weight_decay=1e-4)
 
         adapter.train()

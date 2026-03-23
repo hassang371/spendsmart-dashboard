@@ -1,0 +1,18 @@
+{
+  "skill_files_read": [
+    ".claude/skills/website-cloner/SKILL.md"
+  ],
+  "asked_for_url": true,
+  "recommended_wget_or_httrack": false,
+  "explained_dom_capture_rationale": true,
+  "phases_mentioned": [
+    "Reconnaissance",
+    "HTML Capture",
+    "Asset Discovery",
+    "URL Rewriting",
+    "Corruption Repair",
+    "CSS Restoration",
+    "Routing & Paths",
+    "Validation"
+  ]
+}

@@ -63,6 +63,32 @@ At the bottom of the HLD file, add:
 ## Important Rules
 
 1. **HLD = current state.** Never use past tense. If something was removed, remove it from the HLD.
-2. **LLD = point-in-time record.** LLDs are historical — they capture the design at the time of implementation.
+2. **LLD = evolving record.** LLDs capture the original design AND track deviations — use the changelog to record when reality diverged from the original plan (bug discoveries, scope changes, implementation pivots).
 3. **Diagrams must match.** If an LLD shows a sequence diagram involving Service A → Service B, and the HLD shows the architecture, both must agree on the service names and relationships.
 4. **Don't bloat HLD.** The HLD is an overview. Detailed implementation goes in the LLD. The HLD links to relevant LLDs.
+
+## Changelog on All Doc Types
+
+All docs (Feature LLDs, Bug Reports, RFCs, Policies, HLDs) now require a Changelog section.
+
+**Why:** Feature LLDs without a changelog become stale silently. When the implementation
+deviates from the design — a storage path changes, a table is added, a decision is reversed —
+there is no record of why. BUG-002 (linear adapter broken pipeline) was a direct consequence
+of code that diverged from its intended design with no doc update and no changelog.
+
+**Format for non-HLD docs** (simpler, no Feature column needed):
+
+```markdown
+## Changelog
+
+| Date | Change |
+|---|---|
+| YYYY-MM-DD | Initial draft |
+| YYYY-MM-DD | Updated — [reason reality changed from original design] |
+```
+
+**When to add an entry:**
+- Doc is first written (always)
+- Status changes (Draft → Implemented → Verified)
+- Implementation deviates from the documented design
+- New information discovered during implementation changes scope or approach

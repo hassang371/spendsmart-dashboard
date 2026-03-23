@@ -1,15 +1,47 @@
 # Superpowers Workflow Rules
 
+## Discovery Gate (fires during investigation, BEFORE brainstorming)
+
+When performing any research, investigation, or code analysis:
+
+**If you find a defect, dead code, broken pipeline, or missing data:**
+1. **STOP immediately** — do not continue the analysis, do not discuss solutions
+2. Create `docs/bugs/BUG-NNN-name.md` via the design-docs skill
+3. Run spec review on the bug report (`superpowers:code-reviewer`)
+4. Commit: `git commit -m "docs: add BUG-NNN — <name>"`
+5. Only THEN return to investigation or proceed to brainstorm the fix
+
+This gate fires REGARDLESS of whether code is about to be written. Investigation that finds a
+defect ALWAYS produces a committed bug report. The user must not have to ask for this.
+
+**Investigation output contract:** Every research task concludes with:
+- For each confirmed defect → `BUG-NNN` doc committed
+- For each unconfirmed observation → scratch note in `docs/investigations/` (not a formal doc)
+- For each missing feature noticed → note only; create Feature LLD only if user confirms
+
+---
+
 ## Brainstorming Gate
 
 Before any feature, bug fix, architectural decision, or ambiguous request:
 → Invoke `superpowers:brainstorming` via Skill tool.
 
-**Skip brainstorming ONLY if:**
-- The request is a pure question with no code change implied, OR
-- The change is trivially scoped: you know exactly what to change, it's a single file/function, and the approach is obvious (rename a variable, fix a typo, update a string)
+**Skip brainstorming ONLY if the change is trivially scoped.**
 
-**When in doubt → brainstorm.** Small bug fixes that aren't obviously scoped still need brainstorming.
+Trivially scoped means ONE of these EXACTLY:
+- Fixing a misspelled word or string literal (no logic change)
+- Renaming a variable or function (no behavior change, single file)
+- Changing a log message wording
+- Updating a comment or docstring
+
+It does NOT mean:
+- Anything touching logic, data flow, or API shape
+- Changes spanning more than one file
+- Configuration changes with behavioral impact
+- Any database schema or migration change
+- "I know what to do" — knowing the solution doesn't skip the documentation
+
+**When in doubt → brainstorm.** If you're asking whether it counts as trivial, it doesn't.
 
 Brainstorming IS Step 1 of docs-driven-dev. They are the same thing — not two separate steps.
 
@@ -51,15 +83,30 @@ Brainstorming IS Step 1 of docs-driven-dev. They are the same thing — not two 
 
 ## Anti-Drift Protocol
 
-Check these at the two moments that matter — **before writing any code** and **before claiming done**:
+Check these at the three moments that matter:
 
-- Before writing code: Have I brainstormed? Have I read docs-driven-dev? Have I written a failing test first?
-- Before claiming done: Have I run `superpowers:verification-before-completion` and read the actual output?
-- Always: Am I preloading ALL skill references without SKILL.md directing me? If yes, stop.
+**During investigation:**
+- Did I find a defect? → Discovery Gate fired? → Bug report committed before discussing solution?
+
+**Before writing any code:**
+- Have I brainstormed? Have I read docs-driven-dev? Is there a committed design doc?
+- Have I run spec review on that doc? Did it pass?
+- Have I written a failing test first?
+
+**Before claiming done:**
+- Have I re-read the LLD and recorded any deviations (Step 4.5)?
+- Have I run `superpowers:verification-before-completion` and read the actual output?
+- Does my commit have a `Refs:` line pointing to the design doc?
+
+**Always:**
+- Am I preloading ALL skill references without SKILL.md directing me? If yes, stop.
 
 **Red flags — you are drifting if:**
+- Found a defect but wrote prose about it instead of creating a bug report
 - Wrote code without a failing test
 - Said "should work" without running a command
 - Created `task.md`, `implementation_plan.md`, or `walkthrough.md`
 - Claimed done without verification output
+- Committed `fix:` or `feat:` without a `Refs:` line
 - Loaded all skill references without SKILL.md telling you to
+- Transitioned from investigation to solution discussion without a committed doc

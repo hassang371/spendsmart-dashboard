@@ -33,6 +33,7 @@ from apps.api.core.logging_config import setup_logging, structlog_middleware
 from apps.api.core.rate_limiter import RateLimiter, rate_limit_dependency
 from apps.api.core.security_headers import SecurityHeadersMiddleware
 from apps.api.domains.accounts.router import router as accounts_router
+from apps.api.domains.aggregator.router import router as aggregator_router
 from apps.api.domains.anomaly.router import router as anomaly_router
 from apps.api.domains.categorization.router import router as categorization_router
 from apps.api.domains.forecasting.router import router as forecasting_router
@@ -245,6 +246,7 @@ app.include_router(forecasting_router, prefix="/api/v1")
 app.include_router(training_router, prefix="/api/v1")
 app.include_router(anomaly_router, prefix="/api/v1")
 app.include_router(accounts_router, prefix="/api/v1")
+app.include_router(aggregator_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["health"])

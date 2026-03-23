@@ -22,11 +22,13 @@ from fastapi import (
 )
 from pydantic import BaseModel, Field
 
-from apps.api.core.auth import get_current_user, get_current_user_id, get_user_client
+from apps.api.core.auth import get_current_user, get_current_user_id, get_service_client, get_user_client
 from apps.api.core.filtering import TransactionFilter
 from apps.api.core.pagination import CursorPage, PaginationParams
 from apps.api.domains.accounts.schemas import ProfileOut
 from apps.api.domains.accounts.service import list_user_transactions
+from apps.api.domains.categorization.service import get_classifier
+from packages.categorization.model_registry import save_version
 from supabase import Client
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -41,26 +43,31 @@ def _run_supervised_finetuning_bg(
     texts: list[str],
     categories: list[str],
 ) -> None:
-    """Background task: supervised fine-tuning of user's Linear Adapter on corrected transactions.
+    """Background task: supervised fine-tuning of user's Linear Adapter.
 
-    Triggered after merchant-batch reclassification. Trains the lightweight
-    Linear Adapter (~10KB) on the newly labeled (description, category) pairs.
-    The frozen MiniLM base model is never retrained.
+    Uses the classifier singleton (no re-instantiation of MiniLM) and saves
+    via model_registry.save_version() to the versioned path that load_latest()
+    can find. Writes user_model_metadata atomically via the RPC.
     """
     if not texts or len(texts) != len(categories):
         return
 
     try:
-        from packages.categorization.adapter_manager import AdapterManager
-
-        mgr = AdapterManager()
-        adapter_state = mgr.fine_tune_supervised(
+        classifier = get_classifier()
+        adapter = classifier.train_adapter(
             texts=texts,
             categories=categories,
             epochs=5,
         )
-        if adapter_state:
-            mgr.save_user_adapter(user_id, adapter_state)
+
+        client = get_service_client()
+        save_version(
+            client=client,
+            user_id=user_id,
+            adapter_state_dict=adapter.state_dict(),
+            metrics={"samples": len(texts), "source": "bg_finetuning"},
+            correction_count_delta=len(texts),
+        )
 
         logger.info(
             "supervised_finetuning_complete",
@@ -132,6 +139,7 @@ async def list_transactions(
     category: str = Query(default=None, description="Filter: exact category match"),
     merchant: str = Query(default=None, description="Filter: merchant name (case-insensitive)"),
     type: str = Query(default=None, description="Filter: transaction type (credit/debit)"),
+    account_id: str = Query(default=None, description="Filter: account UUID or 'all' for all accounts"),
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
 ) -> CursorPage[dict]:
@@ -150,6 +158,7 @@ async def list_transactions(
         category=category,
         merchant=merchant,
         type=type,
+        account_id=account_id,
     )
 
     return list_user_transactions(

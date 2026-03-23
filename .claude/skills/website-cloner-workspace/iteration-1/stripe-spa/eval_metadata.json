@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "stripe-spa",
+  "prompt": "I want to clone the Stripe homepage so I can run it locally for design reference. I've got Playwright MCP set up. How should I approach this?",
+  "assertions": [
+    "Recommends Playwright DOM capture (document.documentElement.outerHTML) over wget or HTTrack",
+    "Mentions searching JS files for CDN base URL variables, not just grepping for full URLs",
+    "Warns about referrer-protected CDNs and recommends verifying file sizes (e.g. wc -c)",
+    "Recommends using absolute paths (/css/, /js/) rather than relative paths",
+    "Covers multiple phases of the cloning process in logical order",
+    "Mentions repairing Playwright JSON pipeline corruption artifacts"
+  ]
+}

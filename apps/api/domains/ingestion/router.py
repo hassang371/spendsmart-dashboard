@@ -48,7 +48,7 @@ MAX_RPC_BATCH = 5000  # Max rows per single RPC call
 PRIORITY_THRESHOLD = 5000  # Files larger than this use priority insert
 
 
-def _build_transaction_row(row: dict, user_id: str, fingerprint: str) -> dict:
+def _build_transaction_row(row: dict, user_id: str, fingerprint: str, account_id: str) -> dict:
     """Build a Supabase-ready transaction row from a parsed row.
 
     Always sets category to 'Uncategorized' — classification happens async.
@@ -83,6 +83,7 @@ def _build_transaction_row(row: dict, user_id: str, fingerprint: str) -> dict:
         "status": status,
         "type": tx_type,
         "fingerprint": fingerprint,
+        "account_id": account_id,
         "informative_text": informative_text,
         "bank_name": bank_name,
         "raw_data": {
@@ -98,7 +99,7 @@ def _build_transaction_row(row: dict, user_id: str, fingerprint: str) -> dict:
     }
 
 
-def _rpc_insert_batch(client: Client, user_id: str, rows: list[dict]) -> tuple[int, int]:
+def _rpc_insert_batch(client: Client, user_id: str, account_id: str, rows: list[dict]) -> tuple[int, int]:
     """Insert a batch of rows via the batch_import_transactions RPC.
 
     Returns (inserted_count, skipped_count).
@@ -109,6 +110,7 @@ def _rpc_insert_batch(client: Client, user_id: str, rows: list[dict]) -> tuple[i
         "batch_import_transactions",
         {
             "p_user_id": user_id,
+            "p_account_id": account_id,
             "p_rows": rows,  # NOT json.dumps — let PostgREST handle JSONB serialization
         },
     ).execute()
@@ -119,7 +121,7 @@ def _rpc_insert_batch(client: Client, user_id: str, rows: list[dict]) -> tuple[i
     return 0, 0
 
 
-def _insert_remaining_rows(user_id: str, rows: list[dict], token: str, job_id: str | None) -> None:
+def _insert_remaining_rows(user_id: str, account_id: str, rows: list[dict], token: str, job_id: str | None) -> None:
     """Background task: insert remaining rows from large-file priority insert.
 
     Called only when file has >PRIORITY_THRESHOLD rows and the first 100
@@ -138,7 +140,7 @@ def _insert_remaining_rows(user_id: str, rows: list[dict], token: str, job_id: s
         total_skip = 0
         for i in range(0, len(rows), MAX_RPC_BATCH):
             chunk = rows[i : i + MAX_RPC_BATCH]
-            ins, skip = _rpc_insert_batch(client, user_id, chunk)
+            ins, skip = _rpc_insert_batch(client, user_id, account_id, chunk)
             total_ins += ins
             total_skip += skip
 
@@ -456,6 +458,13 @@ async def import_file(
 
         # --- Stage 2: Build rows + fingerprints ---
         t1 = time.perf_counter()
+
+        # Fetch (or create) the Manual Import account for this user
+        from apps.api.domains.aggregator.service import get_or_create_manual_account
+
+        manual_account = await get_or_create_manual_account(client, user_id)
+        manual_account_id = manual_account["id"]
+
         insert_rows: list[dict] = []
         fps_to_desc: dict[str, str] = {}
 
@@ -470,7 +479,7 @@ async def import_file(
                 reference=str(tx.get("ref", "") or ""),
             )
 
-            tx_row = _build_transaction_row(tx, user_id, fp)
+            tx_row = _build_transaction_row(tx, user_id, fp, manual_account_id)
             insert_rows.append(tx_row)
 
             desc = str(tx.get("description", "") or "")
@@ -503,7 +512,7 @@ async def import_file(
             try:
                 for i in range(0, len(priority_rows), MAX_RPC_BATCH):
                     chunk = priority_rows[i : i + MAX_RPC_BATCH]
-                    ins, skip = _rpc_insert_batch(client, user_id, chunk)
+                    ins, skip = _rpc_insert_batch(client, user_id, manual_account_id, chunk)
                     total_inserted += ins
                     total_skipped += skip
             except Exception as e:
@@ -523,7 +532,7 @@ async def import_file(
             try:
                 for i in range(0, len(insert_rows), MAX_RPC_BATCH):
                     chunk = insert_rows[i : i + MAX_RPC_BATCH]
-                    ins, skip = _rpc_insert_batch(client, user_id, chunk)
+                    ins, skip = _rpc_insert_batch(client, user_id, manual_account_id, chunk)
                     total_inserted += ins
                     total_skipped += skip
             except Exception as e:
@@ -574,7 +583,7 @@ async def import_file(
 
         # For large files: insert remaining rows in background first
         if is_large_file and remaining_rows:
-            background_tasks.add_task(_insert_remaining_rows, user_id, remaining_rows, token, job_id)
+            background_tasks.add_task(_insert_remaining_rows, user_id, manual_account_id, remaining_rows, token, job_id)
 
         # Classify and update categories in background
         if fps_to_desc:

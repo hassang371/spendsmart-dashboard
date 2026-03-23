@@ -1,7 +1,7 @@
 # API Design — HLD
 
 > **Doc ID:** api-design
-> **Last Updated:** 2026-03-06
+> **Last Updated:** 2026-03-16
 > **Status:** Current
 > **Version:** 1.0
 > **DRI:** Hassan
@@ -41,9 +41,8 @@ sequenceDiagram
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| POST | `/import` | Import transactions from CSV/XLSX | ✅ |
-| POST | `/parse` | Parse file without importing | ✅ |
-| GET | `/uploaded-files` | List user's uploaded files | ✅ |
+| POST | `/csv` | Parse CSV file and return rows (preview) | ✅ |
+| POST | `/import` | Import transactions from parsed CSV into DB | ✅ |
 
 ### Categorization Domain (`/api/v1/categorization`)
 
@@ -51,7 +50,9 @@ sequenceDiagram
 |---|---|---|---|
 | POST | `/classify` | Classify single transaction | ✅ |
 | POST | `/classify/batch` | Classify batch (up to 1000) | ✅ |
-| POST | `/feedback` | Submit category correction | ✅ |
+| POST | `/feedback` | Submit category correction (writes training_corrections) | ✅ |
+| GET | `/metrics` | Get classifier performance metrics | ✅ |
+| GET | `/models` | List available model versions for user | ✅ |
 
 ### Forecasting Domain (`/api/v1/forecasting`)
 
@@ -64,18 +65,32 @@ sequenceDiagram
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| POST | `/training/upload` | Start training job | ✅ |
-| GET | `/training/status/{job_id}` | Get job status | ✅ |
-| GET | `/training/checkpoints` | List model checkpoints | ✅ |
-| GET | `/training/stream/{job_id}` | SSE stream (progress) | ✅ |
+| POST | `/upload` | Start training job from uploaded file | ✅ |
+| POST | `/train` | Trigger adapter training on existing transactions | ✅ |
+| GET | `/status/{job_id}` | Get training job status | ✅ |
+| GET | `/latest` | Get latest training job for current user | ✅ |
 
 ### Accounts Domain (`/api/v1/accounts`)
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| GET | `/transactions` | List user transactions (paginated) | ✅ |
+| GET | `/transactions` | List user transactions (paginated, filterable) | ✅ |
+| GET | `/transactions/uncategorized` | List uncategorized transactions | ✅ |
+| GET | `/transactions/count` | Count transactions matching filters | ✅ |
+| PATCH | `/transactions/{id}` | Update single transaction category/amount | ✅ |
+| PATCH | `/transactions/batch` | Bulk update up to 1000 transactions | ✅ |
 | GET | `/profile` | Get user profile | ✅ |
-| PUT | `/settings` | Update user settings | ✅ |
+
+### Aggregator Domain (`/api/v1/aggregator`)
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| GET | `/accounts/` | List linked bank accounts | ✅ |
+| GET | `/accounts/callback` | OAuth/AA consent callback (redirect) | ❌ |
+| GET | `/accounts/{account_id}` | Get single bank account details | ✅ |
+| POST | `/accounts/link` | Initiate AA consent + account linking | ✅ |
+| POST | `/accounts/{account_id}/sync` | Trigger transaction sync for account | ✅ |
+| DELETE | `/accounts/{account_id}` | Unlink bank account | ✅ |
 
 ### Health (`/api/v1`)
 
@@ -168,6 +183,7 @@ graph LR
         FO["📈 /forecasting"]
         AN["📊 /anomaly"]
         IN["📥 /ingestion"]
+        AG["🏦 /aggregator"]
     end
     subgraph DB["💾 Supabase"]
         PG["Postgres + RLS"]
@@ -178,7 +194,8 @@ graph LR
     FE --> FO
     FE --> AN
     FE --> IN
-    AU & TR & CA & FO & AN & IN --> PG
+    FE --> AG
+    AU & TR & CA & FO & AN & IN & AG --> PG
 ```
 
 ## Changelog
@@ -187,3 +204,5 @@ graph LR
 |---|---|---|
 | 2026-03-06 | Initial HLD | Created from archived API design and implementation plan docs |
 | 2026-03-08 | Doc standards | Added Doc ID, Version, DRI metadata; added domain endpoint map diagram |
+| 2026-03-15 | Account Aggregator | Added `/aggregator` domain (bank_accounts CRUD, consent flow, sync, webhook). See docs/features/004-account-aggregator.md |
+| 2026-03-16 | Endpoint audit | Corrected all endpoints to match router implementations: removed non-existent /training/checkpoints and /training/stream/{job_id}; added POST /training/train and GET /training/latest; added PATCH /accounts/transactions/{id}, PATCH /accounts/transactions/batch, GET /accounts/transactions/uncategorized, GET /accounts/transactions/count; added GET /categorization/metrics and GET /categorization/models; fixed /ingestion to POST /csv + POST /import (removed non-existent /parse and /uploaded-files); removed non-existent PUT /accounts/settings |

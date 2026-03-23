@@ -48,6 +48,26 @@ class Settings(BaseSettings):
     # Sentry (optional)
     SENTRY_DSN: str = Field(default="", description="Sentry DSN for error tracking")
 
+    # Setu Account Aggregator (optional — 503 if missing when link is attempted)
+    SETU_CLIENT_ID: str = Field(default="", description="Setu FIU client ID")
+    SETU_CLIENT_SECRET: str = Field(default="", description="Setu FIU client secret")
+    SETU_BASE_URL: str = Field(
+        default="https://fiu-sandbox.setu.co",
+        description="Setu API base URL",
+    )
+    SETU_AUTH_URL: str = Field(
+        default="https://auth-v2.setu.co/realms/setu/protocol/openid-connect/token",
+        description="Setu OAuth2 token endpoint (Keycloak)",
+    )
+    SETU_PRODUCT_INSTANCE_ID: str = Field(
+        default="",
+        description="Setu product instance ID (x-product-instance-id header)",
+    )
+    SETU_REDIRECT_URL: str = Field(
+        default="http://localhost:3000/dashboard/accounts/callback",
+        description="Redirect URL after Setu consent flow",
+    )
+
     @property
     def allowed_origins(self) -> list[str]:
         """Parse comma-separated origins into a list.

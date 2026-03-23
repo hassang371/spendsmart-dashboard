@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
 
@@ -10,33 +10,50 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
-      - run: pip install ruff
+      - run: pip install ruff==0.3.3
       - name: Run Ruff Linter
         run: ruff check apps/ packages/
       - name: Run Ruff Formatter
         run: ruff format --check apps/ packages/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install Node dependencies
+        run: cd apps/web && npm ci
+      - name: Run ESLint
+        run: cd apps/web && npm run lint
+      - name: Run npm audit
+        run: cd apps/web && npm audit --audit-level=high
 
   security-sast:
     name: Security Scans (SAST & Secrets)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Secret Scanning (TruffleHog)
-        # BUG-009 fix: Pinned to immutable SHA (v3.88.1 — 2026-03)
-        uses: trufflesecurity/trufflehog@648aca6bae95a1b76e6dd5bfccc7d07e72572396
+        # Pinned to immutable SHA (v3.94.0 — 2026-03)
+        uses: trufflesecurity/trufflehog@6c64db94d5b2e09d7e0948fb6bd3166cc6fffbc7
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
@@ -52,7 +69,7 @@ jobs:
         run: pip install bandit pip-audit
 
       - name: Run Bandit (SAST)
-        run: bandit -r apps/api/ -c pyproject.toml || bandit -r apps/api/ -ll
+        run: bandit -r apps/api/ -c pyproject.toml -ll
 
       - name: Run pip-audit (SCA)
         # BUG-008 fix: Hard-fail on vulnerabilities — no more soft suppression
@@ -62,6 +79,7 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
     needs: [lint]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -70,12 +88,17 @@ jobs:
           cache: "pip"
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Run pytest
-        run: python -m pytest apps/ packages/ -v --tb=short
+      - name: Run pytest with coverage
+        run: python -m pytest apps/ packages/ -v --tb=short --cov=apps --cov=packages --cov-report=term-missing --cov-fail-under=60
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
   test-frontend:
     name: Frontend Tests & Type Check
     runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -87,36 +110,128 @@ jobs:
         run: cd apps/web && npm ci
       - name: TypeScript check
         run: cd apps/web && npx tsc --noEmit
-      - name: Run Vitest
-        run: cd apps/web && npm test -- --passWithNoTests
+      - name: Run Vitest with coverage
+        run: cd apps/web && npx vitest run --coverage --passWithNoTests
+      - name: Build Next.js
+        run: cd apps/web && npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-  build-scan-images:
-    name: Build & Container Scan
+  test-e2e:
+    name: Playwright E2E Tests
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, security-sast]
+    timeout-minutes: 15
+    needs: [lint]
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright tests
+        run: npx playwright test
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  build-push-images:
+    name: Build, Scan & Push Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [test-backend, test-frontend, test-e2e, security-sast, codeql]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build API Image
+      - name: Build API Image (local for scan)
         uses: docker/build-push-action@v5
         with:
           context: .
           target: api
           load: true
-          tags: scale-api:latest
+          push: false
+          tags: scale-api:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner on API image
-        # BUG-009 fix: Pinned to immutable SHA (v0.29.0 — 2026-03)
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
         with:
-          image-ref: 'scale-api:latest'
+          image-ref: 'scale-api:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
-          vuln-type: 'os,library'
+          vuln-type: 'os'
           severity: 'CRITICAL,HIGH'
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag scale-api:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}

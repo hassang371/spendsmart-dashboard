@@ -44,9 +44,9 @@ function AnalyticsContent() {
   const [error, setError] = useState<string | null>(null);
 
   const hasParams = searchParams.toString().length > 0;
-  const yearParam = hasParams ? (searchParams.get('year') || 'all') : 'all';
-  const monthParam = hasParams ? (searchParams.get('month') || 'all') : 'all';
-  const relativeParam = hasParams ? (searchParams.get('relative') || 'none') : 'this_month';
+  const yearParam = hasParams ? searchParams.get('year') || 'all' : 'all';
+  const monthParam = hasParams ? searchParams.get('month') || 'all' : 'all';
+  const relativeParam = hasParams ? searchParams.get('relative') || 'none' : 'this_month';
 
   const updateFilter = (type: 'year' | 'month' | 'relative', value: string) => {
     const params = new URLSearchParams(searchParams);
@@ -121,14 +121,15 @@ function AnalyticsContent() {
         });
       } catch (err: unknown) {
         if (!mounted) return;
-        console.error("Analytics fetch error:", err);
+        console.error('Analytics fetch error:', err);
         let message = 'Failed to load analytics data.';
         if (err instanceof Error) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          message = err.message === '[object Object]' && (err as any).data
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ? JSON.stringify((err as any).data.detail || (err as any).data)
-            : err.message;
+          message =
+            err.message === '[object Object]' && (err as any).data
+              ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                JSON.stringify((err as any).data.detail || (err as any).data)
+              : err.message;
         }
         setError(message);
       } finally {
@@ -175,18 +176,16 @@ function AnalyticsContent() {
     if (!transactions.length) return [];
 
     // Sort transactions by date descending to ensure charts look correct
-    const sorted = [...transactions].sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+    const sorted = [...transactions].sort(
+      (a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+    );
 
     return sorted.filter(t => {
       const date = new Date(t.transaction_date);
       if (Number.isNaN(date.getTime())) return false;
 
       if (yearParam !== 'all' && String(date.getFullYear()) !== yearParam) return false;
-      if (
-        yearParam !== 'all' &&
-        monthParam !== 'all' &&
-        String(date.getMonth()) !== monthParam
-      )
+      if (yearParam !== 'all' && monthParam !== 'all' && String(date.getMonth()) !== monthParam)
         return false;
 
       if (relativeParam !== 'none') {
@@ -247,8 +246,6 @@ function AnalyticsContent() {
     return <AnalyticsEmptyState />;
   }
 
-
-
   return (
     <motion.div
       variants={containerVariants}
@@ -268,13 +265,17 @@ function AnalyticsContent() {
           <div className="relative group">
             <select
               value={yearParam}
-              onChange={(e) => updateFilter('year', e.target.value)}
+              onChange={e => updateFilter('year', e.target.value)}
               className="appearance-none bg-background border border-border hover:border-primary/50 text-foreground text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer font-medium"
             >
               <option value="all">All Years</option>
-              {years.filter(y => y !== 'all').map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
+              {years
+                .filter(y => y !== 'all')
+                .map(y => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground">
               <ChevronDown className="h-4 w-4" />
@@ -284,13 +285,15 @@ function AnalyticsContent() {
           <div className="relative group">
             <select
               value={monthParam}
-              onChange={(e) => updateFilter('month', e.target.value)}
+              onChange={e => updateFilter('month', e.target.value)}
               disabled={yearParam === 'all' || relativeParam !== 'none'}
               className="appearance-none bg-background border border-border hover:border-primary/50 text-foreground text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="all">All Months</option>
               {Array.from({ length: 12 }).map((_, i) => (
-                <option key={i} value={String(i)}>{monthName(i)}</option>
+                <option key={i} value={String(i)}>
+                  {monthName(i)}
+                </option>
               ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground">
@@ -301,7 +304,7 @@ function AnalyticsContent() {
           <div className="relative group">
             <select
               value={relativeParam}
-              onChange={(e) => updateFilter('relative', e.target.value)}
+              onChange={e => updateFilter('relative', e.target.value)}
               className="appearance-none bg-background border border-border hover:border-primary/50 text-foreground text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer font-medium"
             >
               <option value="none">Custom Range</option>
@@ -320,7 +323,11 @@ function AnalyticsContent() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 auto-rows-[minmax(320px,auto)]">
         <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
-          <ExpandableCard id="income-expense" title="Income vs Expense" className="h-[360px] lg:h-[400px] min-h-[360px]">
+          <ExpandableCard
+            id="income-expense"
+            title="Income vs Expense"
+            className="h-[360px] lg:h-[400px] min-h-[360px]"
+          >
             {({ isExpanded }) => (
               <MonthlyComparison
                 transactions={filteredTransactions}
@@ -334,7 +341,11 @@ function AnalyticsContent() {
         </motion.div>
 
         <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
-          <ExpandableCard id="subscriptions" title="Subscription Radial" className="h-[320px] lg:h-[400px] min-h-[320px]">
+          <ExpandableCard
+            id="subscriptions"
+            title="Subscription Radial"
+            className="h-[320px] lg:h-[400px] min-h-[320px]"
+          >
             {({ isExpanded }) => (
               <SubscriptionRadar transactions={filteredTransactions} isExpanded={isExpanded} />
             )}
@@ -342,7 +353,11 @@ function AnalyticsContent() {
         </motion.div>
 
         <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
-          <ExpandableCard id="categories" title="Category Distribution" className="h-[320px] lg:h-[400px] min-h-[320px]">
+          <ExpandableCard
+            id="categories"
+            title="Category Distribution"
+            className="h-[320px] lg:h-[400px] min-h-[320px]"
+          >
             {({ isExpanded }) => (
               <CategoryDistribution transactions={filteredTransactions} isExpanded={isExpanded} />
             )}
@@ -350,7 +365,11 @@ function AnalyticsContent() {
         </motion.div>
 
         <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
-          <ExpandableCard id="merchants" title="Merchant Leaderboard" className="h-[320px] lg:h-[400px] min-h-[320px]">
+          <ExpandableCard
+            id="merchants"
+            title="Merchant Leaderboard"
+            className="h-[320px] lg:h-[400px] min-h-[320px]"
+          >
             {({ isExpanded }) => (
               <MerchantLeaderboard transactions={filteredTransactions} isExpanded={isExpanded} />
             )}
@@ -363,7 +382,13 @@ function AnalyticsContent() {
 
 export default function AnalyticsPage() {
   return (
-    <Suspense fallback={<div className="flex h-full items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
       <AnalyticsContent />
     </Suspense>
   );

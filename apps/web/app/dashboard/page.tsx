@@ -16,6 +16,8 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie
 import { supabase } from '../../lib/supabase/client';
 import { accountsApi, type Transaction } from '../../lib/api/client';
 import { getCachedData, setCachedData } from '../../lib/utils/cache';
+import { useAccount } from '../../lib/contexts/AccountContext';
+import { AccountBadge } from '../../components/accounts/AccountBadge';
 
 function firstNameFromDisplayName(value: string): string {
   const cleaned = value.trim().replace(/\s+/g, ' ');
@@ -39,9 +41,13 @@ const OVERVIEW_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export default function OverviewPage() {
   const router = useRouter();
+  const { activeAccountId } = useAccount();
   const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Tracks whether the user has ANY transactions at all (across all time).
+  // Used to distinguish "no transactions this period" from "brand new user".
+  const [hasTransactionsEver, setHasTransactionsEver] = useState(false);
   const [displayName, setDisplayName] = useState('there');
   const [timeframe, setTimeframe] = useState<'weekly' | 'monthly'>('weekly');
 
@@ -61,11 +67,13 @@ export default function OverviewPage() {
       const fallbackName = user.email?.split('@')[0] ?? 'there';
       setDisplayName(firstNameFromDisplayName(fullName || fallbackName));
 
-      const cacheKey = `overview-cache:${user.id}`;
+      // Cache key includes account scope so switching invalidates stale data
+      const cacheKey = `overview-cache:${user.id}:${activeAccountId}`;
       const cachedData = getCachedData<Transaction[]>(cacheKey, OVERVIEW_CACHE_TTL_MS);
 
       if (cachedData) {
         setData(cachedData);
+        if (cachedData.length > 0) setHasTransactionsEver(true);
         setLoading(false);
         return;
       }
@@ -80,10 +88,14 @@ export default function OverviewPage() {
           return;
         }
 
-        // Fetch last-30-days transactions for overview charts with cursor pagination
-        // to avoid silent truncation at a fixed page size.
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // Fetch from the earlier of: start of current month OR 7 days ago.
+        // This ensures both the weekly view (last 7 days) and the monthly view
+        // (current calendar month) are fully covered in a single fetch.
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 6);
+        const fetchFrom = startOfMonth < sevenDaysAgo ? startOfMonth : sevenDaysAgo;
 
         const allItems: Transaction[] = [];
         let cursor: string | undefined;
@@ -95,7 +107,8 @@ export default function OverviewPage() {
           const response = await accountsApi.getTransactions(session.access_token, {
             limit: 500,
             cursor,
-            date_from: thirtyDaysAgo.toISOString().split('T')[0],
+            date_from: fetchFrom.toISOString().split('T')[0],
+            account_id: activeAccountId,
           });
 
           allItems.push(...response.items);
@@ -108,8 +121,23 @@ export default function OverviewPage() {
           console.warn('Overview transactions are truncated after pagination safety cap.');
         }
 
+        // If the current period is empty, check whether the user has any
+        // transactions at all (across all time) to decide which empty state to show.
+        if (allItems.length === 0) {
+          // Omit account_id to check globally — backend treats omission same as 'all'.
+          const anyCheck = await accountsApi.getTransactions(session.access_token, {
+            limit: 1,
+          });
+          setHasTransactionsEver(anyCheck.items.length > 0);
+        } else {
+          setHasTransactionsEver(true);
+        }
+
         setData(allItems);
-        setCachedData(cacheKey, allItems);
+        // Only cache non-empty results — storing [] poisons the cache for navigation back.
+        if (allItems.length > 0) {
+          setCachedData(cacheKey, allItems);
+        }
       } catch (err) {
         console.error('Error fetching transactions:', err);
         setError('Unable to load financial data.');
@@ -119,7 +147,7 @@ export default function OverviewPage() {
     };
 
     fetchData();
-  }, [router]);
+  }, [router, activeAccountId]);
 
   const periodExpenses = (() => {
     const now = new Date();
@@ -375,7 +403,10 @@ export default function OverviewPage() {
           <h1 className="text-3xl font-black text-foreground tracking-tight">
             Hi, <span className="text-primary">{displayName}</span>
           </h1>
-          <p className="text-sm text-muted-foreground">Your {timeframe} spending snapshot.</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-muted-foreground">Your {timeframe} spending snapshot.</p>
+            <AccountBadge />
+          </div>
         </div>
         <div className="flex items-center gap-1 rounded-2xl border border-border bg-card p-1 shadow-sm">
           {(['weekly', 'monthly'] as const).map(mode => (
@@ -395,8 +426,8 @@ export default function OverviewPage() {
         </div>
       </motion.div>
 
-      {/* Empty State Check */}
-      {data.length === 0 ? (
+      {/* True empty state: user has zero transactions ever (brand new account) */}
+      {data.length === 0 && !hasTransactionsEver ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -574,7 +605,7 @@ export default function OverviewPage() {
                 ) : (
                   splurges.map((tx, i) => (
                     <motion.div
-                      whileHover={{ x: 2, backgroundColor: 'hsla(var(--foreground)/0.05)' }}
+                      whileHover={{ x: 2 }}
                       onClick={() =>
                         router.push(`/dashboard/transactions?openTx=${encodeURIComponent(tx.id)}`)
                       }
@@ -629,8 +660,8 @@ export default function OverviewPage() {
               </div>
             </div>
 
-            <div style={{ width: '100%', height: '300px' }}>
-              <ResponsiveContainer width="100%" height={300} minWidth={1}>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1}>
                 <BarChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">

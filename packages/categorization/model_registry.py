@@ -23,6 +23,7 @@ class ModelVersion:
     created_at: str
     metrics: Dict[str, Any]
     storage_path: str
+    metadata_written: bool = True
 
 
 def save_version(
@@ -30,10 +31,10 @@ def save_version(
     user_id: str,
     adapter_state_dict: Dict[str, Any],
     metrics: Optional[Dict[str, Any]] = None,
+    correction_count_delta: int = 0,
 ) -> ModelVersion:
-    """Save a new model version to Supabase Storage.
-
-    Since we are saving a PyTorch state_dict, we serialize it with torch.save to a bytes buffer.
+    """Save a new model version to Supabase Storage and atomically update
+    user_model_metadata via the upsert_model_metadata RPC.
     """
     import torch
 
@@ -45,24 +46,51 @@ def save_version(
     buffer.seek(0)
 
     try:
-        # Upload object
         client.storage.from_("models").upload(
             storage_path,
             buffer.read(),
             file_options={"content-type": "application/octet-stream"},
         )
         logger.info("model_saved", user_id=user_id, version_id=version_id)
-
-        return ModelVersion(
-            version_id=version_id,
-            user_id=user_id,
-            created_at=datetime.utcnow().isoformat(),
-            metrics=metrics or {},
-            storage_path=storage_path,
-        )
     except Exception as e:
         logger.error("model_save_failed", error=str(e))
         raise
+
+    # Atomically update user_model_metadata (url + timestamp + count increment).
+    # Non-fatal: if the RPC fails, the adapter is still saved to Storage.
+    metadata_written = True
+    try:
+        client.rpc(
+            "upsert_model_metadata",
+            {
+                "p_user_id": user_id,
+                "p_adapter_url": storage_path,
+                "p_count_delta": correction_count_delta,
+            },
+        ).execute()
+        logger.info(
+            "user_model_metadata_updated",
+            user_id=user_id,
+            storage_path=storage_path,
+            count_delta=correction_count_delta,
+        )
+    except Exception as e:
+        logger.error(
+            "user_model_metadata_rpc_failed",
+            user_id=user_id,
+            storage_path=storage_path,
+            error=str(e),
+        )
+        metadata_written = False
+
+    return ModelVersion(
+        version_id=version_id,
+        user_id=user_id,
+        created_at=datetime.utcnow().isoformat(),
+        metrics=metrics or {},
+        storage_path=storage_path,
+        metadata_written=metadata_written,
+    )
 
 
 def load_latest(client: Client, user_id: str) -> Optional[Dict[str, Any]]:

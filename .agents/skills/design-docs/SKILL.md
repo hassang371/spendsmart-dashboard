@@ -128,6 +128,38 @@ After writing any LLD, check if HLD needs updating:
 3. Update affected HLD sections
 4. Add changelog entry at bottom of HLD
 
+### Step 5.5: Spec Review (MANDATORY — before committing any doc)
+
+After writing or updating ANY doc — before committing — run a spec review.
+
+**How:**
+
+Read `.agents/workflows/request-code-review.md` and apply it to the doc content with:
+- Full doc content
+- Doc type (Bug Report / Feature LLD / HLD / RFC / Policy)
+- Review focus (see table below)
+- Project context: SCALE is an AI-powered personal finance platform
+  (FastAPI backend, Next.js frontend, Supabase Postgres, Celery workers)
+
+**Review focus by doc type:**
+
+| Doc type | Key checks for reviewer |
+|---|---|
+| Bug Report | Root cause backed by code evidence (file + line)? Steps reproducible? Fix description names exact files and functions? Test function named explicitly? |
+| Feature LLD | Success criteria are measurable checkboxes (not prose)? All required sections present and filled? Security section non-empty? Edge cases concrete? |
+| HLD | Accurate against codebase right now? No phantom endpoints or tables? Diagrams agree with actual code? Nothing documented that doesn't exist? |
+| RFC | Alternatives are genuine (not strawmen)? Impact fully assessed? Decision clearly stated with rationale? |
+| Policy | Rules are actionable (not vague)? Examples provided? Enforcement mechanism described? |
+
+**Process:**
+
+1. Run spec review
+2. Fix all issues found
+3. Re-run — repeat until reviewer finds no issues
+4. Max 3 iterations; if still failing after 3, surface the unresolved issues to the user
+
+**Block commit until spec review passes.** A doc with open review issues is not ready to commit.
+
 ### Step 6: Commit the Doc
 
 Commit the documentation before any code:

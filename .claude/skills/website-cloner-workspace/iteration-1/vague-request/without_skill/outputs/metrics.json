@@ -1,0 +1,13 @@
+{
+  "skill_files_read": [],
+  "asked_for_url": true,
+  "recommended_wget_or_httrack": true,
+  "explained_dom_capture_rationale": false,
+  "phases_mentioned": [
+    "ask for URL",
+    "choose tool (wget vs HTTrack)",
+    "run download command",
+    "caveats for dynamic/JS sites",
+    "clarify scope (whole site vs single page)"
+  ]
+}

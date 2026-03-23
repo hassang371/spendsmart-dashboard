@@ -18,7 +18,19 @@
 - After HLD sync at the end of a feature
 - Mid-feature commits are fine if a sub-task is independently useful
 
-## Commit Body (include doc reference when relevant)
+## Mandatory Doc Reference (enforced for fix: and feat:)
+
+Every `fix:` commit MUST reference a Bug Report:
+
+```
+fix: write user_model_metadata after adapter training
+
+Upserts user_model_metadata on training completion so the classifier
+can discover the adapter URL on next request.
+Refs: docs/bugs/BUG-002-linear-adapter-broken-pipeline.md
+```
+
+Every `feat:` commit MUST reference a Feature LLD or RFC:
 
 ```
 feat: add transaction categorization confidence filter
@@ -26,6 +38,11 @@ feat: add transaction categorization confidence filter
 Implements confidence threshold filtering for the categorization pipeline.
 Refs: docs/features/002-confidence-filter.md
 ```
+
+**No Refs: = orphan commit.** A `fix:` or `feat:` commit with no `Refs:` line pointing to a
+real file in `docs/` is NOT ALLOWED. If no doc exists yet, create it first.
+
+`refactor:`, `test:`, `chore:`, `docs:` commits: `Refs:` is optional but recommended.
 
 ## Pre-Commit: Update Doc Status
 

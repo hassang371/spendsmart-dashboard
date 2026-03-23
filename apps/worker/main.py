@@ -1,7 +1,8 @@
+import asyncio
 import logging
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 
@@ -204,8 +205,24 @@ def main():
     supabase = get_supabase()
     logger.info("Worker started. Polling for jobs...")
 
+    last_auto_sync: datetime | None = None
+    AUTO_SYNC_INTERVAL = timedelta(hours=1)  # Check eligibility every hour; sync_task skips if < 24h stale
+
     while True:
         had_job = process_next_job(supabase)
+
+        # Run auto-sync on a background schedule
+        now = datetime.now(timezone.utc)
+        if last_auto_sync is None or (now - last_auto_sync) >= AUTO_SYNC_INTERVAL:
+            try:
+                from apps.worker.sync_task import run_auto_sync
+
+                result = asyncio.run(run_auto_sync(supabase))
+                logger.info("auto_sync synced=%d errors=%d", result["synced"], result["errors"])
+            except Exception as exc:
+                logger.error("auto_sync_loop_error: %s", exc)
+            last_auto_sync = now
+
         if not had_job:
             time.sleep(5)
 

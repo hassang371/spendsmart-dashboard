@@ -48,6 +48,8 @@ import {
   type UncategorizedTransaction,
 } from '../../../lib/api/client';
 import { getCachedData, setCachedData, removeCachedData } from '../../../lib/utils/cache';
+import { useAccount } from '../../../lib/contexts/AccountContext';
+import { AccountBadge } from '../../../components/accounts/AccountBadge';
 
 type TransactionRow = {
   id: string;
@@ -103,7 +105,6 @@ const defaultFilters: FilterState = {
   paymentMethod: 'all',
 };
 
-
 const TRANSACTIONS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const UNCATEGORIZED_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const PAGE_SIZE = 100;
@@ -116,7 +117,6 @@ function normalizeStatus(value: string): string {
   if (status.includes('complete') || status.includes('success')) return 'completed';
   return status || 'completed';
 }
-
 
 function categoryIcon(category: string) {
   const cat = category.toLowerCase().trim();
@@ -236,6 +236,7 @@ function monthName(index: number): string {
 
 export default function TransactionsPage() {
   const router = useRouter();
+  const { activeAccountId } = useAccount();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   // Suppresses the length-change scroll-to-top when Load More appends rows
@@ -382,8 +383,13 @@ export default function TransactionsPage() {
       return;
     }
 
-    const cacheKey = `transactions-cache:${user.id}`;
-    type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
+    const cacheKey = `transactions-cache:${user.id}:${activeAccountId}`;
+    type TxCache = {
+      rows: TransactionRow[];
+      nextCursor?: string;
+      hasMore?: boolean;
+      counts?: TransactionCountsResponse;
+    };
     const cached = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
     if (cached && Array.isArray(cached.rows)) {
       setTransactions(cached.rows);
@@ -397,18 +403,22 @@ export default function TransactionsPage() {
     // Fetch first page only — user loads more on demand
     const response = await accountsApi.getTransactions(session.access_token, {
       limit: PAGE_SIZE,
+      account_id: activeAccountId,
     });
     const rows = response.items.map(mapItem);
 
     setTransactions(rows);
     setNextCursor(response.next_cursor ?? undefined);
     setHasMore(response.has_more);
-    setCachedData<TxCache>(cacheKey, {
-      rows,
-      nextCursor: response.next_cursor ?? undefined,
-      hasMore: response.has_more,
-    });
-  }, [router]);
+    // Only cache non-empty results — storing [] poisons the cache for navigation back.
+    if (rows.length > 0) {
+      setCachedData<TxCache>(cacheKey, {
+        rows,
+        nextCursor: response.next_cursor ?? undefined,
+        hasMore: response.has_more,
+      });
+    }
+  }, [router, activeAccountId]);
 
   const fetchMoreTransactions = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -422,6 +432,7 @@ export default function TransactionsPage() {
       const response = await accountsApi.getTransactions(session.access_token, {
         limit: PAGE_SIZE,
         cursor: nextCursor,
+        account_id: activeAccountId,
       });
       const newRows = response.items.map(mapItem);
 
@@ -430,14 +441,11 @@ export default function TransactionsPage() {
         const combined = [...prev, ...newRows];
         if (userId) {
           const ck = `transactions-cache:${userId}`;
-          type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
-          // Preserve existing cached counts so they survive Load More rewrites
-          const existingCache = getCachedData<TxCache>(ck, TRANSACTIONS_CACHE_TTL_MS);
+          type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean };
           setCachedData<TxCache>(ck, {
             rows: combined,
             nextCursor: response.next_cursor ?? undefined,
             hasMore: response.has_more,
-            ...(existingCache?.counts ? { counts: existingCache.counts } : {}),
           });
         }
         return combined;
@@ -459,24 +467,22 @@ export default function TransactionsPage() {
     } = await supabase.auth.getSession();
     if (!session?.access_token) return;
 
-    const cacheKey = `transactions-cache:${user.id}`;
-    type TxCache = { rows: TransactionRow[]; nextCursor?: string; hasMore?: boolean; counts?: TransactionCountsResponse };
+    // Dedicated counts-only cache key — independent of the row cache so counts are
+    // always persisted after the first API call, regardless of Load More history.
+    // Refs: docs/bugs/BUG-011-transactions-badge-stale-counts-and-slow-load.md
+    const cacheKey = `transaction-counts:${user.id}`;
+    type CountsCache = { counts: TransactionCountsResponse };
 
-    // Use cached counts if still within TTL
-    const cachedForCounts = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
-    if (cachedForCounts?.counts) {
-      setServerCounts(cachedForCounts.counts);
+    const cachedCounts = getCachedData<CountsCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
+    if (cachedCounts?.counts) {
+      setServerCounts(cachedCounts.counts);
       return;
     }
 
     try {
       const counts = await accountsApi.getTransactionCounts(session.access_token);
       setServerCounts(counts);
-      // Merge counts into the existing cache entry so the next navigation is free
-      const existing = getCachedData<TxCache>(cacheKey, TRANSACTIONS_CACHE_TTL_MS);
-      if (existing) {
-        setCachedData<TxCache>(cacheKey, { ...existing, counts });
-      }
+      setCachedData<CountsCache>(cacheKey, { counts });
     } catch {
       // non-critical — tab headers fall back to local counts
     }
@@ -508,7 +514,14 @@ export default function TransactionsPage() {
     }
   }, []);
 
-  // Fetch uncategorized when review tab is selected
+  // Fetch uncategorized eagerly on mount so the Review badge shows the
+  // deduplicated merchant count from the start (not the raw server count).
+  // Refs: docs/bugs/BUG-007-review-badge-wrong-count.md
+  useEffect(() => {
+    fetchUncategorized();
+  }, [fetchUncategorized]);
+
+  // Keep fetching on tab switch in case the cache was invalidated
   useEffect(() => {
     if (tab === 'review') fetchUncategorized();
   }, [tab, fetchUncategorized]);
@@ -543,7 +556,7 @@ export default function TransactionsPage() {
       setMessage('Category saved.');
       // Invalidate caches so next navigation picks up server state
       if (userId) {
-        removeCachedData(`transactions-cache:${userId}`);
+        removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
         removeCachedData(`uncategorized-cache:${userId}`);
       }
       fetchTransactions();
@@ -562,9 +575,10 @@ export default function TransactionsPage() {
     [4000, 10000].forEach(delay =>
       setTimeout(() => {
         if (userId) {
-          removeCachedData(`transactions-cache:${userId}`);
+          removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
           removeCachedData(`uncategorized-cache:${userId}`);
-          removeCachedData(`overview-cache:${userId}`);
+          removeCachedData(`overview-cache:${userId}:${activeAccountId}`);
+          removeCachedData(`transaction-counts:${userId}`);
         }
         fetchTransactions();
         fetchTotalCounts(); // also refresh Review badge count after classification
@@ -586,7 +600,10 @@ export default function TransactionsPage() {
     (async () => {
       try {
         await fetchTransactions();
-        // Fetch server-side total counts in background (non-blocking for main UI)
+        // Fetch server-side total counts in background (non-blocking for main UI).
+        // Must run after fetchTransactions — both call supabase.auth APIs that share
+        // an internal lock; concurrent calls cause AbortError.
+        // Refs: docs/bugs/BUG-011-transactions-badge-stale-counts-and-slow-load.md
         fetchTotalCounts();
       } catch (fetchError) {
         if (mounted) {
@@ -858,7 +875,7 @@ export default function TransactionsPage() {
       await accountsApi.updateTransaction(txId, updates, accessToken);
       setMessage('Category updated.');
       // Invalidate cache so fetchTransactions fetches fresh data (not cached stale rows)
-      if (userId) removeCachedData(`transactions-cache:${userId}`);
+      if (userId) removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
       // Refresh in background to sync any additional batch updates from server
       fetchTransactions();
 
@@ -926,7 +943,7 @@ export default function TransactionsPage() {
     const result = await ingestionApi.importFile(file, accessToken, password);
 
     // Clear local caches so that immediately subsequent UI fetch requests retrieve fresh data
-    removeCachedData(`transactions-cache:${userId}`);
+    removeCachedData(`transactions-cache:${userId}:${activeAccountId}`);
     removeCachedData(`uncategorized-cache:${userId}`);
 
     setImportProgress(100);
@@ -1065,6 +1082,9 @@ export default function TransactionsPage() {
             <h2 className="text-4xl font-black tracking-tight text-foreground">
               Transactions
               <span className="ml-2 text-lg font-medium text-muted-foreground">History</span>
+              <span className="ml-3 align-middle">
+                <AccountBadge />
+              </span>
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               View and manage your financial activity.
@@ -1413,7 +1433,9 @@ export default function TransactionsPage() {
                   const amount = Number(tx.amount || 0);
                   const isCredit = amount >= 0;
                   const confidencePct =
-                    tx.confidence_score !== null && tx.confidence_score !== undefined ? Math.round(tx.confidence_score * 100) : null;
+                    tx.confidence_score !== null && tx.confidence_score !== undefined
+                      ? Math.round(tx.confidence_score * 100)
+                      : null;
                   const isEditing = reviewEditId === tx.id;
                   const isSaving = savingReviewId === tx.id;
 
