@@ -1,27 +1,30 @@
 name: Deploy
 
-# BUG-001 fix: Trigger ONLY when CI workflow completes successfully.
-# This replaces the fake echo-only wait-for-ci job that never verified anything.
-# The deploy will NOT run if any CI job fails.
 on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: 'Image SHA to rollback to (required)'
+        required: true
+        type: string
 
-# Ensure only one deployment runs at a time
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
-# Minimal permissions
 permissions:
   contents: read
 
 jobs:
-  # Real CI gate: abort immediately if the triggering CI run did not succeed
   check-ci-success:
+    name: Check CI passed
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    timeout-minutes: 5
     steps:
       - name: Abort if CI did not succeed
         if: ${{ github.event.workflow_run.conclusion != 'success' }}
@@ -32,57 +35,196 @@ jobs:
       - name: CI passed — proceeding
         run: echo "CI succeeded (run ${{ github.event.workflow_run.id }}). Proceeding to deploy."
 
-  deploy-staging:
-    name: Deploy to Staging
+  run-migrations:
+    name: Run DB Migrations
     needs: [check-ci-success]
     runs-on: ubuntu-latest
-    environment:
-      name: staging
-      url: https://staging.api.scale-app.com
-
+    if: github.event_name == 'workflow_run'
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      # TODO: Configure deployment target.
-      # Option A — SSH + Docker Compose on a VPS:
-      #   - Add SSH_KEY, STAGING_HOST, STAGING_USER to GitHub Secrets
-      #   - Uncomment and adapt the steps below
-      #
-      # - name: Deploy via SSH
-      #   uses: appleboy/ssh-action@v1
-      #   with:
-      #     host: ${{ secrets.STAGING_HOST }}
-      #     username: ${{ secrets.STAGING_USER }}
-      #     key: ${{ secrets.SSH_KEY }}
-      #     script: |
-      #       cd /opt/scale-app
-      #       git pull origin main
-      #       docker compose pull
-      #       docker compose up -d --build
-      #
-      # Option B — PaaS (Render / Fly.io / Railway):
-      #   - Use the platform's official GitHub Action and add the deploy key to Secrets
-      - name: Deploy to Staging
-        run: echo "TODO — configure deployment target (see comments above)."
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: supabase db push --db-url "$DATABASE_URL"
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [run-migrations]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    timeout-minutes: 10
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_API_URL }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify image exists in GHCR
+        run: docker manifest inspect ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event.workflow_run.head_sha }}
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy scale-api to staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service scale-api \
+            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event.workflow_run.head_sha }} \
+            --detach
+
+      - name: Deploy scale-worker to staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service scale-worker \
+            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event.workflow_run.head_sha }} \
+            --detach
+
+  smoke-test-staging:
+    name: Smoke Test Staging
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    timeout-minutes: 5
+    steps:
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.STAGING_API_URL }}/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS — waiting 10s"
+            sleep 10
+          done
+          echo "Health check failed after 180s"
+          exit 1
 
   deploy-production:
     name: Deploy to Production
-    needs: [deploy-staging]
+    needs: [smoke-test-staging, run-migrations]
     runs-on: ubuntu-latest
-
-    # Requires an Environment Protection Rule in GitHub Settings → Environments → production:
-    # "Required reviewers" — deployment will pause until a reviewer approves.
+    if: github.event_name == 'workflow_run'
+    timeout-minutes: 10
     environment:
       name: production
-      url: https://api.scale-app.com
-
+      url: ${{ vars.PRODUCTION_API_URL }}
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # TODO: Mirror staging deployment steps here, pointing at production secrets.
-      - name: Deploy to Production
-        run: echo "TODO — configure deployment target (see comments above)."
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy scale-api to production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service scale-api \
+            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event.workflow_run.head_sha }} \
+            --detach
+
+      - name: Deploy scale-worker to production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service scale-worker \
+            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event.workflow_run.head_sha }} \
+            --detach
+
+  smoke-test-production:
+    name: Smoke Test Production
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    timeout-minutes: 5
+    steps:
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.PRODUCTION_API_URL }}/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS — waiting 10s"
+            sleep 10
+          done
+          echo "Health check failed after 180s"
+          exit 1
+
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify rollback image exists
+        run: docker manifest inspect ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }}
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Rollback scale-api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service scale-api \
+            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }} \
+            --detach
+
+      - name: Rollback scale-worker
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service scale-worker \
+            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }} \
+            --detach
+
+      - name: Verify rollback health
+        run: |
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.PRODUCTION_API_URL }}/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Rollback health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS — waiting 10s"
+            sleep 10
+          done
+          echo "Rollback health check failed after 180s"
+          exit 1
