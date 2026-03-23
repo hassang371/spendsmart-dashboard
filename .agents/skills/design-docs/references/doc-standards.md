@@ -34,4 +34,4 @@ When writing Feature LLDs, Bug Reports, or RFCs as an agent, strictly verify:
 3. **Diagram Integrity:** Ensure all Mermaid diagrams have matching aliases/participants that align with the actual code class/module names. Do not invent arbitrary conceptual blocks if they don't map to code.
 4. **HLD Delta:** Every Feature LLD or Bug Report *must* conclude by explicitly listing which HLD files (in `docs/design/`) are affected by this change, preparing for Step 5a of the Docs-Driven Dev workflow.
 5. **Changelog Section:** Every doc (Feature LLD, Bug Report, RFC, Policy, HLD) must include a Changelog section with at least one entry (creation date + initial status).
-6. **Spec Review Passed:** Before committing, run spec review via `request-code-review.md` applied to the doc. Fix all issues. Do not commit a doc with open review issues.
+6. **Spec Review Passed:** Before committing, read `spec-review.md` and work through its checklists. Fix all issues. Do not commit a doc with open review items.

@@ -14,6 +14,7 @@ On your FIRST turn, BEFORE answering the user:
 2. Read `.gemini/context-rules.md` (context management rules)
 3. Read `.agents/workflows/documentation-gates.md` (documentation obligation gates)
 4. Read `.agents/workflows/commit-strategy.md` (commit standards)
+5. Read `.gemini/tech-stack.md` (stack conventions — FastAPI, Next.js, Supabase)
 
 ## CONTEXT MANAGEMENT
 
@@ -62,13 +63,17 @@ Before ANY implementation, check `.agents/workflows/` and `.agents/skills/` for 
 
 **Skip this gate = violating the framework. No exceptions.**
 
-## SKILL LOADING PROTOCOL — PROGRESSIVE DISCLOSURE
+## SKILL LOADING PROTOCOL
 
-Three levels: (1) metadata always in context, (2) SKILL.md read when skill triggers, (3) references loaded on-demand only when SKILL.md directs.
+When a skill activates, **load ALL files in the skill folder**:
 
-- **SKILL.md is the router.** Trust it. Never preload all references.
-- Scripts execute — run `python scripts/X.py`, don't paste into context.
-- Full-load override: only if user explicitly says "load the full X skill".
+1. `list_dir` on `.agents/skills/<skill-name>/` to discover all contents
+2. `view_file` on `SKILL.md` — the entry point and orchestrator
+3. `view_file` on EVERY file in `references/`, `scripts/`, `agents/`, `assets/`, `evals/`
+
+Scripts: execute directly (`python scripts/X.py`) — don't read into context unless debugging.
+
+**Partial loading = degraded capability.** Reading only SKILL.md = ~20% of available knowledge. Always load the full skill folder.
 
 ## ANTI-DRIFT PROTOCOL
 
@@ -80,7 +85,7 @@ Three levels: (1) metadata always in context, (2) SKILL.md read when skill trigg
 
 **Before claiming done:** Re-read LLD + deviations recorded? Verification run and output read? `Refs:` line in commit?
 
-**Always:** Context crowded? Follow `context-checkpoint.md`. Preloading all skill references without SKILL.md directing you? Stop.
+**Always:** Context crowded? Follow `context-checkpoint.md`. Loading all skill files? Good — that's correct.
 
 ### Brainstorming Skip Condition
 
@@ -97,7 +102,6 @@ Trivially scoped means ONE of: fixing a misspelled word, renaming a single-file 
 - Said "Done!" without verification output
 - Committed `fix:` or `feat:` without a `Refs:` line
 - Transitioned from investigation to solution discussion without a committed doc
-- Preloaded all skill reference files without SKILL.md directing you
 - Ignored context degradation signals
 
 **ANY red flag = STOP. Re-read the relevant workflow. Resume correctly.**

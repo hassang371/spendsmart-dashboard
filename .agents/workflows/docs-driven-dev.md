@@ -42,7 +42,7 @@ This phase fires DURING any research or investigation task — not only when cod
 
 1. **STOP** — do not continue the analysis, do not discuss solutions, do not propose fixes
 2. Immediately create the Bug Report (`docs/bugs/BUG-NNN-name.md`) via the design-docs skill
-3. Run **spec review** on the bug report (read `request-code-review.md` and apply to the doc)
+3. Run **spec review** on the bug report (read `spec-review.md` and work through its checklists)
 4. Commit the bug report: `git commit -m "docs: add BUG-NNN — <name>"`
 5. Only THEN proceed to Step 1 (Brainstorm the fix)
 
@@ -63,7 +63,7 @@ Every investigation concludes with a structured output:
 
 **Invoke:** `brainstorm.md` workflow
 
-This step runs for **5-10+ rounds** of back-and-forth with the user. Do NOT rush.
+Run for as many rounds as needed — no fixed limit. Do NOT rush.
 
 **Exit criteria:** User explicitly says they are satisfied with the design direction.
 
@@ -71,7 +71,7 @@ This step runs for **5-10+ rounds** of back-and-forth with the user. Do NOT rush
 
 ## Step 2: Document
 
-**Invoke:** `design-docs` skill — read `.agents/skills/design-docs/SKILL.md`, then follow its progressive disclosure (load only what SKILL.md directs, not the full folder)
+**Invoke:** `design-docs` skill — load the full skill folder (list_dir `.agents/skills/design-docs/`, then view_file every file)
 
 Based on the work type:
 
@@ -92,7 +92,7 @@ Add an entry when the doc is first created and whenever the implementation devia
 original design. See `docs/STANDARDS.md` for changelog format per doc type.
 
 **Run spec review before committing:**
-After writing the doc, read `request-code-review.md` and apply it to the doc content. Fix all issues. Re-run until no issues remain (max 3 iterations; surface to user if still failing). No commit until spec review passes.
+After writing the doc, read `.agents/workflows/spec-review.md` and work through its checklists. Fix all issues. Re-run until all items pass (max 3 iterations; surface to user if still failing). No commit until spec review passes.
 
 **Commit docs before any code:**
 
@@ -114,6 +114,8 @@ Create implementation plan with Epic → Story → Task hierarchy.
 - Reference the LLD doc created in Step 2
 - Include diagrams in the plan where useful
 - Save to `implementation_plan.md` and `task.md` artifacts
+
+If the session is long after Steps 1–2, checkpoint: read `context-checkpoint.md` and write `.gemini/current_state.md` before continuing.
 
 **Exit criteria:** User approves the plan.
 
@@ -207,17 +209,6 @@ Run each command and read the actual output — do not assume.
 git add .
 git commit -m "chore: update HLD and finalize <feature-name>"
 ```
-
-### 5c. Push
-
-```
-git push
-```
-
-### 5d. Update Linear (if connected)
-
-- Update the issue status to "Done"
-- Add a comment with the LLD link and commit hash
 
 ---
 

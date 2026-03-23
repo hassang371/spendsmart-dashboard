@@ -48,15 +48,6 @@ BEFORE any response or action:
 | `finish-branch.md`            | Branch work complete (optional)  |
 | `writing-skills.md`           | Creating new workflows           |
 
-## Where Things Go
-
-| What                  | Where                             |
-| --------------------- | --------------------------------- |
-| Task tracking         | `task.md` artifact                |
-| Design & plan         | `implementation_plan.md` artifact |
-| Verification evidence | `walkthrough.md` artifact         |
-| Project state         | `.gemini/current_state.md`        |
-
 ## The Anti-Drift Rule
 
 If you find yourself writing code without having checked for a relevant workflow: **STOP.** Read the workflow. Resume correctly.
