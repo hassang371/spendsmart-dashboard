@@ -43,3 +43,11 @@ flowchart LR
 - **Code Review:** Reviewers MUST block any PR that reads/writes data without an explicit `user_id` query filter.
 - **Testing:** All new API routes must include a cross-tenant test (e.g., User A attempting to access User B's resource) to prove the filter is active.
 - **Migration:** Existing routes (like BUG-002 and BUG-032) have already been patched to comply.
+
+---
+
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-08 | Decision — Dual-layer auth model adopted, BUG-002 and BUG-032 patched to comply, status Implemented |

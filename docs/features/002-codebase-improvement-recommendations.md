@@ -416,6 +416,14 @@ This doc = strategic engineering improvements and operating model upgrades.
 
 ---
 
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-08 | Initial draft — 90-day improvement roadmap, status Proposed |
+
+---
+
 ## 10. Success Criteria
 
 - [ ] All Phase 1 (CI + API contract) improvements implemented and passing CI

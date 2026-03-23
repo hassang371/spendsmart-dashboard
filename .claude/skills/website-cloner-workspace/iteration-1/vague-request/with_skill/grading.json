@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Skill triggers and engages with the cloning task (does not just say it cannot help)",
+      "passed": true,
+      "evidence": "Skill fully engaged — read SKILL.md, outlined the 8-phase approach, explained the DOM capture rationale"
+    },
+    {
+      "text": "Explains why DOM capture is necessary rather than simple wget/curl",
+      "passed": true,
+      "evidence": "Response explains traditional tools fail on JS-heavy sites because they can't execute JavaScript and miss dynamically-rendered content"
+    },
+    {
+      "text": "Asks for the target URL if not provided, OR outlines the general process",
+      "passed": true,
+      "evidence": "Response asked for the target URL before proceeding, then outlined all 8 phases as preview"
+    },
+    {
+      "text": "Mentions the multi-phase approach to cloning",
+      "passed": true,
+      "evidence": "All 8 phases mentioned and previewed in the response even while waiting for the URL"
+    },
+    {
+      "text": "Does not immediately suggest only wget or HTTrack as the solution",
+      "passed": true,
+      "evidence": "Response explicitly warns against wget/HTTrack as primary tools, explaining they fail on modern JS sites"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

@@ -14,7 +14,8 @@ export default function Home() {
   useEffect(() => {
     // Inject Webflow external CSS into document head
     const link = document.createElement('link');
-    link.href = 'https://cdn.prod.website-files.com/680905cfdc450738383648a6/css/sui-slush-staging.shared.af10f7987.min.css';
+    link.href =
+      'https://cdn.prod.website-files.com/680905cfdc450738383648a6/css/sui-slush-staging.shared.af10f7987.min.css';
     link.rel = 'stylesheet';
     link.type = 'text/css';
     link.integrity = 'sha384-rxD3mH4xSMVwaBQeNXbiKNTrCQoFFUP2bXG68tATZpCE/LHKIURVmVf3mQ4sOTNA';
@@ -139,7 +140,9 @@ export default function Home() {
         }
 
         // Find and log all interactive elements for debugging
-        const plusIcons = document.querySelectorAll('[data-accordion-toggle], [class*="plus"], [class*="expand"]');
+        const plusIcons = document.querySelectorAll(
+          '[data-accordion-toggle], [class*="plus"], [class*="expand"]'
+        );
         console.log('[SCALE] Found', plusIcons.length, 'potential accordion/expand elements');
         if (plusIcons.length > 0) {
           console.log('[SCALE] First accordion element:', plusIcons[0]);
@@ -187,13 +190,13 @@ export default function Home() {
           Webflow: typeof (window as any).Webflow,
           barba: typeof (window as any).barba,
           Lottie: typeof (window as any).lottie,
-          Lenis: typeof (window as any).Lenis
+          Lenis: typeof (window as any).Lenis,
         });
 
         // Prevent navigation links from causing 404s
         const navLinks = document.querySelectorAll('.nav-inner-list a[href^="/"]');
         navLinks.forEach(link => {
-          link.addEventListener('click', (e) => {
+          link.addEventListener('click', e => {
             e.preventDefault();
             const href = (link as HTMLAnchorElement).href;
             console.log('[SCALE] Navigation link clicked, preventing default:', href);
@@ -205,7 +208,9 @@ export default function Home() {
             }
 
             // Show alert or handle navigation
-            alert(`This is a landing page demo. The link "${href}" would navigate to your actual dashboard.`);
+            alert(
+              `This is a landing page demo. The link "${href}" would navigate to your actual dashboard.`
+            );
           });
         });
         console.log('[SCALE] Prevented', navLinks.length, 'navigation links from causing 404s');
@@ -216,10 +221,7 @@ export default function Home() {
   return (
     <>
       {/* Webflow HTML Content */}
-      <div
-        className="webflow-landing"
-        dangerouslySetInnerHTML={{ __html: WEBFLOW_LANDING_HTML }}
-      />
+      <div className="webflow-landing" dangerouslySetInnerHTML={{ __html: WEBFLOW_LANDING_HTML }} />
 
       {/* External Scripts - Load in dependency order */}
       <Script
@@ -265,7 +267,7 @@ export default function Home() {
         src="https://assets.greensock.com/v3/InertiaPlugin.min.js"
         strategy="afterInteractive"
         onLoad={() => console.log('[SCALE] InertiaPlugin loaded')}
-        onError={(e) => console.error('[SCALE] InertiaPlugin failed to load:', e)}
+        onError={e => console.error('[SCALE] InertiaPlugin failed to load:', e)}
       />
       <Script
         src="https://assets.greensock.com/v3/SplitText.min.js"
@@ -274,7 +276,7 @@ export default function Home() {
           console.log('[SCALE] SplitText loaded - GSAP ready');
           setGsapReady(true);
         }}
-        onError={(e) => {
+        onError={e => {
           console.error('[SCALE] SplitText failed to load:', e);
           // Set gsapReady anyway so the app doesn't hang
           console.warn('[SCALE] Setting gsapReady=true despite SplitText error');
@@ -309,7 +311,7 @@ export default function Home() {
           console.log('[SCALE] Webflow site script loaded - Core libs ready');
           setCoreLibsReady(true);
         }}
-        onError={(e) => {
+        onError={e => {
           console.error('[SCALE] Webflow site script failed to load:', e);
           console.warn('[SCALE] Setting coreLibsReady=true despite Webflow script error');
           setCoreLibsReady(true);
@@ -334,7 +336,7 @@ export default function Home() {
               console.log('[SCALE] Slater script 2 (interactions) loaded');
               setSlaterScriptsLoaded(prev => prev + 1);
             }}
-            onError={(e) => console.error('[SCALE] Slater script 2 error:', e)}
+            onError={e => console.error('[SCALE] Slater script 2 error:', e)}
           />
         </>
       )}

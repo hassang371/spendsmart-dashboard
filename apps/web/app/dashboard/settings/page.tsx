@@ -69,7 +69,7 @@ export default function SettingsPage() {
   // Toast States
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-useEffect(() => {
+  useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 5000);
       return () => clearTimeout(timer);
@@ -168,7 +168,6 @@ useEffect(() => {
         const str = sanitizeFormula(value ?? '');
         if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
           return `"${str.replace(/"/g, '""')}"`;
-
         }
         return str;
       };
@@ -333,8 +332,8 @@ useEffect(() => {
 
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* Profile Section */}
-        <section className="group relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md h-full">
-          <div className="relative z-10 flex flex-col h-full">
+        <section className="group relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md">
+          <div className="relative z-10 flex flex-col">
             <div className="mb-6 flex items-center gap-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-500 ring-4 ring-blue-500/5">
                 <User size={20} strokeWidth={2.5} />
@@ -550,7 +549,7 @@ useEffect(() => {
         </div>
 
         {/* Right Column: Danger Zone */}
-        <section className="rounded-3xl border border-destructive/20 bg-destructive/5 p-5 shadow-sm h-full flex flex-col justify-between">
+        <section className="rounded-3xl border border-destructive/20 bg-destructive/5 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive ring-4 ring-destructive/5">
               <AlertTriangle size={18} strokeWidth={2.5} />

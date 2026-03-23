@@ -30,6 +30,15 @@ The agent had no enforced documentation step before coding. It would jump straig
 
 ---
 
+## Changelog
+
+| Date | Change |
+|---|---|
+| 2026-03-06 | Initial draft — docs-driven-dev workflow + agent tooling design |
+| 2026-03-08 | Updated — added progressive disclosure section, skill loading gaps, design-docs upstream file restoration |
+
+---
+
 ## 2. What Was Built
 
 ### 2.1 New Skill: `design-docs` (`.agents/skills/design-docs/`)

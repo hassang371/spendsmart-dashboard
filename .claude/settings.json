@@ -41,7 +41,16 @@
     "fullstack-dev-skills@fullstack-dev-skills": true,
     "aws-cost-optimization@devops-skills": false,
     "iac-terraform@devops-skills": false,
-    "k8s-troubleshooter@devops-skills": false
+    "k8s-troubleshooter@devops-skills": false,
+    "frontend-design@claude-plugins-official": true,
+    "design-ops@designer-skills": false,
+    "design-research@designer-skills": false,
+    "design-systems@designer-skills": false,
+    "designer-toolkit@designer-skills": false,
+    "interaction-design@designer-skills": false,
+    "prototyping-testing@designer-skills": false,
+    "ui-design@designer-skills": false,
+    "ux-strategy@designer-skills": false
   },
   "autoMemoryEnabled": true
 }

@@ -28,7 +28,7 @@ function evictAppCacheByPrefix(storage: Storage): void {
       keysToRemove.push(k);
     }
   }
-  keysToRemove.forEach((k) => storage.removeItem(k));
+  keysToRemove.forEach(k => storage.removeItem(k));
 }
 
 /**

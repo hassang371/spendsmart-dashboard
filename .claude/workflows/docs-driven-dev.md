@@ -13,17 +13,45 @@ Every code change starts with brainstorming, followed by documentation, then imp
 ## When to Use
 
 For ANY of: new feature, bug fix, architectural decision, or any work that changes code.
+Also fires when investigation reveals a defect — see Phase 0.
 
 ## The Pipeline
 
 ```
-Step 1: Brainstorm  →  superpowers:brainstorming (no round limit)
-Step 2: Document    →  design-docs skill (LLD / bug report / RFC)
-Step 3: Plan        →  superpowers:writing-plans
-Step 4: Execute     →  superpowers:test-driven-development + superpowers:executing-plans
-Step 5: Verify      →  superpowers:verification-before-completion
-Step 6: Commit      →  Conventional commits + HLD sync check
+Phase 0: Investigate  →  discovery gate (fires when defect found during research)
+Step 1: Brainstorm    →  superpowers:brainstorming (no round limit)
+Step 2: Document      →  design-docs skill (LLD / bug report / RFC) + SPEC REVIEW
+Step 3: Plan          →  superpowers:writing-plans
+Step 4: Execute       →  superpowers:test-driven-development + superpowers:executing-plans
+Step 4.5: Doc Sync    →  re-read LLD, record deviations, update changelog
+Step 5: Verify        →  superpowers:verification-before-completion
+Step 6: Commit        →  Conventional commits + HLD sync check
 ```
+
+---
+
+## Phase 0: Investigation (fires when research reveals a defect)
+
+This phase fires DURING any research or investigation task — not only when code is about to change.
+
+**If you find a defect during investigation:**
+
+1. **STOP** — do not continue the analysis, do not discuss solutions, do not propose fixes
+2. Immediately create the Bug Report (`docs/bugs/BUG-NNN-name.md`) via the design-docs skill
+3. Run **spec review** on the bug report (Step 4.5 of SKILL.md)
+4. Commit the bug report: `git commit -m "docs: add BUG-NNN — <name>"`
+5. Only THEN proceed to Step 1 (Brainstorm the fix)
+
+**Investigation output contract:**
+
+Every investigation concludes with a structured output:
+- Findings summary
+- For each confirmed defect: a `BUG-NNN` doc committed (before discussing solutions)
+- For each suspected issue (not yet confirmed): a note in `docs/investigations/` (lightweight, unreviewed)
+- For each missing feature identified: note only — create Feature LLD only if user confirms to build it
+
+`docs/investigations/` is a scratch directory for unreviewed findings. Notes here graduate to proper
+`docs/bugs/` or `docs/features/` once confirmed. They are never committed as formal docs.
 
 ---
 
@@ -54,6 +82,14 @@ Based on work type:
 
 Must include at least one Mermaid diagram. HLD sync check required after every LLD.
 
+**Every doc requires a Changelog section** (Feature LLDs, Bug Reports, RFCs, Policies, HLDs).
+Add an entry when the doc is first created and whenever the implementation deviates from the
+original design. See `docs/STANDARDS.md` for changelog format per doc type.
+
+**Run spec review before committing** (SKILL.md Step 4.5):
+After writing the doc, dispatch `superpowers:code-reviewer` on it. Fix all issues. No commit
+until spec review passes.
+
 **Commit docs before any code:**
 
 ```bash
@@ -61,7 +97,7 @@ git add docs/
 git commit -m "docs: add LLD for <name>"
 ```
 
-Exit criteria: user approves the documentation.
+Exit criteria: user approves the documentation AND spec review passes.
 
 ---
 
@@ -90,6 +126,34 @@ Exit criteria: user approves the documentation.
 | `test:` | Adding/updating tests |
 | `refactor:` | Code restructuring, no behavior change |
 | `chore:` | Maintenance, config, HLD sync |
+
+---
+
+## Step 4.5: Implementation Doc Sync (before Verify)
+
+Before running verification, re-read the design doc and reconcile it against what was actually built.
+
+**Check for deviations:**
+- Did you use a different storage path, table name, or approach than the doc specifies?
+- Did you add or remove something from scope during execution?
+- Did you discover something that changes the design?
+
+**If yes — update the doc changelog with a Deviation entry:**
+
+```markdown
+| YYYY-MM-DD | DEVIATION: [what changed from the design] — [why it changed] |
+```
+
+This is distinct from a normal status-change entry. It records WHY reality diverged from intent.
+This step is what prevents documents from becoming stale silently.
+
+**If no deviations** — add a confirmation entry:
+
+```markdown
+| YYYY-MM-DD | Implementation matches design. Status → Implemented |
+```
+
+Commit the doc update before running verification.
 
 ---
 

@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   AlertTriangle,
+  Building2,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -22,6 +23,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { supabase } from '../../lib/supabase/client';
+import { AccountProvider } from '@/lib/contexts/AccountContext';
+import { AccountSwitcher } from '@/components/accounts/AccountSwitcher';
 
 function firstNameFromDisplayName(value: string): string {
   const cleaned = value.trim().replace(/\s+/g, ' ');
@@ -45,10 +48,7 @@ function readStoredSessions(): StoredSession[] {
     return parsed.filter((item): item is StoredSession => {
       if (!item || typeof item !== 'object') return false;
       const value = item as Record<string, unknown>;
-      return (
-        typeof value.email === 'string' &&
-        typeof value.user_id === 'string'
-      );
+      return typeof value.email === 'string' && typeof value.user_id === 'string';
     });
   } catch {
     return [];
@@ -66,6 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const [accessToken, setAccessToken] = useState<string>('');
 
   const [savedSessions, setSavedSessions] = useState<StoredSession[]>([]);
   const [expiredSessionEmail, setExpiredSessionEmail] = useState<string | null>(null);
@@ -81,6 +82,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const avatar = data.user.user_metadata?.avatar_url as string | undefined;
       const fallback = data.user.email?.split('@')[0] || 'User';
       const userEmail = data.user.email || '';
+
+      // Capture access token for AccountProvider
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session?.access_token) {
+        setAccessToken(sessionData.session.access_token);
+      }
 
       setDisplayName(firstNameFromDisplayName(fullName || fallback));
       setEmail(userEmail);
@@ -98,7 +105,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       sessions.push(currentSessionInfo);
       localStorage.setItem('supabase-multi-auth', JSON.stringify(sessions));
       setSavedSessions(sessions);
-
     };
 
     loadUser();
@@ -176,194 +182,207 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-background p-4 md:p-6 font-sans text-foreground selection:bg-primary/30 transition-colors duration-300">
-      <AnimatePresence>
-        {expiredSessionEmail && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 rounded-2xl border border-destructive/30 bg-card px-5 py-3 shadow-xl backdrop-blur-md"
-          >
-            <AlertTriangle size={16} className="text-destructive shrink-0" />
-            <p className="text-sm font-bold text-foreground">
-              Session for {expiredSessionEmail} has expired.
-            </p>
-            <button
-              onClick={async () => {
-                setExpiredSessionEmail(null);
-                await supabase.auth.signOut();
-                router.push('/login');
-              }}
-              className="rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+    <AccountProvider token={accessToken}>
+      <div className="h-screen overflow-hidden bg-background p-4 md:p-6 font-sans text-foreground selection:bg-primary/30 transition-colors duration-300">
+        <AnimatePresence>
+          {expiredSessionEmail && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 rounded-2xl border border-destructive/30 bg-card px-5 py-3 shadow-xl backdrop-blur-md"
             >
-              Log in
-            </button>
-            <button
-              onClick={() => setExpiredSessionEmail(null)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              <AlertTriangle size={16} className="text-destructive shrink-0" />
+              <p className="text-sm font-bold text-foreground">
+                Session for {expiredSessionEmail} has expired.
+              </p>
+              <button
+                onClick={async () => {
+                  setExpiredSessionEmail(null);
+                  await supabase.auth.signOut();
+                  router.push('/login');
+                }}
+                className="rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Log in
+              </button>
+              <button
+                onClick={() => setExpiredSessionEmail(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="sr-only">Dismiss</span>
+                &times;
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div className="mx-auto flex h-full max-w-[1700px] gap-6">
+          <aside className="hidden h-full w-72 flex-col rounded-[2.5rem] bg-card border border-border p-6 shadow-2xl md:flex shrink-0 transition-colors duration-300">
+            <div
+              onClick={toggleTheme}
+              className="mb-10 flex items-center gap-3 px-2 cursor-pointer group select-none"
             >
-              <span className="sr-only">Dismiss</span>
-              &times;
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <div className="mx-auto flex h-full max-w-[1700px] gap-6">
-        <aside className="hidden h-full w-72 flex-col rounded-[2.5rem] bg-card border border-border p-6 shadow-2xl md:flex shrink-0 transition-colors duration-300">
-          <div
-            onClick={toggleTheme}
-            className="mb-10 flex items-center gap-3 px-2 cursor-pointer group select-none"
-          >
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black text-lg shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
-              {theme === 'light' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </div>
-            <span className="text-xl font-bold tracking-tight text-foreground/90 group-hover:text-primary transition-colors">
-              SCALE
-            </span>
-          </div>
-
-          <nav className="flex-1 space-y-2">
-            <SidebarItem
-              icon={<LayoutDashboard size={20} />}
-              label="Overview"
-              href="/dashboard"
-              active={pathname === '/dashboard'}
-            />
-            <SidebarItem
-              icon={<Wallet size={20} />}
-              label="Transactions"
-              href="/dashboard/transactions"
-              active={pathname === '/dashboard/transactions'}
-            />
-            <SidebarItem
-              icon={<PieChart size={20} />}
-              label="Analytics"
-              href="/dashboard/analytics"
-              active={pathname === '/dashboard/analytics'}
-            />
-            <SidebarItem
-              icon={<Brain size={20} />}
-              label="AI Insights"
-              href="/dashboard/insights"
-              active={pathname === '/dashboard/insights'}
-            />
-            <SidebarItem
-              icon={<Settings size={20} />}
-              label="Settings"
-              href="/dashboard/settings"
-              active={pathname === '/dashboard/settings'}
-            />
-          </nav>
-
-          <div ref={profileMenuRef} className="relative mt-auto">
-            <AnimatePresence>
-              {isProfileOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                  className="absolute bottom-full mb-4 w-full rounded-2xl bg-popover border border-border shadow-xl overflow-hidden z-50 p-1"
-                >
-                  <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex justify-between items-center">
-                    <span>Switch Accounts</span>
-                  </div>
-
-                  <div className="max-h-[150px] overflow-y-auto custom-scrollbar mb-1 space-y-0.5">
-                    {savedSessions.map(s => (
-                      <button
-                        key={s.email}
-                        onClick={() => handleSwitchAccount(s)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                          s.email === email
-                            ? 'bg-muted text-foreground'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          {s.avatar_url ? (
-                            <Image
-                              src={s.avatar_url}
-                              alt={s.name || s.email}
-                              width={20}
-                              height={20}
-                              className="w-5 h-5 rounded-full"
-                            />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-blue-500/50 flex items-center justify-center text-[8px] font-bold text-white">
-                              {s.name?.[0] || s.email[0]}
-                            </div>
-                          )}
-                          <span className="truncate max-w-[100px]">{s.email}</span>
-                        </div>
-                        {s.email === email && <Check size={14} className="text-primary shrink-0" />}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={handleAddAccount}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-blue-500 hover:bg-blue-500/10 transition-colors border-t border-border mt-1"
-                  >
-                    <UserPlus size={16} />
-                    Add Account
-                  </button>
-
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <LogOut size={16} />
-                    Sign Out
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <button
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className={`w-full flex items-center gap-3 rounded-2xl border p-3 transition-all duration-200 group ${
-                isProfileOpen
-                  ? 'bg-muted border-border'
-                  : 'bg-card border-border hover:border-border/80 hover:bg-muted/50'
-              }`}
-            >
-              {avatarUrl ? (
-                <Image
-                  src={avatarUrl}
-                  alt={displayName}
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 rounded-full object-cover border-2 border-border"
-                />
-              ) : (
-                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-secondary text-primary-foreground text-sm font-bold border-2 border-border">
-                  {displayName[0]}
-                </div>
-              )}
-              <div className="flex-1 min-w-0 text-left">
-                <p className="truncate text-sm font-bold text-foreground group-hover:text-primary transition-colors">
-                  {displayName}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">{email}</p>
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black text-lg shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
+                {theme === 'light' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </div>
-              <MoreVertical
-                size={16}
-                className={`text-muted-foreground transition-transform ${
-                  isProfileOpen ? 'rotate-90' : ''
-                }`}
-              />
-            </button>
-          </div>
-        </aside>
+              <span className="text-xl font-bold tracking-tight text-foreground/90 group-hover:text-primary transition-colors">
+                SCALE
+              </span>
+            </div>
 
-        <main className="h-full min-w-0 flex-1 overflow-visible rounded-[2.5rem] border border-border bg-background shadow-xl relative transition-colors duration-300">
-          <div className="h-full overflow-y-auto overflow-x-hidden p-6 custom-scrollbar relative z-10">
-            {children}
-          </div>
-        </main>
+            <nav className="flex-1 space-y-2">
+              <SidebarItem
+                icon={<LayoutDashboard size={20} />}
+                label="Overview"
+                href="/dashboard"
+                active={pathname === '/dashboard'}
+              />
+              <SidebarItem
+                icon={<Wallet size={20} />}
+                label="Transactions"
+                href="/dashboard/transactions"
+                active={pathname === '/dashboard/transactions'}
+              />
+              <SidebarItem
+                icon={<PieChart size={20} />}
+                label="Analytics"
+                href="/dashboard/analytics"
+                active={pathname === '/dashboard/analytics'}
+              />
+              <SidebarItem
+                icon={<Brain size={20} />}
+                label="AI Insights"
+                href="/dashboard/insights"
+                active={pathname === '/dashboard/insights'}
+              />
+              <SidebarItem
+                icon={<Building2 size={20} />}
+                label="Accounts"
+                href="/dashboard/accounts"
+                active={pathname.startsWith('/dashboard/accounts')}
+              />
+              <SidebarItem
+                icon={<Settings size={20} />}
+                label="Settings"
+                href="/dashboard/settings"
+                active={pathname === '/dashboard/settings'}
+              />
+            </nav>
+
+            {/* Bank account switcher — only rendered once token is available */}
+            {accessToken && <AccountSwitcher />}
+
+            <div ref={profileMenuRef} className="relative mt-auto">
+              <AnimatePresence>
+                {isProfileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="absolute bottom-full mb-4 w-full rounded-2xl bg-popover border border-border shadow-xl overflow-hidden z-50 p-1"
+                  >
+                    <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex justify-between items-center">
+                      <span>Switch Accounts</span>
+                    </div>
+
+                    <div className="max-h-[150px] overflow-y-auto custom-scrollbar mb-1 space-y-0.5">
+                      {savedSessions.map(s => (
+                        <button
+                          key={s.email}
+                          onClick={() => handleSwitchAccount(s)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                            s.email === email
+                              ? 'bg-muted text-foreground'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {s.avatar_url ? (
+                              <Image
+                                src={s.avatar_url}
+                                alt={s.name || s.email}
+                                width={20}
+                                height={20}
+                                className="w-5 h-5 rounded-full"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-blue-500/50 flex items-center justify-center text-[8px] font-bold text-white">
+                                {s.name?.[0] || s.email[0]}
+                              </div>
+                            )}
+                            <span className="truncate max-w-[100px]">{s.email}</span>
+                          </div>
+                          {s.email === email && (
+                            <Check size={14} className="text-primary shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleAddAccount}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-blue-500 hover:bg-blue-500/10 transition-colors border-t border-border mt-1"
+                    >
+                      <UserPlus size={16} />
+                      Add Account
+                    </button>
+
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className={`w-full flex items-center gap-3 rounded-2xl border p-3 transition-all duration-200 group ${
+                  isProfileOpen
+                    ? 'bg-muted border-border'
+                    : 'bg-card border-border hover:border-border/80 hover:bg-muted/50'
+                }`}
+              >
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt={displayName}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-full object-cover border-2 border-border"
+                  />
+                ) : (
+                  <div className="h-10 w-10 flex items-center justify-center rounded-full bg-secondary text-primary-foreground text-sm font-bold border-2 border-border">
+                    {displayName[0]}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="truncate text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{email}</p>
+                </div>
+                <MoreVertical
+                  size={16}
+                  className={`text-muted-foreground transition-transform ${
+                    isProfileOpen ? 'rotate-90' : ''
+                  }`}
+                />
+              </button>
+            </div>
+          </aside>
+
+          <main className="h-full min-w-0 flex-1 overflow-visible rounded-[2.5rem] border border-border bg-background shadow-xl relative transition-colors duration-300">
+            <div className="h-full overflow-y-auto overflow-x-hidden p-6 custom-scrollbar relative z-10">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AccountProvider>
   );
 }
 

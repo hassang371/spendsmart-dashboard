@@ -21,13 +21,14 @@ BEFORE any response or action:
 
 ### Process Workflows (prioritize these)
 
-| Workflow          | When                             |
-| ----------------- | -------------------------------- |
-| `brainstorm.md`   | New feature, component, project  |
-| `write-plan.md`   | After design approved            |
-| `execute-plan.md` | When plan exists and is approved |
-| `tdd.md`          | ANY implementation code          |
-| `verify.md`       | Before ANY completion claim      |
+| Workflow             | When                                          |
+| -------------------- | --------------------------------------------- |
+| `docs-driven-dev.md` | ANY code change (master workflow — read first) |
+| `brainstorm.md`      | New feature, component, project               |
+| `write-plan.md`      | After design approved                         |
+| `execute-plan.md`    | When plan exists and is approved              |
+| `tdd.md`             | ANY implementation code                       |
+| `verify.md`          | Before ANY completion claim                   |
 
 ### Quality Workflows
 
@@ -59,5 +60,7 @@ BEFORE any response or action:
 ## The Anti-Drift Rule
 
 If you find yourself writing code without having checked for a relevant workflow: **STOP.** Read the workflow. Resume correctly.
+
+If you find a defect during investigation but haven't created a bug report: **STOP.** Create the bug report, run spec review, commit it — then continue.
 
 This isn't optional. It's how you work.

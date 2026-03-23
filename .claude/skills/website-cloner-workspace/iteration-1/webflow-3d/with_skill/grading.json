@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Mentions the need to find and download .glb 3D model files",
+      "passed": true,
+      "evidence": "Response explicitly states '.glb 3D models' as assets that 'will NOT appear as full URLs anywhere in the source' and describes how to find them via base URL variable concatenation"
+    },
+    {
+      "text": "Mentions .riv binary animation files and the Rive WASM runtime",
+      "passed": true,
+      "evidence": "Response mentions '.riv Rive animations, and .wasm decoders' and specifically calls out downloading the Rive WASM runtime from unpkg"
+    },
+    {
+      "text": "Warns about w-embed CSS blocks embedded in body and their fragility to regex cleaning",
+      "passed": true,
+      "evidence": "Phase 6 explicitly covers: 'Webflow embeds CSS in <div class=\"css-* w-embed\"> elements in <body>... These are destroyed by any broad regex on style content'"
+    },
+    {
+      "text": "Mentions searching minified JS for base URL variable assignments",
+      "passed": true,
+      "evidence": "Phase 3 includes the full base URL variable example: 'var vQ = \"https://cdn.example.com/assets\"' and explains all asset URLs are constructed from it"
+    },
+    {
+      "text": "Mentions HDR environment maps or other binary assets beyond standard CSS/JS",
+      "passed": true,
+      "evidence": "Response explicitly mentions '.hdr environment maps' alongside .glb, .riv, and .wasm as assets to discover"
+    },
+    {
+      "text": "Recommends verifying all downloaded files are not 32-byte access-denied responses",
+      "passed": true,
+      "evidence": "Phase 8 Validation states: 'Check every downloaded file is over 100 bytes (CDN access-denied responses are ~32 bytes)'"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

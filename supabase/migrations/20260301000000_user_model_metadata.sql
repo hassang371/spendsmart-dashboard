@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.user_model_metadata (
     user_id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    adapter_url      TEXT,           -- Supabase Storage path: users/{user_id}/adapter.pt
+    adapter_url      TEXT,           -- Supabase Storage path: {user_id}/v_{timestamp}/adapter.pt
     correction_count INT  NOT NULL DEFAULT 0,
     adapter_updated_at TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()

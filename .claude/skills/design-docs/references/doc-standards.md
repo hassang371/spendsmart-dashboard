@@ -25,13 +25,15 @@ bash .claude/skills/design-docs/scripts/next_doc_number.sh rfcs       # → RFC-
 
 ## Quality Checklist (Claude)
 
-Before committing any doc, verify:
+Before committing any doc, verify ALL of:
 
 - [ ] Metadata block at top (Doc ID, Date, Status, DRI)
 - [ ] Status set to `Draft` or `Proposed`
 - [ ] All required sections filled — no placeholders, no TODOs
 - [ ] At least one Mermaid diagram (except RFC short-form)
+- [ ] Changelog section present with at least one entry
 - [ ] HLD sync check done (`references/hld-sync-protocol.md`)
+- [ ] **Spec review passed** (`superpowers:code-reviewer` dispatched, issues fixed, re-reviewed clean)
 - [ ] File committed before any code touches the repo
 
 ## Mermaid Help

@@ -87,20 +87,12 @@ const nextConfig: NextConfig = {
       // Landing page: permissive CSP for third-party Webflow/GSAP/Slater scripts
       {
         source: '/',
-        headers: [
-          { key: 'Content-Security-Policy', value: landingCsp },
-          ...securityHeaders,
-          hsts,
-        ],
+        headers: [{ key: 'Content-Security-Policy', value: landingCsp }, ...securityHeaders, hsts],
       },
       // All other routes: strict CSP
       {
         source: '/((?!$).*)',
-        headers: [
-          { key: 'Content-Security-Policy', value: appCsp },
-          ...securityHeaders,
-          hsts,
-        ],
+        headers: [{ key: 'Content-Security-Policy', value: appCsp }, ...securityHeaders, hsts],
       },
     ];
   },

@@ -3,10 +3,72 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Transactions Table
+-- 1. Bank Accounts Table (Account Aggregator)
+-- Must be defined before transactions (transactions.account_id references bank_accounts.id)
+CREATE TABLE IF NOT EXISTS public.bank_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    account_name TEXT NOT NULL,
+    account_type TEXT NOT NULL DEFAULT 'savings',
+    institution TEXT,
+    provider TEXT,
+    provider_account_id TEXT,
+    consent_id TEXT,
+    consent_status TEXT NOT NULL DEFAULT 'none',
+    consent_expiry TIMESTAMPTZ,
+    last_synced_at TIMESTAMPTZ,
+    sync_status TEXT NOT NULL DEFAULT 'idle',
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    is_manual BOOLEAN NOT NULL DEFAULT FALSE,
+    masked_number TEXT,
+    currency TEXT NOT NULL DEFAULT 'INR',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX idx_bank_accounts_user ON public.bank_accounts (user_id);
+
+-- Provider account uniqueness (only for non-null provider accounts)
+CREATE UNIQUE INDEX idx_bank_accounts_provider_account
+    ON public.bank_accounts (user_id, provider_account_id)
+    WHERE provider_account_id IS NOT NULL;
+
+-- Only one manual account per user
+CREATE UNIQUE INDEX idx_bank_accounts_user_manual
+    ON public.bank_accounts (user_id)
+    WHERE is_manual = TRUE;
+
+-- RLS
+ALTER TABLE public.bank_accounts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own accounts"
+    ON public.bank_accounts FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own accounts"
+    ON public.bank_accounts FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own accounts"
+    ON public.bank_accounts FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete non-manual accounts"
+    ON public.bank_accounts FOR DELETE
+    USING (auth.uid() = user_id AND is_manual = FALSE);
+
+-- Service role bypass for worker sync
+CREATE POLICY "Service role has full access to bank_accounts"
+    ON public.bank_accounts FOR ALL
+    TO service_role
+    USING (true) WITH CHECK (true);
+
+-- 2. Transactions Table
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES bank_accounts(id) ON DELETE RESTRICT,
     transaction_date TIMESTAMP WITH TIME ZONE NOT NULL,
     amount NUMERIC(12, 2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'INR',
@@ -30,17 +92,20 @@ CREATE TABLE IF NOT EXISTS transactions (
     -- No CHECK on amount: cancelled transactions have amount=0
 );
 
--- 2. Indexes
+-- 3. Indexes
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, transaction_date);
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
 -- Cursor-based pagination orders by (user_id, created_at DESC)
 CREATE INDEX IF NOT EXISTS idx_transactions_user_created ON transactions(user_id, created_at DESC);
--- Fingerprint deduplication unique constraint (used by upsert and import dedup)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_user_fingerprint
-    ON transactions(user_id, fingerprint)
+-- Fingerprint deduplication unique index scoped to account_id (used by upsert and import dedup)
+-- Note: PostgreSQL does not support ADD CONSTRAINT UNIQUE USING INDEX on partial indexes.
+-- Uniqueness is enforced by the index itself; use ON CONFLICT (account_id, fingerprint)
+-- WHERE fingerprint IS NOT NULL in application upserts.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_account_fingerprint
+    ON transactions(account_id, fingerprint)
     WHERE fingerprint IS NOT NULL;
 
--- 3. RLS Policies
+-- 4. RLS Policies
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own transactions"
@@ -59,7 +124,7 @@ CREATE POLICY "Users can delete own transactions"
 ON transactions FOR DELETE
 USING (auth.uid() = user_id);
 
--- 4. Uploaded Files Table (deduplication by file hash)
+-- 5. Uploaded Files Table (deduplication by file hash)
 CREATE TABLE IF NOT EXISTS uploaded_files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -78,7 +143,7 @@ CREATE POLICY "Users can manage own uploaded files"
 ON uploaded_files FOR ALL
 USING (auth.uid() = user_id);
 
--- 5. Training Jobs Table
+-- 6. Training Jobs Table
 CREATE TABLE IF NOT EXISTS training_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -89,9 +154,9 @@ CREATE TABLE IF NOT EXISTS training_jobs (
     transaction_count INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    -- status values: pending → running → completed | failed
+    -- status values: pending → queued → running → processing → completed | failed
     CONSTRAINT training_jobs_status_check
-        CHECK (status = ANY (ARRAY['pending'::text, 'running'::text, 'processing'::text, 'completed'::text, 'failed'::text]))
+        CHECK (status = ANY (ARRAY['pending'::text, 'queued'::text, 'running'::text, 'processing'::text, 'completed'::text, 'failed'::text]))
 );
 
 ALTER TABLE training_jobs ENABLE ROW LEVEL SECURITY;
@@ -103,7 +168,7 @@ CREATE POLICY "Service role can manage training jobs"
 ON training_jobs FOR ALL
 USING (true);
 
--- 6. Classification Jobs Table
+-- 7. Classification Jobs Table
 -- NOTE: v3 ingestion classifies inline in background tasks; this table may be unused
 CREATE TABLE IF NOT EXISTS classification_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -129,7 +194,7 @@ CREATE POLICY "Users can delete own classification jobs"
 ON classification_jobs FOR DELETE
 USING (auth.uid() = user_id);
 
--- 7. Training Corrections Table (Active Learning)
+-- 8. Training Corrections Table (Active Learning)
 CREATE TABLE IF NOT EXISTS training_corrections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -148,7 +213,7 @@ CREATE POLICY "Users can insert own training corrections"
 ON training_corrections FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
--- 8. User Model Metadata
+-- 9. User Model Metadata
 CREATE TABLE IF NOT EXISTS public.user_model_metadata (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     adapter_url TEXT,

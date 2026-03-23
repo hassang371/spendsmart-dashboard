@@ -2,7 +2,7 @@
 
 > **Canonical source of truth for all agents (Claude, Gemini) and humans.**
 > When any agent's internal doc-standards file conflicts with this file, this file wins.
-> Last Updated: 2026-03-08
+> Last Updated: 2026-03-16
 
 ---
 
@@ -84,6 +84,7 @@ Additional fields by doc type:
 8. Security Considerations
 9. Testing Strategy
 10. Related Documents (HLD links, RFC links)
+11. Changelog (append-only — add an entry when the doc is created and whenever reality diverges from the original design)
 
 ### Bug Report (all required)
 
@@ -95,6 +96,7 @@ Additional fields by doc type:
 6. Fix Description (files changed + why it works)
 7. Regression Prevention (test added, guard added)
 8. Related Documents
+9. Changelog (append-only — add an entry at creation; add entries as status transitions)
 
 ### RFC — Full (all required)
 
@@ -107,6 +109,7 @@ Additional fields by doc type:
 7. Timeline
 8. Decision (approved/rejected/deferred + rationale)
 9. Related Documents
+10. Changelog (append-only — add entries as decision status changes)
 
 ### RFC — Short (for small decisions, all required)
 
@@ -114,6 +117,7 @@ Additional fields by doc type:
 2. Decision (what was chosen and why)
 3. Alternatives Considered (1–2, brief)
 4. Impact (what changes as a result)
+5. Changelog (append-only — add entries as decision status changes)
 
 ### HLD — Living Document (all required)
 
@@ -122,6 +126,13 @@ Additional fields by doc type:
 3. Domain/Module/Endpoint Details
 4. Key Decisions
 5. Changelog (append-only, newest at top)
+
+### Policy (all required)
+
+1. Policy Statement (what this policy governs)
+2. Rules / Checklist
+3. Examples or templates (where applicable)
+4. Changelog (append-only — add entries when policy is created or updated)
 
 ---
 
@@ -177,3 +188,40 @@ After writing any Feature LLD or Bug Report, always check if an HLD needs updati
 | Architecture / service topology | `docs/design/system-architecture.md` |
 
 Add a changelog entry at the bottom of any HLD you update.
+
+---
+
+## Spec Review Rule
+
+After writing or updating ANY doc, run a spec review before committing:
+
+1. Dispatch `superpowers:code-reviewer` with the doc content + type + review focus
+2. Fix all issues found
+3. Re-run until clean (max 3 iterations)
+4. Commit only after spec review passes
+
+This applies to all doc types: Feature LLDs, Bug Reports, RFCs, HLDs, Policies.
+
+---
+
+## Deviation Log Rule
+
+When implementation diverges from a design doc, record it in the Changelog:
+
+```markdown
+| YYYY-MM-DD | DEVIATION: [what changed from original design] — [why it changed] |
+```
+
+This is distinct from a status-change entry. Its purpose is to explain WHY reality
+diverged from the documented intent. A doc without deviation entries that describes
+something that no longer matches the code is a silent lie.
+
+---
+
+## Planned Automation (not yet implemented — tracked for future Feature LLDs)
+
+| Item | Description | Status |
+|---|---|---|
+| Pre-commit Refs: check | Shell hook that blocks `fix:`/`feat:` commits without a `Refs:` line pointing to a real `docs/` file | Planned |
+| CI doc-gate job | GitHub Action that requires every `fix:`/`feat:` PR to also modify a file in `docs/bugs/` or `docs/features/` | Planned |
+| Stale doc detector | `make check-docs` script: finds docs with `Status: In Progress` and no recent commits referencing them | Planned |

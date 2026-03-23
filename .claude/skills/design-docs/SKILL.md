@@ -64,13 +64,51 @@ Every doc needs at least one diagram. Load ONLY the guide you need:
 2. High-contrast colors (accessible)
 3. Descriptive labels ("Auth Service (JWT)" not "Service A")
 
-## Step 4: HLD Sync Check
+## Step 4: HLD Sync Check + Changelog
 
 After any LLD, check if HLD needs updating:
 
 1. Read `references/hld-sync-protocol.md`
 2. Identify affected HLD files in `docs/design/`
 3. Update affected sections + add changelog entry at bottom
+
+**All docs require a Changelog section** (Feature LLDs, Bug Reports, RFCs, Policies, HLDs).
+Add an entry when the doc is first written and whenever the implementation deviates from the
+original design. See `docs/STANDARDS.md` for the required format per doc type.
+
+## Step 4.5: Spec Review (MANDATORY)
+
+After writing or updating ANY doc — before committing — run a spec review.
+
+**How:**
+
+```
+Dispatch the superpowers:code-reviewer agent with:
+  - Full doc content
+  - Doc type (Bug Report / Feature LLD / HLD / RFC / Policy)
+  - Review focus (see table below)
+  - Project context: SCALE is an AI-powered personal finance platform
+    (FastAPI backend, Next.js frontend, Supabase Postgres, Celery workers)
+```
+
+**Review focus by doc type:**
+
+| Doc type | Key checks for reviewer |
+|---|---|
+| Bug Report | Root cause backed by code evidence (file + line)? Steps reproducible? Fix description names exact files and functions? Test function named explicitly? |
+| Feature LLD | Success criteria are measurable checkboxes (not prose)? All 11 required sections present and filled? Security section non-empty? Edge cases concrete? |
+| HLD | Accurate against codebase right now? No phantom endpoints or tables? Diagrams agree with actual code? Nothing documented that doesn't exist? |
+| RFC | Alternatives are genuine (not strawmen)? Impact fully assessed? Decision clearly stated with rationale? |
+| Policy | Rules are actionable (not vague)? Examples provided? Enforcement mechanism described? |
+
+**Process:**
+
+1. Dispatch reviewer
+2. Fix all issues found
+3. Re-dispatch — repeat until reviewer finds no issues
+4. Max 3 iterations; if still failing after 3, surface the unresolved issues to the user
+
+**Block commit until spec review passes.** A doc with open review issues is not ready to commit.
 
 ## Step 5: Commit Docs Before Code
 
