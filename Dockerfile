@@ -17,10 +17,7 @@ WORKDIR /app
 # Non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser
 
-# Patch CVEs in python:3.11-slim base toolchain before our packages land
-RUN pip install --no-cache-dir "jaraco.context>=6.1.0" "wheel>=0.46.2" && pip cache purge
-
-# Copy installed packages from builder (may overwrite patched versions — both safe)
+# Copy installed packages from builder
 COPY --from=builder /install /usr/local
 
 # Copy application code (NO .env files — secrets injected at runtime)

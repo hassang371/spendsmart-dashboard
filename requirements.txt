@@ -1,6 +1,4 @@
 aiohappyeyeballs==2.6.1
-jaraco.context==6.1.0
-wheel==0.46.2
 aiohttp==3.13.3
 aiosignal==1.4.0
 amqp==5.3.1
