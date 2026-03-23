@@ -124,6 +124,9 @@ When ANY skill is activated, you MUST load ALL files in the skill folder. No exc
 | `git-worktrees.md`            | When git isolation needed                           |
 | `finish-branch.md`            | When ready to merge/PR                              |
 | `context-checkpoint.md`       | Long sessions (5+ turns)                            |
+| `documentation-gates.md`      | Always-active: 5 documentation gates (Discovery, Design, Spec Review, Commit, Sync) |
+| `commit-strategy.md`          | Always-active: commit prefixes, Refs: rules, mandatory doc references |
+| `spec-review.md`              | Doc quality review before committing any design doc |
 | `global-rule.md`              | Framework anchor (pasted into Antigravity Rules UI) |
 
 ## How Skills Get Discovered

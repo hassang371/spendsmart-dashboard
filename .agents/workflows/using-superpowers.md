@@ -19,6 +19,13 @@ BEFORE any response or action:
 
 ## Available Workflows
 
+### Foundation (always active — read at session start)
+
+| Workflow                  | Purpose                                                   |
+| ------------------------- | --------------------------------------------------------- |
+| `documentation-gates.md`  | 5 gates: Discovery, Design, Spec Review, Commit, Doc Sync |
+| `commit-strategy.md`      | Commit prefixes + mandatory Refs: rules                   |
+
 ### Process Workflows (prioritize these)
 
 | Workflow             | When                                          |
@@ -34,6 +41,7 @@ BEFORE any response or action:
 
 | Workflow                  | When                  |
 | ------------------------- | --------------------- |
+| `spec-review.md`          | After writing any design doc, before committing |
 | `request-code-review.md`  | After major feature   |
 | `receive-code-review.md`  | When feedback arrives |
 | `systematic-debugging.md` | Bug investigation     |
