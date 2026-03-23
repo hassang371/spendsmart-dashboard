@@ -1,0 +1,12 @@
+# railway.toml — service deploy configuration.
+# Deployed via: railway up --service <name> --image ghcr.io/.../scale-api:<sha> --detach
+# Railway applies the matching [services.<name>.deploy] block at runtime.
+
+[services.scale-api.deploy]
+startCommand = "uvicorn apps.api.main:app --host 0.0.0.0 --port $PORT --workers 1"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+
+[services.scale-worker.deploy]
+# Workers serve no HTTP traffic; Railway uses process liveness (exit code) for health.
+startCommand = "celery -A apps.api.celery_app worker --loglevel=info --queues=training --concurrency=2"
