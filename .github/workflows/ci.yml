@@ -213,6 +213,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
       - name: Run Trivy vulnerability scanner on API image
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
         with:
@@ -222,6 +229,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os'
           severity: 'CRITICAL,HIGH'
+          cache-dir: ~/.cache/trivy
 
       - name: Log in to GHCR
         if: github.ref == 'refs/heads/main'
@@ -239,9 +247,11 @@ jobs:
 
       - name: Generate SBOM
         if: github.ref == 'refs/heads/main'
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          syft ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }} -o spdx-json > sbom.json
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom.json
 
       - name: Upload SBOM artifact
         if: github.ref == 'refs/heads/main'
@@ -251,12 +261,12 @@ jobs:
           path: sbom.json
           retention-days: 30
 
+      - name: Install cosign
+        if: github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@v3
+
       - name: Sign image with cosign
         if: github.ref == 'refs/heads/main'
         run: |
-          COSIGN_VERSION=v2.4.3
-          curl -sSL -o /usr/local/bin/cosign \
-            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
-          chmod +x /usr/local/bin/cosign
           cosign sign --yes \
             ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
