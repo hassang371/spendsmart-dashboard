@@ -116,7 +116,8 @@ jobs:
               req = urllib.request.Request(
                   'https://backboard.railway.app/graphql/v2',
                   data=data,
-                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json',
+                           'User-Agent': 'railway-cli/3.0.0'}
               )
               with urllib.request.urlopen(req) as r:
                   result = json.loads(r.read())
@@ -211,7 +212,8 @@ jobs:
               req = urllib.request.Request(
                   'https://backboard.railway.app/graphql/v2',
                   data=data,
-                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json',
+                           'User-Agent': 'railway-cli/3.0.0'}
               )
               with urllib.request.urlopen(req) as r:
                   result = json.loads(r.read())
@@ -296,7 +298,8 @@ jobs:
               req = urllib.request.Request(
                   'https://backboard.railway.app/graphql/v2',
                   data=data,
-                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json',
+                           'User-Agent': 'railway-cli/3.0.0'}
               )
               with urllib.request.urlopen(req) as r:
                   result = json.loads(r.read())
