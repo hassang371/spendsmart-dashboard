@@ -41,7 +41,7 @@ jobs:
       url: https://staging.api.scale-app.com
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
@@ -79,7 +79,7 @@ jobs:
       url: https://api.scale-app.com
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
