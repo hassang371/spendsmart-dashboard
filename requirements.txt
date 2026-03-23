@@ -139,7 +139,7 @@ tokenizers==0.22.2
 torch==2.10.0
 torchmetrics==1.8.2
 tqdm==4.67.3
-transformers==5.1.0
+transformers==5.3.0
 typer==0.23.0
 typer-slim==0.23.0
 typing-inspection==0.4.2
