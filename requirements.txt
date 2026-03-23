@@ -140,7 +140,7 @@ torch==2.10.0
 torchmetrics==1.8.2
 tqdm==4.67.3
 transformers==5.1.0
-typer==0.23.0
+typer==0.24.1
 typer-slim==0.23.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
