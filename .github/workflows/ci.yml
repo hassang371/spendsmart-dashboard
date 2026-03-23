@@ -190,7 +190,7 @@ jobs:
   build-push-images:
     name: Build, Scan & Push Images
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     needs: [test-backend, test-frontend, test-e2e, security-sast, codeql]
     permissions:
       contents: read
