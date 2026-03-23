@@ -75,6 +75,15 @@ jobs:
       contents: read
       packages: read
     steps:
+      - name: Set deploy SHA
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "value=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ inputs.deploy_sha }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -83,26 +92,67 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify image exists in GHCR
-        run: docker manifest inspect ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.deploy_sha }}
+        run: docker manifest inspect ghcr.io/${{ github.repository_owner }}/scale-api:${{ steps.sha.outputs.value }}
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy scale-api to staging
+      - name: Deploy to Railway (staging)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/scale-api:${{ steps.sha.outputs.value }}
+          RAILWAY_ENV_NAME: staging
         run: |
-          railway up --service scale-api \
-            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.deploy_sha }} \
-            --detach
+          python3 << 'PYEOF'
+          import json, urllib.request, os, sys
 
-      - name: Deploy scale-worker to staging
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway up --service scale-worker \
-            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.deploy_sha }} \
-            --detach
+          token = os.environ['RAILWAY_TOKEN']
+          image = os.environ['IMAGE']
+          env_name = os.environ['RAILWAY_ENV_NAME']
+
+          def railway_gql(query, variables=None):
+              data = json.dumps({'query': query, 'variables': variables or {}}).encode()
+              req = urllib.request.Request(
+                  'https://backboard.railway.app/graphql/v2',
+                  data=data,
+                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+              )
+              with urllib.request.urlopen(req) as r:
+                  result = json.loads(r.read())
+              if result.get('errors'):
+                  print(f"GraphQL errors: {result['errors']}", file=sys.stderr)
+                  sys.exit(1)
+              return result
+
+          # Discover project structure via project token
+          result = railway_gql('''
+          {
+            projectToken {
+              project {
+                services { edges { node { id name } } }
+                environments { edges { node { id name } } }
+              }
+            }
+          }
+          ''')
+          project = result['data']['projectToken']['project']
+          services = {s['node']['name']: s['node']['id'] for s in project['services']['edges']}
+          envs = {e['node']['name']: e['node']['id'] for e in project['environments']['edges']}
+          print(f"Services: {list(services.keys())}")
+          print(f"Environments: {list(envs.keys())}")
+
+          env_id = envs[env_name]
+          for svc_name in ['scale-api', 'scale-worker']:
+              svc_id = services[svc_name]
+              print(f"Updating {svc_name} → {image}")
+              railway_gql(
+                  'mutation($id: String!, $env: String!, $inp: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $id, environmentId: $env, input: $inp) }',
+                  {'id': svc_id, 'env': env_id, 'inp': {'source': {'image': image}}}
+              )
+              print(f"Triggering deploy for {svc_name}...")
+              railway_gql(
+                  'mutation($id: String!, $env: String!) { serviceInstanceDeploy(serviceId: $id, environmentId: $env) }',
+                  {'id': svc_id, 'env': env_id}
+              )
+          print("Staging deploy triggered.")
+          PYEOF
 
   smoke-test-staging:
     name: Smoke Test Staging
@@ -138,6 +188,15 @@ jobs:
       contents: read
       packages: read
     steps:
+      - name: Set deploy SHA
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "value=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ inputs.deploy_sha }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -145,24 +204,62 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy scale-api to production
+      - name: Deploy to Railway (production)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/scale-api:${{ steps.sha.outputs.value }}
+          RAILWAY_ENV_NAME: production
         run: |
-          railway up --service scale-api \
-            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.deploy_sha }} \
-            --detach
+          python3 << 'PYEOF'
+          import json, urllib.request, os, sys
 
-      - name: Deploy scale-worker to production
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway up --service scale-worker \
-            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.deploy_sha }} \
-            --detach
+          token = os.environ['RAILWAY_TOKEN']
+          image = os.environ['IMAGE']
+          env_name = os.environ['RAILWAY_ENV_NAME']
+
+          def railway_gql(query, variables=None):
+              data = json.dumps({'query': query, 'variables': variables or {}}).encode()
+              req = urllib.request.Request(
+                  'https://backboard.railway.app/graphql/v2',
+                  data=data,
+                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+              )
+              with urllib.request.urlopen(req) as r:
+                  result = json.loads(r.read())
+              if result.get('errors'):
+                  print(f"GraphQL errors: {result['errors']}", file=sys.stderr)
+                  sys.exit(1)
+              return result
+
+          result = railway_gql('''
+          {
+            projectToken {
+              project {
+                services { edges { node { id name } } }
+                environments { edges { node { id name } } }
+              }
+            }
+          }
+          ''')
+          project = result['data']['projectToken']['project']
+          services = {s['node']['name']: s['node']['id'] for s in project['services']['edges']}
+          envs = {e['node']['name']: e['node']['id'] for e in project['environments']['edges']}
+
+          env_id = envs[env_name]
+          for svc_name in ['scale-api', 'scale-worker']:
+              svc_id = services[svc_name]
+              print(f"Updating {svc_name} → {image}")
+              railway_gql(
+                  'mutation($id: String!, $env: String!, $inp: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $id, environmentId: $env, input: $inp) }',
+                  {'id': svc_id, 'env': env_id, 'inp': {'source': {'image': image}}}
+              )
+              print(f"Triggering deploy for {svc_name}...")
+              railway_gql(
+                  'mutation($id: String!, $env: String!) { serviceInstanceDeploy(serviceId: $id, environmentId: $env) }',
+                  {'id': svc_id, 'env': env_id}
+              )
+          print("Production deploy triggered.")
+          PYEOF
 
   smoke-test-production:
     name: Smoke Test Production
@@ -204,24 +301,61 @@ jobs:
       - name: Verify rollback image exists
         run: docker manifest inspect ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }}
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Rollback scale-api
+      - name: Rollback via Railway API
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }}
+          RAILWAY_ENV_NAME: production
         run: |
-          railway up --service scale-api \
-            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }} \
-            --detach
+          python3 << 'PYEOF'
+          import json, urllib.request, os, sys
 
-      - name: Rollback scale-worker
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway up --service scale-worker \
-            --image ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }} \
-            --detach
+          token = os.environ['RAILWAY_TOKEN']
+          image = os.environ['IMAGE']
+          env_name = os.environ['RAILWAY_ENV_NAME']
+
+          def railway_gql(query, variables=None):
+              data = json.dumps({'query': query, 'variables': variables or {}}).encode()
+              req = urllib.request.Request(
+                  'https://backboard.railway.app/graphql/v2',
+                  data=data,
+                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+              )
+              with urllib.request.urlopen(req) as r:
+                  result = json.loads(r.read())
+              if result.get('errors'):
+                  print(f"GraphQL errors: {result['errors']}", file=sys.stderr)
+                  sys.exit(1)
+              return result
+
+          result = railway_gql('''
+          {
+            projectToken {
+              project {
+                services { edges { node { id name } } }
+                environments { edges { node { id name } } }
+              }
+            }
+          }
+          ''')
+          project = result['data']['projectToken']['project']
+          services = {s['node']['name']: s['node']['id'] for s in project['services']['edges']}
+          envs = {e['node']['name']: e['node']['id'] for e in project['environments']['edges']}
+
+          env_id = envs[env_name]
+          for svc_name in ['scale-api', 'scale-worker']:
+              svc_id = services[svc_name]
+              print(f"Rolling back {svc_name} → {image}")
+              railway_gql(
+                  'mutation($id: String!, $env: String!, $inp: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $id, environmentId: $env, input: $inp) }',
+                  {'id': svc_id, 'env': env_id, 'inp': {'source': {'image': image}}}
+              )
+              railway_gql(
+                  'mutation($id: String!, $env: String!) { serviceInstanceDeploy(serviceId: $id, environmentId: $env) }',
+                  {'id': svc_id, 'env': env_id}
+              )
+          print("Rollback triggered.")
+          PYEOF
 
       - name: Verify rollback health
         run: |
