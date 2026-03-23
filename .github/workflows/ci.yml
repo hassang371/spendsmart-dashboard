@@ -195,14 +195,15 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write  # required for cosign keyless signing (Sigstore OIDC)
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
 
       - name: Build API Image (local for scan)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5
         with:
           context: .
           target: api
@@ -235,3 +236,27 @@ jobs:
         run: |
           docker tag scale-api:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
           docker push ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
+
+      - name: Generate SBOM
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }} -o spdx-json > sbom.json
+
+      - name: Upload SBOM artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.json
+          retention-days: 30
+
+      - name: Sign image with cosign
+        if: github.ref == 'refs/heads/main'
+        run: |
+          COSIGN_VERSION=v2.4.3
+          curl -sSL -o /usr/local/bin/cosign \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+          chmod +x /usr/local/bin/cosign
+          cosign sign --yes \
+            ghcr.io/${{ github.repository_owner }}/scale-api:${{ github.sha }}
