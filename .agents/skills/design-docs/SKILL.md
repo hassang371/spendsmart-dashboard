@@ -1,6 +1,6 @@
 ---
 name: design-docs
-description: Use when creating design documentation (LLD/HLD), writing RFCs, documenting bug reports, or generating Mermaid diagrams for any design artifact. Invoke for "create a diagram", "generate mermaid", "document architecture", "code to diagram", "create design doc", "convert code to diagram", "design document", or before writing implementation plans. Supports hierarchical on-demand guide loading, Unicode semantic symbols, and Python utilities for diagram extraction and image conversion.
+description: Use when creating design documentation (LLD/HLD), writing RFCs, documenting bug reports, or generating Mermaid diagrams for any design artifact. Invoke for "create a diagram", "generate mermaid", "document architecture", "code to diagram", "create design doc", "convert code to diagram", "design document", or before writing implementation plans. Supports full context loading of all reference guides, Unicode semantic symbols, and Python utilities for diagram extraction and image conversion.
 ---
 
 # Design Documentation Skill
