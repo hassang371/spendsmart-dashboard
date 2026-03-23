@@ -31,15 +31,15 @@ const nextConfig: NextConfig = {
     // Strict CSP for authenticated app routes
     const appCsp = `
       default-src 'self';
-      script-src 'self' 'unsafe-inline' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com;
+      script-src 'self' 'unsafe-inline' https://js.sentry-cdn.com https://browser.sentry-cdn.com https://va.vercel-scripts.com https://vercel.live;
       style-src 'self' 'unsafe-inline';
-      img-src 'self' blob: data: https://lh3.googleusercontent.com https://nbtowufbthavewruaicc.supabase.co https://avatars.githubusercontent.com https://cdn.prod.website-files.com https://sui-dev.b-cdn.net;
+      img-src 'self' blob: data: https://lh3.googleusercontent.com https://nbtowufbthavewruaicc.supabase.co https://avatars.githubusercontent.com https://cdn.prod.website-files.com https://sui-dev.b-cdn.net https://grainy-gradients.vercel.app;
       font-src 'self' data:;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
       frame-ancestors 'none';
-      connect-src 'self' http://localhost:8000 https://scale-api.vercel.app https://nbtowufbthavewruaicc.supabase.co https://*.sentry.io;
+      connect-src 'self' http://localhost:8000 https://scale-api-production-4373.up.railway.app https://scale-api-staging.up.railway.app https://nbtowufbthavewruaicc.supabase.co https://*.sentry.io;
       worker-src 'self' blob:;
       upgrade-insecure-requests;
     `
@@ -59,7 +59,7 @@ const nextConfig: NextConfig = {
         https://assets.slater.app
         https://js.hsforms.net;
       style-src 'self' 'unsafe-inline' https://cdn.prod.website-files.com;
-      img-src 'self' blob: data: https://lh3.googleusercontent.com https://nbtowufbthavewruaicc.supabase.co https://avatars.githubusercontent.com https://cdn.prod.website-files.com https://sui-dev.b-cdn.net;
+      img-src 'self' blob: data: https://lh3.googleusercontent.com https://nbtowufbthavewruaicc.supabase.co https://avatars.githubusercontent.com https://cdn.prod.website-files.com https://sui-dev.b-cdn.net https://grainy-gradients.vercel.app;
       font-src 'self' data: https://cdn.prod.website-files.com;
       object-src 'none';
       base-uri 'self';
