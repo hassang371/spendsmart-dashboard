@@ -98,14 +98,18 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           IMAGE: ghcr.io/${{ github.repository_owner }}/scale-api:${{ steps.sha.outputs.value }}
-          RAILWAY_ENV_NAME: staging
+          API_SERVICE_ID: ${{ vars.RAILWAY_API_SERVICE_ID }}
+          WORKER_SERVICE_ID: ${{ vars.RAILWAY_WORKER_SERVICE_ID }}
+          ENV_ID: ${{ vars.RAILWAY_STAGING_ENV_ID }}
         run: |
           python3 << 'PYEOF'
           import json, urllib.request, os, sys
 
           token = os.environ['RAILWAY_TOKEN']
           image = os.environ['IMAGE']
-          env_name = os.environ['RAILWAY_ENV_NAME']
+          api_id = os.environ['API_SERVICE_ID']
+          worker_id = os.environ['WORKER_SERVICE_ID']
+          env_id = os.environ['ENV_ID']
 
           def railway_gql(query, variables=None):
               data = json.dumps({'query': query, 'variables': variables or {}}).encode()
@@ -121,26 +125,7 @@ jobs:
                   sys.exit(1)
               return result
 
-          # Discover project structure via project token
-          result = railway_gql('''
-          {
-            projectToken {
-              project {
-                services { edges { node { id name } } }
-                environments { edges { node { id name } } }
-              }
-            }
-          }
-          ''')
-          project = result['data']['projectToken']['project']
-          services = {s['node']['name']: s['node']['id'] for s in project['services']['edges']}
-          envs = {e['node']['name']: e['node']['id'] for e in project['environments']['edges']}
-          print(f"Services: {list(services.keys())}")
-          print(f"Environments: {list(envs.keys())}")
-
-          env_id = envs[env_name]
-          for svc_name in ['scale-api', 'scale-worker']:
-              svc_id = services[svc_name]
+          for svc_name, svc_id in [('scale-api', api_id), ('scale-worker', worker_id)]:
               print(f"Updating {svc_name} → {image}")
               railway_gql(
                   'mutation($id: String!, $env: String!, $inp: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $id, environmentId: $env, input: $inp) }',
@@ -208,14 +193,18 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           IMAGE: ghcr.io/${{ github.repository_owner }}/scale-api:${{ steps.sha.outputs.value }}
-          RAILWAY_ENV_NAME: production
+          API_SERVICE_ID: ${{ vars.RAILWAY_API_SERVICE_ID }}
+          WORKER_SERVICE_ID: ${{ vars.RAILWAY_WORKER_SERVICE_ID }}
+          ENV_ID: ${{ vars.RAILWAY_PRODUCTION_ENV_ID }}
         run: |
           python3 << 'PYEOF'
           import json, urllib.request, os, sys
 
           token = os.environ['RAILWAY_TOKEN']
           image = os.environ['IMAGE']
-          env_name = os.environ['RAILWAY_ENV_NAME']
+          api_id = os.environ['API_SERVICE_ID']
+          worker_id = os.environ['WORKER_SERVICE_ID']
+          env_id = os.environ['ENV_ID']
 
           def railway_gql(query, variables=None):
               data = json.dumps({'query': query, 'variables': variables or {}}).encode()
@@ -231,23 +220,7 @@ jobs:
                   sys.exit(1)
               return result
 
-          result = railway_gql('''
-          {
-            projectToken {
-              project {
-                services { edges { node { id name } } }
-                environments { edges { node { id name } } }
-              }
-            }
-          }
-          ''')
-          project = result['data']['projectToken']['project']
-          services = {s['node']['name']: s['node']['id'] for s in project['services']['edges']}
-          envs = {e['node']['name']: e['node']['id'] for e in project['environments']['edges']}
-
-          env_id = envs[env_name]
-          for svc_name in ['scale-api', 'scale-worker']:
-              svc_id = services[svc_name]
+          for svc_name, svc_id in [('scale-api', api_id), ('scale-worker', worker_id)]:
               print(f"Updating {svc_name} → {image}")
               railway_gql(
                   'mutation($id: String!, $env: String!, $inp: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $id, environmentId: $env, input: $inp) }',
@@ -305,14 +278,18 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           IMAGE: ghcr.io/${{ github.repository_owner }}/scale-api:${{ inputs.rollback_sha }}
-          RAILWAY_ENV_NAME: production
+          API_SERVICE_ID: ${{ vars.RAILWAY_API_SERVICE_ID }}
+          WORKER_SERVICE_ID: ${{ vars.RAILWAY_WORKER_SERVICE_ID }}
+          ENV_ID: ${{ vars.RAILWAY_PRODUCTION_ENV_ID }}
         run: |
           python3 << 'PYEOF'
           import json, urllib.request, os, sys
 
           token = os.environ['RAILWAY_TOKEN']
           image = os.environ['IMAGE']
-          env_name = os.environ['RAILWAY_ENV_NAME']
+          api_id = os.environ['API_SERVICE_ID']
+          worker_id = os.environ['WORKER_SERVICE_ID']
+          env_id = os.environ['ENV_ID']
 
           def railway_gql(query, variables=None):
               data = json.dumps({'query': query, 'variables': variables or {}}).encode()
@@ -328,23 +305,7 @@ jobs:
                   sys.exit(1)
               return result
 
-          result = railway_gql('''
-          {
-            projectToken {
-              project {
-                services { edges { node { id name } } }
-                environments { edges { node { id name } } }
-              }
-            }
-          }
-          ''')
-          project = result['data']['projectToken']['project']
-          services = {s['node']['name']: s['node']['id'] for s in project['services']['edges']}
-          envs = {e['node']['name']: e['node']['id'] for e in project['environments']['edges']}
-
-          env_id = envs[env_name]
-          for svc_name in ['scale-api', 'scale-worker']:
-              svc_id = services[svc_name]
+          for svc_name, svc_id in [('scale-api', api_id), ('scale-worker', worker_id)]:
               print(f"Rolling back {svc_name} → {image}")
               railway_gql(
                   'mutation($id: String!, $env: String!, $inp: ServiceInstanceUpdateInput!) { serviceInstanceUpdate(serviceId: $id, environmentId: $env, input: $inp) }',
