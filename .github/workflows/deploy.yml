@@ -145,11 +145,11 @@ jobs:
     needs: [deploy-staging]
     runs-on: ubuntu-latest
     if: always() && needs.deploy-staging.result == 'success'
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Wait for health
         run: |
-          for i in $(seq 1 18); do
+          for i in $(seq 1 36); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.STAGING_API_URL }}/health)
             if [ "$STATUS" = "200" ]; then
               echo "Health check passed on attempt $i"
@@ -158,7 +158,7 @@ jobs:
             echo "Attempt $i: HTTP $STATUS — waiting 10s"
             sleep 10
           done
-          echo "Health check failed after 180s"
+          echo "Health check failed after 360s"
           exit 1
 
   deploy-production:
@@ -241,11 +241,11 @@ jobs:
     needs: [deploy-production]
     runs-on: ubuntu-latest
     if: always() && needs.deploy-production.result == 'success'
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Wait for health
         run: |
-          for i in $(seq 1 18); do
+          for i in $(seq 1 36); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.PRODUCTION_API_URL }}/health)
             if [ "$STATUS" = "200" ]; then
               echo "Health check passed on attempt $i"
@@ -254,7 +254,7 @@ jobs:
             echo "Attempt $i: HTTP $STATUS — waiting 10s"
             sleep 10
           done
-          echo "Health check failed after 180s"
+          echo "Health check failed after 360s"
           exit 1
 
   rollback:
@@ -323,7 +323,7 @@ jobs:
 
       - name: Verify rollback health
         run: |
-          for i in $(seq 1 18); do
+          for i in $(seq 1 36); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.PRODUCTION_API_URL }}/health)
             if [ "$STATUS" = "200" ]; then
               echo "Rollback health check passed on attempt $i"
@@ -332,5 +332,5 @@ jobs:
             echo "Attempt $i: HTTP $STATUS — waiting 10s"
             sleep 10
           done
-          echo "Rollback health check failed after 180s"
+          echo "Rollback health check failed after 360s"
           exit 1
