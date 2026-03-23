@@ -47,7 +47,9 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Install Supabase CLI
-        run: npm install -g supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Run migrations
         env:
