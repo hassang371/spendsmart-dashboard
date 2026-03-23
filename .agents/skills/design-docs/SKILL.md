@@ -134,29 +134,14 @@ After writing or updating ANY doc — before committing — run a spec review.
 
 **How:**
 
-Read `.agents/workflows/request-code-review.md` and apply it to the doc content with:
-- Full doc content
-- Doc type (Bug Report / Feature LLD / HLD / RFC / Policy)
-- Review focus (see table below)
-- Project context: SCALE is an AI-powered personal finance platform
-  (FastAPI backend, Next.js frontend, Supabase Postgres, Celery workers)
-
-**Review focus by doc type:**
-
-| Doc type | Key checks for reviewer |
-|---|---|
-| Bug Report | Root cause backed by code evidence (file + line)? Steps reproducible? Fix description names exact files and functions? Test function named explicitly? |
-| Feature LLD | Success criteria are measurable checkboxes (not prose)? All required sections present and filled? Security section non-empty? Edge cases concrete? |
-| HLD | Accurate against codebase right now? No phantom endpoints or tables? Diagrams agree with actual code? Nothing documented that doesn't exist? |
-| RFC | Alternatives are genuine (not strawmen)? Impact fully assessed? Decision clearly stated with rationale? |
-| Policy | Rules are actionable (not vague)? Examples provided? Enforcement mechanism described? |
+Read `.agents/workflows/spec-review.md` and work through its checklists for this doc type.
 
 **Process:**
 
-1. Run spec review
-2. Fix all issues found
-3. Re-run — repeat until reviewer finds no issues
-4. Max 3 iterations; if still failing after 3, surface the unresolved issues to the user
+1. Work through the universal checklist + doc-type checklist in `spec-review.md`
+2. Fix all failing items
+3. Re-check until all items pass
+4. Max 3 iterations; if items still fail after 3, surface them to the user
 
 **Block commit until spec review passes.** A doc with open review issues is not ready to commit.
 

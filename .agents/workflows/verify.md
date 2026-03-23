@@ -20,6 +20,20 @@ NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
 
 If you haven't run the verification command in this message, you cannot claim it passes.
 
+## Pre-Verification: Implementation Doc Sync (Gate 5)
+
+Before running any verification checks, complete this first:
+
+1. Re-read the design doc (LLD/RFC/Bug Report) for this work
+2. Did implementation deviate from the documented design?
+   - **If YES** → add a `DEVIATION:` entry to the doc changelog + commit the update
+   - **If NO** → add confirmation entry: `Implementation matches design. Status → Implemented` + commit
+3. Only then proceed to the verification checklist below
+
+Never verify against a stale doc.
+
+---
+
 ## The Gate Function
 
 ```

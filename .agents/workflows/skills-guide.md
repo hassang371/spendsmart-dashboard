@@ -131,4 +131,4 @@ When ANY skill is activated, you MUST load ALL files in the skill folder. No exc
 1. **Antigravity auto-discovery** — Skills in `.agents/skills/` with `SKILL.md` appear in the system prompt's `<skills>` section with their description
 2. **Workflow auto-discovery** — Workflows in `.agents/workflows/` appear in the `<workflows>` section
 3. **Global Rule Activation Map** — Core process workflows are explicitly mapped for guaranteed activation
-4. **Progressive disclosure** — SKILL.md loads first (~80 lines), references load on-demand via reference tables
+4. **Full context loading** — when a skill activates, ALL files in the folder are loaded (see Full Context Loading Protocol above)

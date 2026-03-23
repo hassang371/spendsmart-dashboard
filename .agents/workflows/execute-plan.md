@@ -51,6 +51,7 @@ Based on feedback:
 
 After all tasks complete and verified:
 
+- If session is long or context feels crowded: checkpoint to `.gemini/current_state.md` (read `context-checkpoint.md`)
 - Write results to `walkthrough.md` artifact
 - Use `verify.md` workflow for final verification
 
