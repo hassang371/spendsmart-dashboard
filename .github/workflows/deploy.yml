@@ -74,6 +74,8 @@ jobs:
     permissions:
       contents: read
       packages: read
+    outputs:
+      prev_url: ${{ steps.prev.outputs.prev_url }}
     steps:
       - name: Set deploy SHA
         id: sha
@@ -103,6 +105,43 @@ jobs:
             --certificate-identity-regexp="https://github.com/${{ github.repository }}/.*" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             ghcr.io/${{ github.repository_owner }}/scale-api:${{ steps.sha.outputs.value }}
+
+      - name: Capture previous staging SHA for rollback
+        id: prev
+        run: |
+          python3 - <<'EOF'
+          import urllib.request, json, os
+          token = os.environ['RAILWAY_TOKEN']
+          service_id = os.environ['RAILWAY_API_SERVICE_ID']
+          env_id = os.environ['RAILWAY_STAGING_ENV_ID']
+          query = json.dumps({'query': '''
+          query { deployments(
+            serviceId: "%s", environmentId: "%s", first: 2
+          ) { edges { node { staticUrl } } } }
+          ''' % (service_id, env_id)})
+          req = urllib.request.Request(
+              'https://backboard.railway.com/graphql/v2',
+              data=query.encode(),
+              headers={'Authorization': f'Bearer {token}',
+                       'Content-Type': 'application/json',
+                       'User-Agent': 'railway-cli/3.0.0'}
+          )
+          resp = json.loads(urllib.request.urlopen(req).read())
+          deployments = resp.get('data', {}).get('deployments', {}).get('edges', [])
+          if len(deployments) >= 2:
+              prev_url = deployments[1]['node'].get('staticUrl', '')
+              print(f"Previous deployment found: {prev_url}")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"prev_url={prev_url}\n")
+          else:
+              print("No previous deployment found — rollback will be skipped")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("prev_url=\n")
+          EOF
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_API_SERVICE_ID: ${{ vars.RAILWAY_API_SERVICE_ID }}
+          RAILWAY_STAGING_ENV_ID: ${{ vars.RAILWAY_STAGING_ENV_ID }}
 
       - name: Deploy to Railway (staging)
         env:
@@ -174,6 +213,56 @@ jobs:
           curl -v --max-time 15 "$URL/health" 2>&1 || true
           echo "Health check failed after 360s"
           exit 1
+
+      - name: Auto-rollback staging on smoke failure
+        if: failure() && needs.deploy-staging.outputs.prev_url != ''
+        run: |
+          python3 - <<'EOF'
+          import urllib.request, json, os
+          token = os.environ['RAILWAY_TOKEN']
+          for service_id, env_id in [
+              (os.environ['RAILWAY_API_SERVICE_ID'], os.environ['RAILWAY_STAGING_ENV_ID']),
+              (os.environ['RAILWAY_WORKER_SERVICE_ID'], os.environ['RAILWAY_STAGING_ENV_ID']),
+          ]:
+              prev_image = os.environ['PREV_IMAGE']
+              if not prev_image:
+                  print(f"No previous image for {service_id} — skipping")
+                  continue
+              update_q = json.dumps({'query': '''
+              mutation { serviceInstanceUpdate(
+                  serviceId: "%s", environmentId: "%s",
+                  input: { source: { image: "%s" } }
+              ) }
+              ''' % (service_id, env_id, prev_image)})
+              req = urllib.request.Request(
+                  'https://backboard.railway.com/graphql/v2',
+                  data=update_q.encode(),
+                  headers={'Authorization': f'Bearer {token}',
+                           'Content-Type': 'application/json',
+                           'User-Agent': 'railway-cli/3.0.0'}
+              )
+              urllib.request.urlopen(req)
+              deploy_q = json.dumps({'query': '''
+              mutation { serviceInstanceDeploy(
+                  serviceId: "%s", environmentId: "%s"
+              ) }
+              ''' % (service_id, env_id)})
+              req2 = urllib.request.Request(
+                  'https://backboard.railway.com/graphql/v2',
+                  data=deploy_q.encode(),
+                  headers={'Authorization': f'Bearer {token}',
+                           'Content-Type': 'application/json',
+                           'User-Agent': 'railway-cli/3.0.0'}
+              )
+              urllib.request.urlopen(req2)
+              print(f"Auto-rollback triggered for service {service_id}")
+          EOF
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_API_SERVICE_ID: ${{ vars.RAILWAY_API_SERVICE_ID }}
+          RAILWAY_WORKER_SERVICE_ID: ${{ vars.RAILWAY_WORKER_SERVICE_ID }}
+          RAILWAY_STAGING_ENV_ID: ${{ vars.RAILWAY_STAGING_ENV_ID }}
+          PREV_IMAGE: ${{ needs.deploy-staging.outputs.prev_url }}
 
   deploy-production:
     name: Deploy to Production
