@@ -3,7 +3,7 @@
 > **Doc ID:** BUG-014-trivy-cache-run-id
 > **Date:** 2026-03-24
 > **Severity:** Low
-> **Status:** Fix Applied
+> **Status:** Verified
 > **DRI:** Mohammed Hassan Mohiddin
 
 ## Observed Behavior
@@ -158,3 +158,4 @@ prefix ensures cross-week restores still find the most recent entry for the same
 |---|---|
 | 2026-03-24 | Bug report created. Status: Root Cause Found. |
 | 2026-03-24 | Fix applied. Status → Fix Applied |
+| 2026-03-25 | Verification passed. Status → Verified |
