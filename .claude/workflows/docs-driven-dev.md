@@ -38,7 +38,7 @@ This phase fires DURING any research or investigation task — not only when cod
 
 1. **STOP** — do not continue the analysis, do not discuss solutions, do not propose fixes
 2. Immediately create the Bug Report (`docs/bugs/BUG-NNN-name.md`) via the design-docs skill
-3. Run **spec review** on the bug report (Step 4.5 of SKILL.md)
+3. Run **spec review** on the bug report (see `.claude/skills/design-docs/SKILL.md` Step 4.5)
 4. Commit the bug report: `git commit -m "docs: add BUG-NNN — <name>"`
 5. Only THEN proceed to Step 1 (Brainstorm the fix)
 

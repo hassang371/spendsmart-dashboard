@@ -28,11 +28,6 @@
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "context-engineering-fundamentals@context-engineering-marketplace": true,
-    "cognitive-architecture@context-engineering-marketplace": false,
-    "agent-evaluation@context-engineering-marketplace": false,
-    "agent-development@context-engineering-marketplace": false,
-    "agent-architecture@context-engineering-marketplace": false,
     "monitoring-observability@devops-skills": true,
     "ci-cd@devops-skills": true,
     "gitops-workflows@devops-skills": true,
@@ -50,7 +45,8 @@
     "interaction-design@designer-skills": false,
     "prototyping-testing@designer-skills": false,
     "ui-design@designer-skills": false,
-    "ux-strategy@designer-skills": false
+    "ux-strategy@designer-skills": false,
+    "context-engineering@context-engineering-marketplace": false
   },
   "autoMemoryEnabled": true
 }
