@@ -8,9 +8,9 @@
 Use the script to get the next doc number before creating any doc:
 
 ```bash
-bash .claude/skills/design-docs/scripts/next_doc_number.sh features   # → 003
-bash .claude/skills/design-docs/scripts/next_doc_number.sh bugs       # → BUG-002
-bash .claude/skills/design-docs/scripts/next_doc_number.sh rfcs       # → RFC-002
+bash .claude/skills/design-docs/scripts/next_doc_number.sh features   # → returns next available (e.g., 008)
+bash .claude/skills/design-docs/scripts/next_doc_number.sh bugs       # → returns next available (e.g., BUG-014)
+bash .claude/skills/design-docs/scripts/next_doc_number.sh rfcs       # → returns next available (e.g., RFC-001)
 ```
 
 ## Template Selection

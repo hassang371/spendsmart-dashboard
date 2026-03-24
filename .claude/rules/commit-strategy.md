@@ -36,7 +36,7 @@ Every `feat:` commit MUST reference a Feature LLD or RFC:
 feat: add transaction categorization confidence filter
 
 Implements confidence threshold filtering for the categorization pipeline.
-Refs: docs/features/002-confidence-filter.md
+Refs: docs/features/NNN-feature-name.md
 ```
 
 **No Refs: = orphan commit.** A `fix:` or `feat:` commit with no `Refs:` line pointing to a

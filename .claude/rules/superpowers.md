@@ -72,6 +72,10 @@ Brainstorming IS Step 1 of docs-driven-dev. They are the same thing — not two 
 | Security review | Skill tool | `fullstack-dev-skills:secure-code-guardian` |
 | CI/CD | Skill tool | `ci-cd:ci-cd` |
 | Monitoring / SLOs | Skill tool | `monitoring-observability:monitoring-observability` |
+| GitOps / ArgoCD / Flux | Skill tool | `gitops-workflows:gitops-workflows` |
+| IaC / Terraform | Skill tool | `iac-terraform:iac-terraform` |
+| Kubernetes troubleshooting | Skill tool | `k8s-troubleshooter:k8s-troubleshooter` |
+| AWS cost optimization | Skill tool | `aws-cost-optimization:aws-cost-optimization` |
 
 ## Skill Loading Protocol
 
