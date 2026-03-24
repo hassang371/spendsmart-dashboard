@@ -3,7 +3,7 @@
 > **Doc ID:** BUG-016-concurrency-cancels-docker-push
 > **Date:** 2026-03-24
 > **Severity:** High
-> **Status:** Root Cause Found
+> **Status:** Fix Applied
 > **DRI:** Mohammed Hassan Mohiddin
 
 ## Observed Behavior
@@ -141,3 +141,4 @@ for PRs while protecting the integrity of `main` pushes.
 | Date | Note |
 |---|---|
 | 2026-03-24 | Bug report created. Status: Root Cause Found |
+| 2026-03-25 | Fix applied. Status → Fix Applied |
