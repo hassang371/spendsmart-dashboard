@@ -111,7 +111,7 @@ jobs:
       - name: TypeScript check
         run: cd apps/web && npx tsc --noEmit
       - name: Run Vitest with coverage
-        run: cd apps/web && npx vitest run --coverage --passWithNoTests
+        run: cd apps/web && npx vitest run --coverage --reporter=verbose
       - name: Build Next.js
         run: cd apps/web && npm run build
         env:
