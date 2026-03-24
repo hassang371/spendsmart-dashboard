@@ -159,15 +159,19 @@ jobs:
     steps:
       - name: Wait for health
         run: |
+          URL="${{ vars.STAGING_API_URL }}"
           for i in $(seq 1 36); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.STAGING_API_URL }}/health)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL/health" || echo "000")
+            BODY=$(curl -s --max-time 5 "$URL/health" 2>/dev/null || true)
             if [ "$STATUS" = "200" ]; then
               echo "Health check passed on attempt $i"
               exit 0
             fi
-            echo "Attempt $i: HTTP $STATUS — waiting 10s"
+            echo "Attempt $i: HTTP $STATUS — body: $BODY — waiting 10s"
             sleep 10
           done
+          echo "=== FINAL DIAGNOSTIC ==="
+          curl -v --max-time 15 "$URL/health" 2>&1 || true
           echo "Health check failed after 360s"
           exit 1
 
@@ -265,15 +269,19 @@ jobs:
     steps:
       - name: Wait for health
         run: |
+          URL="${{ vars.PRODUCTION_API_URL }}"
           for i in $(seq 1 36); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.PRODUCTION_API_URL }}/health)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL/health" || echo "000")
+            BODY=$(curl -s --max-time 5 "$URL/health" 2>/dev/null || true)
             if [ "$STATUS" = "200" ]; then
               echo "Health check passed on attempt $i"
               exit 0
             fi
-            echo "Attempt $i: HTTP $STATUS — waiting 10s"
+            echo "Attempt $i: HTTP $STATUS — body: $BODY — waiting 10s"
             sleep 10
           done
+          echo "=== FINAL DIAGNOSTIC ==="
+          curl -v --max-time 15 "$URL/health" 2>&1 || true
           echo "Health check failed after 360s"
           exit 1
 
@@ -343,14 +351,18 @@ jobs:
 
       - name: Verify rollback health
         run: |
+          URL="${{ vars.PRODUCTION_API_URL }}"
           for i in $(seq 1 36); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.PRODUCTION_API_URL }}/health)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL/health" || echo "000")
+            BODY=$(curl -s --max-time 5 "$URL/health" 2>/dev/null || true)
             if [ "$STATUS" = "200" ]; then
               echo "Rollback health check passed on attempt $i"
               exit 0
             fi
-            echo "Attempt $i: HTTP $STATUS — waiting 10s"
+            echo "Attempt $i: HTTP $STATUS — body: $BODY — waiting 10s"
             sleep 10
           done
+          echo "=== FINAL DIAGNOSTIC ==="
+          curl -v --max-time 15 "$URL/health" 2>&1 || true
           echo "Rollback health check failed after 360s"
           exit 1
