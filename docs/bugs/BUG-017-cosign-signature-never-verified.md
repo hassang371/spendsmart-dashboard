@@ -3,7 +3,7 @@
 > **Doc ID:** BUG-017-cosign-signature-never-verified
 > **Date:** 2026-03-24
 > **Severity:** High
-> **Status:** Root Cause Found
+> **Status:** Fix Applied
 > **DRI:** Mohammed Hassan Mohiddin
 
 ## Observed Behavior
@@ -153,3 +153,4 @@ that were signed by a legitimate run of this repository's CI workflow can pass t
 | Date | Note |
 |---|---|
 | 2026-03-24 | Bug report created. Status: Root Cause Found |
+| 2026-03-25 | Fix applied. Status → Fix Applied |
