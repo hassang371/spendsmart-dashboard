@@ -10,6 +10,8 @@ node_modules/
 
 # Testing
 /coverage
+.coverage
+.coverage.*
 
 # Next.js
 /.next/
@@ -30,6 +32,9 @@ __pycache__/
 .backend.log
 .frontend.log
 .worker.log
+
+# Supabase
+supabase/.temp/
 
 # Misc
 .DS_Store
