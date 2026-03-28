@@ -322,6 +322,44 @@ export function buildCategoryBreakdown(
   }));
 }
 
+// ─── Top Merchants ───────────────────────────────────────────────────────────
+
+export interface MerchantSpend {
+  merchant: string;
+  amount: number;
+  /** Number of transactions with this merchant */
+  count: number;
+  /** 0–100, share of the top-N total */
+  pct: number;
+}
+
+/**
+ * Returns top merchants ranked by total expense spend.
+ * Falls back to `description` when `merchant_name` is blank.
+ * Caps at `maxMerchants`.
+ */
+export function buildTopMerchants(transactions: Transaction[], maxMerchants = 8): MerchantSpend[] {
+  const totals = new Map<string, { amount: number; count: number }>();
+  for (const tx of transactions) {
+    const amount = Number(tx.amount);
+    if (amount >= 0) continue;
+    const name = (tx.merchant_name || tx.description || 'Unknown').trim();
+    const existing = totals.get(name) ?? { amount: 0, count: 0 };
+    totals.set(name, { amount: existing.amount + Math.abs(amount), count: existing.count + 1 });
+  }
+  if (totals.size === 0) return [];
+  const sorted = Array.from(totals.entries())
+    .sort((a, b) => b[1].amount - a[1].amount)
+    .slice(0, maxMerchants);
+  const total = sorted.reduce((s, [, v]) => s + v.amount, 0);
+  return sorted.map(([merchant, { amount, count }]) => ({
+    merchant,
+    amount,
+    count,
+    pct: total > 0 ? (amount / total) * 100 : 0,
+  }));
+}
+
 // ─── Category Trend ──────────────────────────────────────────────────────────
 
 export interface CategoryTrendPoint {

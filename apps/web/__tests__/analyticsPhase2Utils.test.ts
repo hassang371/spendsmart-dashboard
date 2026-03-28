@@ -14,6 +14,7 @@ import {
   buildCategoryTrendSeries,
   buildMonthlyBarData,
   buildCategoryBreakdown,
+  buildTopMerchants,
 } from '../app/dashboard/analytics/components/analyticsUtils';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -428,5 +429,71 @@ describe('buildCategoryBreakdown', () => {
     const txns = [tx({ amount: -200, transaction_date: '2026-03-01', category: '' })];
     const result = buildCategoryBreakdown(txns);
     expect(result[0].category).toBe('Uncategorized');
+  });
+});
+
+// ─── buildTopMerchants ────────────────────────────────────────────────────────
+
+describe('buildTopMerchants', () => {
+  it('returns empty for empty transactions', () => {
+    expect(buildTopMerchants([])).toHaveLength(0);
+  });
+
+  it('ignores income (positive) transactions', () => {
+    const txns = [tx({ amount: 5000, transaction_date: '2026-03-01', merchant_name: 'Salary Co' })];
+    expect(buildTopMerchants(txns)).toHaveLength(0);
+  });
+
+  it('ranks merchants by total spend descending', () => {
+    const txns = [
+      tx({ amount: -100, transaction_date: '2026-03-01', merchant_name: 'Coffee Shop' }),
+      tx({ amount: -500, transaction_date: '2026-03-02', merchant_name: 'Amazon' }),
+      tx({ amount: -200, transaction_date: '2026-03-03', merchant_name: 'Swiggy' }),
+    ];
+    const result = buildTopMerchants(txns);
+    expect(result[0].merchant).toBe('Amazon');
+    expect(result[1].merchant).toBe('Swiggy');
+    expect(result[2].merchant).toBe('Coffee Shop');
+  });
+
+  it('accumulates multiple transactions for the same merchant', () => {
+    const txns = [
+      tx({ amount: -200, transaction_date: '2026-03-01', merchant_name: 'Swiggy' }),
+      tx({ amount: -300, transaction_date: '2026-03-02', merchant_name: 'Swiggy' }),
+    ];
+    const result = buildTopMerchants(txns);
+    expect(result[0].amount).toBe(500);
+    expect(result[0].count).toBe(2);
+  });
+
+  it('computes percentage of top-N total correctly', () => {
+    const txns = [
+      tx({ amount: -300, transaction_date: '2026-03-01', merchant_name: 'A' }),
+      tx({ amount: -700, transaction_date: '2026-03-02', merchant_name: 'B' }),
+    ];
+    const result = buildTopMerchants(txns);
+    expect(result[0].pct).toBeCloseTo(70, 1);
+    expect(result[1].pct).toBeCloseTo(30, 1);
+  });
+
+  it('falls back to description when merchant_name is blank', () => {
+    const txns = [
+      tx({
+        amount: -100,
+        transaction_date: '2026-03-01',
+        merchant_name: '',
+        description: 'UPI Txn',
+      }),
+    ];
+    const result = buildTopMerchants(txns);
+    expect(result[0].merchant).toBe('UPI Txn');
+  });
+
+  it('caps at maxMerchants', () => {
+    const txns = Array.from({ length: 10 }, (_, i) =>
+      tx({ amount: -(i + 1) * 100, transaction_date: '2026-03-01', merchant_name: `M${i}` })
+    );
+    const result = buildTopMerchants(txns, 5);
+    expect(result).toHaveLength(5);
   });
 });
