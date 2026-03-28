@@ -23,6 +23,59 @@ interface MonthOverMonthProps {
   isExpanded?: boolean;
 }
 
+interface TooltipPayloadEntry {
+  dataKey: string;
+  name: string;
+  value: number;
+  fill: string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadEntry[];
+  label?: string;
+}
+
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const income = payload.find(p => p.dataKey === 'income');
+  const expense = payload.find(p => p.dataKey === 'expense');
+  const net = (income?.value ?? 0) - (expense?.value ?? 0);
+  return (
+    <div className="rounded-xl border border-white/[0.1] bg-black/95 px-3.5 py-2.5 text-xs backdrop-blur-md shadow-2xl min-w-[160px]">
+      <p className="mb-2 font-bold text-white/50 tracking-wide">{label}</p>
+      {income && (
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="text-white/50">Income</span>
+          </div>
+          <span className="font-mono font-black text-emerald-400">
+            ₹{Math.round(income.value).toLocaleString('en-IN')}
+          </span>
+        </div>
+      )}
+      {expense && (
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-red-400" />
+            <span className="text-white/50">Expense</span>
+          </div>
+          <span className="font-mono font-black text-red-400">
+            ₹{Math.round(expense.value).toLocaleString('en-IN')}
+          </span>
+        </div>
+      )}
+      <div className="mt-2 border-t border-white/[0.06] pt-2 flex items-center justify-between gap-4">
+        <span className="text-white/30">Net</span>
+        <span className="font-mono font-black" style={{ color: net >= 0 ? '#10B981' : '#EF4444' }}>
+          {net >= 0 ? '+' : ''}₹{Math.round(Math.abs(net)).toLocaleString('en-IN')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function MonthOverMonth({ transactions, isExpanded = false }: MonthOverMonthProps) {
   const data = useMemo(
     () => buildMonthlyBarData(transactions, isExpanded ? 12 : 6),
@@ -78,24 +131,7 @@ export function MonthOverMonth({ transactions, isExpanded = false }: MonthOverMo
                 width={48}
               />
             )}
-            <Tooltip
-              cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-              contentStyle={{
-                backgroundColor: 'rgba(10,10,10,0.95)',
-                borderColor: 'rgba(255,255,255,0.08)',
-                borderRadius: '12px',
-                backdropFilter: 'blur(12px)',
-                fontSize: 12,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-              }}
-              labelStyle={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 4 }}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(value: unknown, name: any) => [
-                `₹${Number(value).toLocaleString('en-IN')}`,
-                name as string,
-              ]}
-              itemStyle={{ fontWeight: 700 }}
-            />
+            <Tooltip cursor={{ fill: 'rgba(255,255,255,0.03)' }} content={<CustomTooltip />} />
             {isExpanded && (
               <Legend
                 wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
