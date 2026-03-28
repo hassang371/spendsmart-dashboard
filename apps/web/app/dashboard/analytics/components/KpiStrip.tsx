@@ -46,8 +46,7 @@ function KpiCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: delay / 1000, duration: 0.5, ease: 'easeOut' }}
-      className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03] px-5 py-4 backdrop-blur-md"
-      style={{ boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.04)` }}
+      className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card px-5 py-4"
     >
       {/* Ambient glow behind number */}
       <div
