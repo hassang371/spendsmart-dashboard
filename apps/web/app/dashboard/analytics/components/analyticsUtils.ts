@@ -247,6 +247,45 @@ export function computeDowAverages(transactions: Transaction[]): DowAverage[] {
   }));
 }
 
+// ─── Month-over-Month Bar Data ───────────────────────────────────────────────
+
+export interface MonthlyBarPoint {
+  /** e.g. "Jan '26" */
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+/**
+ * Returns monthly income/expense/net aggregates, sorted chronologically.
+ * Caps at `maxMonths` most-recent months.
+ */
+export function buildMonthlyBarData(transactions: Transaction[], maxMonths = 6): MonthlyBarPoint[] {
+  const byMonth = new Map<string, { income: number; expense: number }>();
+  for (const tx of transactions) {
+    const amount = Number(tx.amount);
+    const d = new Date(tx.transaction_date);
+    if (isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!byMonth.has(key)) byMonth.set(key, { income: 0, expense: 0 });
+    const entry = byMonth.get(key)!;
+    if (amount > 0) entry.income += amount;
+    else if (amount < 0) entry.expense += Math.abs(amount);
+  }
+  if (byMonth.size === 0) return [];
+  const sortedKeys = Array.from(byMonth.keys()).sort().slice(-maxMonths);
+  return sortedKeys.map(key => {
+    const [year, month] = key.split('-').map(Number);
+    const label = new Date(year, month - 1, 1).toLocaleDateString('en-US', {
+      month: 'short',
+      year: '2-digit',
+    });
+    const { income, expense } = byMonth.get(key)!;
+    return { month: label, income, expense, net: income - expense };
+  });
+}
+
 // ─── Category Trend ──────────────────────────────────────────────────────────
 
 export interface CategoryTrendPoint {

@@ -27,11 +27,8 @@ interface MonthlyComparisonProps {
 
 export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyComparisonProps) {
   const chartData = useMemo(() => {
-    // Process transactions into chronological buckets
     if (!transactions || transactions.length === 0) return [];
 
-    // Grouping by date string "YYYY-MM-DD" or similar basis depending on spread.
-    // For simplicity and a smooth area chart, we'll sort chronologically and group by day.
     const grouped = new Map<
       string,
       { dateStr: string; timestamp: number; income: number; expense: number }
@@ -73,6 +70,30 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
       }));
   }, [transactions]);
 
+  // Monthly regime computation for expanded Regime Shift strip
+  const monthlyRegime = useMemo(() => {
+    if (!isExpanded || !transactions.length) return [];
+    const byMonth = new Map<string, { income: number; expense: number }>();
+    transactions.forEach(tx => {
+      const d = new Date(tx.transaction_date);
+      if (isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!byMonth.has(key)) byMonth.set(key, { income: 0, expense: 0 });
+      const entry = byMonth.get(key)!;
+      const amount = Number(tx.amount);
+      if (amount > 0) entry.income += amount;
+      else if (amount < 0) entry.expense += Math.abs(amount);
+    });
+    return Array.from(byMonth.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([key, { income, expense }]) => {
+        const [year, month] = key.split('-').map(Number);
+        const label = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'short' });
+        return { label, regime: income >= expense ? ('saving' as const) : ('spending' as const) };
+      });
+  }, [transactions, isExpanded]);
+
   if (chartData.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -85,7 +106,7 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-full w-full flex-col relative"
+      className="flex h-full w-full flex-col relative min-h-0"
     >
       {/* Chart Canvas */}
       <div className={`${isExpanded ? 'flex-1 min-h-0' : 'h-[300px]'} w-full relative pt-4`}>
@@ -130,6 +151,7 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
                 border: '1px solid hsl(var(--border))',
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
               }}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
             />
             <Area
@@ -153,6 +175,34 @@ export function MonthlyComparison({ transactions, isExpanded = false }: MonthlyC
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Regime Shift strip — expanded only */}
+      {isExpanded && monthlyRegime.length > 0 && (
+        <div className="px-4 pb-4 pt-3 border-t border-white/[0.04]">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2">
+            Regime Shifts
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {monthlyRegime.map(({ label, regime }) => (
+              <div
+                key={label}
+                className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                  regime === 'saving'
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-red-500/10 text-red-400'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    regime === 'saving' ? 'bg-emerald-400' : 'bg-red-400'
+                  }`}
+                />
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -9,13 +9,13 @@ import { accountsApi, type Transaction } from '../../../lib/api/client';
 
 import { MonthlyComparison } from './components/MonthlyComparison';
 import { SubscriptionLeakageRadar } from './components/SubscriptionLeakageRadar';
-import { CategoryDistribution } from './components/CategoryDistribution';
-import { MerchantLeaderboard } from './components/MerchantLeaderboard';
 import { AnalyticsEmptyState } from './components/AnalyticsEmptyState';
 import { KpiStrip } from './components/KpiStrip';
 import { SpendHeatmap } from './components/SpendHeatmap';
 import { DayOfWeekPattern } from './components/DayOfWeekPattern';
 import { CategoryTrend } from './components/CategoryTrend';
+import { SavingsRateGauge } from './components/SavingsRateGauge';
+import { MonthOverMonth } from './components/MonthOverMonth';
 import { ExpandableCard } from '../../../components/ui/ExpandableCard';
 import { getCachedData, setCachedData } from '../../../lib/utils/cache';
 
@@ -403,27 +403,27 @@ function AnalyticsContent() {
           </ExpandableCard>
         </motion.div>
 
-        {/* Row 4: Category Distribution | Merchant Leaderboard */}
+        {/* Row 4: Savings Rate Gauge | Month-over-Month */}
         <motion.div variants={itemVariants} className="lg:col-span-2">
           <ExpandableCard
-            id="categories"
-            title="Category Distribution"
+            id="savings-gauge"
+            title="Savings Rate"
             className="h-[320px] lg:h-[400px] min-h-[320px]"
           >
             {({ isExpanded }) => (
-              <CategoryDistribution transactions={filteredTransactions} isExpanded={isExpanded} />
+              <SavingsRateGauge transactions={filteredTransactions} isExpanded={isExpanded} />
             )}
           </ExpandableCard>
         </motion.div>
 
         <motion.div variants={itemVariants} className="lg:col-span-2">
           <ExpandableCard
-            id="merchants"
-            title="Merchant Leaderboard"
+            id="month-over-month"
+            title="Month-over-Month"
             className="h-[320px] lg:h-[400px] min-h-[320px]"
           >
             {({ isExpanded }) => (
-              <MerchantLeaderboard transactions={filteredTransactions} isExpanded={isExpanded} />
+              <MonthOverMonth transactions={filteredTransactions} isExpanded={isExpanded} />
             )}
           </ExpandableCard>
         </motion.div>
