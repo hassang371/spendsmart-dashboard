@@ -36,12 +36,15 @@ interface TooltipState {
 export function SpendHeatmap({ transactions, isExpanded = false }: SpendHeatmapProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const update = () => setContainerWidth(el.getBoundingClientRect().width);
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setContainerSize({ width: rect.width, height: rect.height });
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -51,13 +54,15 @@ export function SpendHeatmap({ transactions, isExpanded = false }: SpendHeatmapP
   const maxWeeks = isExpanded ? 52 : 26;
   const grid = useMemo(() => buildHeatmapGrid(transactions, maxWeeks), [transactions, maxWeeks]);
 
-  // Compute cell size from container width so cells always fill available space
+  // Compute cell size from both container width and height so SVG always fits
   const weeks = grid.weeks || 1;
-  const rawCellSize =
-    containerWidth > 0
-      ? Math.floor((containerWidth - LABEL_W - CELL_GAP * (weeks + 1)) / weeks)
+  const cellFromWidth =
+    containerSize.width > 0
+      ? Math.floor((containerSize.width - LABEL_W - CELL_GAP * (weeks + 1)) / weeks)
       : 14;
-  const cellSize = Math.max(8, rawCellSize);
+  const cellFromHeight =
+    containerSize.height > 0 ? Math.floor((containerSize.height - LABEL_H - CELL_GAP * 8) / 7) : 14;
+  const cellSize = Math.max(8, Math.min(cellFromWidth, cellFromHeight));
   const step = cellSize + CELL_GAP;
   const svgWidth = LABEL_W + weeks * step;
   const svgHeight = LABEL_H + 7 * step;
@@ -86,7 +91,7 @@ export function SpendHeatmap({ transactions, isExpanded = false }: SpendHeatmapP
 
       {/* SVG container — fills full width via ref */}
       <div ref={containerRef} className="flex-1 min-h-0 w-full px-4">
-        {containerWidth > 0 && (
+        {containerSize.width > 0 && (
           <svg
             width={svgWidth}
             height={svgHeight}

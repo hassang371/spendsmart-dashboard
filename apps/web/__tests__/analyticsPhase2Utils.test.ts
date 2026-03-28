@@ -12,6 +12,7 @@ import {
   buildHeatmapGrid,
   computeDowAverages,
   buildCategoryTrendSeries,
+  buildMonthlyBarData,
 } from '../app/dashboard/analytics/components/analyticsUtils';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -315,5 +316,67 @@ describe('buildCategoryTrendSeries', () => {
     const txns = [tx({ amount: 5000, transaction_date: '2026-03-01', category: 'Salary' })];
     const result = buildCategoryTrendSeries(txns);
     expect(result.data).toHaveLength(0);
+  });
+});
+
+// ─── buildMonthlyBarData ──────────────────────────────────────────────────────
+
+describe('buildMonthlyBarData', () => {
+  it('returns empty for empty transactions', () => {
+    expect(buildMonthlyBarData([])).toHaveLength(0);
+  });
+
+  it('produces one point per distinct month sorted chronologically', () => {
+    const txns = [
+      tx({ amount: -100, transaction_date: '2026-01-10' }),
+      tx({ amount: -200, transaction_date: '2026-03-05' }),
+      tx({ amount: -150, transaction_date: '2026-02-15' }),
+    ];
+    const result = buildMonthlyBarData(txns);
+    expect(result).toHaveLength(3);
+    expect(result[0].month).toMatch(/Jan/);
+    expect(result[1].month).toMatch(/Feb/);
+    expect(result[2].month).toMatch(/Mar/);
+  });
+
+  it('correctly sums income and expense per month', () => {
+    const txns = [
+      tx({ amount: 10000, transaction_date: '2026-03-01' }),
+      tx({ amount: -3000, transaction_date: '2026-03-10' }),
+      tx({ amount: -2000, transaction_date: '2026-03-20' }),
+    ];
+    const result = buildMonthlyBarData(txns);
+    expect(result).toHaveLength(1);
+    expect(result[0].income).toBe(10000);
+    expect(result[0].expense).toBe(5000);
+    expect(result[0].net).toBe(5000);
+  });
+
+  it('computes negative net when expense exceeds income', () => {
+    const txns = [
+      tx({ amount: 1000, transaction_date: '2026-03-01' }),
+      tx({ amount: -5000, transaction_date: '2026-03-10' }),
+    ];
+    const result = buildMonthlyBarData(txns);
+    expect(result[0].net).toBe(-4000);
+  });
+
+  it('caps to maxMonths most-recent months', () => {
+    const txns = ['2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07'].map(
+      m => tx({ amount: -100, transaction_date: `${m}-01` })
+    );
+    const result = buildMonthlyBarData(txns, 3);
+    expect(result).toHaveLength(3);
+    expect(result[0].month).toMatch(/May/);
+    expect(result[2].month).toMatch(/Jul/);
+  });
+
+  it('ignores transactions with invalid dates', () => {
+    const txns = [
+      tx({ amount: -100, transaction_date: 'invalid-date' }),
+      tx({ amount: -200, transaction_date: '2026-03-01' }),
+    ];
+    const result = buildMonthlyBarData(txns);
+    expect(result).toHaveLength(1);
   });
 });
