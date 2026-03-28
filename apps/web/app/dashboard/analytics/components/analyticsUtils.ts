@@ -286,6 +286,42 @@ export function buildMonthlyBarData(transactions: Transaction[], maxMonths = 6):
   });
 }
 
+// ─── Category Breakdown (ranked totals for the current period) ───────────────
+
+export interface CategoryBreakdownItem {
+  category: string;
+  amount: number;
+  /** 0–100, share of total expense */
+  pct: number;
+}
+
+/**
+ * Returns top categories ranked by total expense for the given transactions.
+ * Ignores income. Caps at `maxCategories`.
+ */
+export function buildCategoryBreakdown(
+  transactions: Transaction[],
+  maxCategories = 8
+): CategoryBreakdownItem[] {
+  const totals = new Map<string, number>();
+  for (const tx of transactions) {
+    const amount = Number(tx.amount);
+    if (amount >= 0) continue;
+    const cat = tx.category || 'Uncategorized';
+    totals.set(cat, (totals.get(cat) ?? 0) + Math.abs(amount));
+  }
+  if (totals.size === 0) return [];
+  const sorted = Array.from(totals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxCategories);
+  const total = sorted.reduce((s, [, v]) => s + v, 0);
+  return sorted.map(([category, amount]) => ({
+    category,
+    amount,
+    pct: total > 0 ? (amount / total) * 100 : 0,
+  }));
+}
+
 // ─── Category Trend ──────────────────────────────────────────────────────────
 
 export interface CategoryTrendPoint {

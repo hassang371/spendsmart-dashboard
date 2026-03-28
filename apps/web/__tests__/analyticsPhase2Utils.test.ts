@@ -13,6 +13,7 @@ import {
   computeDowAverages,
   buildCategoryTrendSeries,
   buildMonthlyBarData,
+  buildCategoryBreakdown,
 } from '../app/dashboard/analytics/components/analyticsUtils';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -378,5 +379,54 @@ describe('buildMonthlyBarData', () => {
     ];
     const result = buildMonthlyBarData(txns);
     expect(result).toHaveLength(1);
+  });
+});
+
+// ─── buildCategoryBreakdown ───────────────────────────────────────────────────
+
+describe('buildCategoryBreakdown', () => {
+  it('returns empty for empty transactions', () => {
+    expect(buildCategoryBreakdown([])).toHaveLength(0);
+  });
+
+  it('returns empty when all transactions are income', () => {
+    const txns = [tx({ amount: 5000, transaction_date: '2026-03-01', category: 'Salary' })];
+    expect(buildCategoryBreakdown(txns)).toHaveLength(0);
+  });
+
+  it('ranks categories by total spend descending', () => {
+    const txns = [
+      tx({ amount: -100, transaction_date: '2026-03-01', category: 'Food' }),
+      tx({ amount: -500, transaction_date: '2026-03-02', category: 'Rent' }),
+      tx({ amount: -200, transaction_date: '2026-03-03', category: 'Transport' }),
+    ];
+    const result = buildCategoryBreakdown(txns);
+    expect(result[0].category).toBe('Rent');
+    expect(result[1].category).toBe('Transport');
+    expect(result[2].category).toBe('Food');
+  });
+
+  it('computes percentage of total correctly', () => {
+    const txns = [
+      tx({ amount: -300, transaction_date: '2026-03-01', category: 'Food' }),
+      tx({ amount: -700, transaction_date: '2026-03-02', category: 'Rent' }),
+    ];
+    const result = buildCategoryBreakdown(txns);
+    expect(result[0].pct).toBeCloseTo(70, 1);
+    expect(result[1].pct).toBeCloseTo(30, 1);
+  });
+
+  it('caps at maxCategories', () => {
+    const txns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].map((cat, i) =>
+      tx({ amount: -(i + 1) * 100, transaction_date: '2026-03-01', category: cat })
+    );
+    const result = buildCategoryBreakdown(txns, 5);
+    expect(result).toHaveLength(5);
+  });
+
+  it('uses Uncategorized for transactions with no category', () => {
+    const txns = [tx({ amount: -200, transaction_date: '2026-03-01', category: '' })];
+    const result = buildCategoryBreakdown(txns);
+    expect(result[0].category).toBe('Uncategorized');
   });
 });

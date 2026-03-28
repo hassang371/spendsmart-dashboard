@@ -9,7 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  ReferenceLine,
+  CartesianGrid,
+  Cell,
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { BarChart2 } from 'lucide-react';
@@ -17,6 +18,7 @@ import { type Transaction } from '../../../../lib/api/client';
 import { buildMonthlyBarData } from './analyticsUtils';
 
 interface MonthOverMonthProps {
+  /** Pass the full unfiltered transaction set so the chart always shows historical months. */
   transactions: Transaction[];
   isExpanded?: boolean;
 }
@@ -46,7 +48,9 @@ export function MonthOverMonth({ transactions, isExpanded = false }: MonthOverMo
         <p className="text-xs font-semibold uppercase tracking-widest text-white/40">
           Month-over-Month
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Income vs Expenses by month</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Historical income vs expenses — last {isExpanded ? 12 : 6} months
+        </p>
       </div>
 
       <div className={`flex-1 min-h-0 w-full ${isExpanded ? 'px-4 pb-6' : 'px-2 pb-3'}`}>
@@ -55,8 +59,10 @@ export function MonthOverMonth({ transactions, isExpanded = false }: MonthOverMo
             data={data}
             margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
             barGap={3}
-            barCategoryGap="25%"
+            barCategoryGap="28%"
+            style={{ background: 'transparent' }}
           >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
             <XAxis
               dataKey="month"
               tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }}
@@ -73,15 +79,22 @@ export function MonthOverMonth({ transactions, isExpanded = false }: MonthOverMo
               />
             )}
             <Tooltip
+              cursor={{ fill: 'rgba(255,255,255,0.03)' }}
               contentStyle={{
-                backgroundColor: 'rgba(0,0,0,0.85)',
+                backgroundColor: 'rgba(10,10,10,0.95)',
                 borderColor: 'rgba(255,255,255,0.08)',
                 borderRadius: '12px',
                 backdropFilter: 'blur(12px)',
                 fontSize: 12,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
               }}
-              formatter={(value: unknown) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
-              itemStyle={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}
+              labelStyle={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 4 }}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              formatter={(value: unknown, name: any) => [
+                `₹${Number(value).toLocaleString('en-IN')}`,
+                name as string,
+              ]}
+              itemStyle={{ fontWeight: 700 }}
             />
             {isExpanded && (
               <Legend
@@ -91,21 +104,16 @@ export function MonthOverMonth({ transactions, isExpanded = false }: MonthOverMo
                 )}
               />
             )}
-            <ReferenceLine y={0} stroke="rgba(255,255,255,0.08)" />
-            <Bar
-              dataKey="income"
-              name="Income"
-              fill="#10B981"
-              radius={[3, 3, 0, 0]}
-              opacity={0.9}
-            />
-            <Bar
-              dataKey="expense"
-              name="Expense"
-              fill="#EF4444"
-              radius={[3, 3, 0, 0]}
-              opacity={0.9}
-            />
+            <Bar dataKey="income" name="Income" radius={[3, 3, 0, 0]} background={false}>
+              {data.map((_, i) => (
+                <Cell key={i} fill="#10B981" fillOpacity={0.9} />
+              ))}
+            </Bar>
+            <Bar dataKey="expense" name="Expense" radius={[3, 3, 0, 0]} background={false}>
+              {data.map((_, i) => (
+                <Cell key={i} fill="#EF4444" fillOpacity={0.9} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
