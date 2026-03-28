@@ -8,10 +8,14 @@ import { supabase } from '../../../lib/supabase/client';
 import { accountsApi, type Transaction } from '../../../lib/api/client';
 
 import { MonthlyComparison } from './components/MonthlyComparison';
-import { SubscriptionRadar } from './components/SubscriptionRadar';
+import { SubscriptionLeakageRadar } from './components/SubscriptionLeakageRadar';
 import { CategoryDistribution } from './components/CategoryDistribution';
 import { MerchantLeaderboard } from './components/MerchantLeaderboard';
 import { AnalyticsEmptyState } from './components/AnalyticsEmptyState';
+import { KpiStrip } from './components/KpiStrip';
+import { SpendHeatmap } from './components/SpendHeatmap';
+import { DayOfWeekPattern } from './components/DayOfWeekPattern';
+import { CategoryTrend } from './components/CategoryTrend';
 import { ExpandableCard } from '../../../components/ui/ExpandableCard';
 import { getCachedData, setCachedData } from '../../../lib/utils/cache';
 
@@ -321,8 +325,14 @@ function AnalyticsContent() {
         </motion.div>
       </div>
 
+      {/* Row 0: KPI Strip */}
+      <motion.div variants={itemVariants}>
+        <KpiStrip transactions={filteredTransactions} />
+      </motion.div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 auto-rows-[minmax(320px,auto)]">
-        <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
+        {/* Row 1: Income vs Expense | Subscription Radar */}
+        <motion.div variants={itemVariants} className="lg:col-span-2">
           <ExpandableCard
             id="income-expense"
             title="Income vs Expense"
@@ -340,19 +350,61 @@ function AnalyticsContent() {
           </ExpandableCard>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
+        <motion.div variants={itemVariants} className="lg:col-span-2">
           <ExpandableCard
-            id="subscriptions"
-            title="Subscription Radial"
-            className="h-[320px] lg:h-[400px] min-h-[320px]"
+            id="subscription-radar"
+            title="Subscription Leakage"
+            className="h-[360px] lg:h-[400px] min-h-[360px]"
           >
             {({ isExpanded }) => (
-              <SubscriptionRadar transactions={filteredTransactions} isExpanded={isExpanded} />
+              <SubscriptionLeakageRadar
+                transactions={filteredTransactions}
+                isExpanded={isExpanded}
+              />
             )}
           </ExpandableCard>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
+        {/* Row 2: Category Trend (3/4) | Day of Week (1/4) */}
+        <motion.div variants={itemVariants} className="lg:col-span-3">
+          <ExpandableCard
+            id="category-trend"
+            title="Category Trend"
+            className="h-[320px] lg:h-[380px] min-h-[320px]"
+          >
+            {({ isExpanded }) => (
+              <CategoryTrend transactions={filteredTransactions} isExpanded={isExpanded} />
+            )}
+          </ExpandableCard>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="lg:col-span-1">
+          <ExpandableCard
+            id="day-of-week"
+            title="Day of Week"
+            className="h-[320px] lg:h-[380px] min-h-[320px]"
+          >
+            {({ isExpanded }) => (
+              <DayOfWeekPattern transactions={filteredTransactions} isExpanded={isExpanded} />
+            )}
+          </ExpandableCard>
+        </motion.div>
+
+        {/* Row 3: Spend Heatmap (full width) */}
+        <motion.div variants={itemVariants} className="lg:col-span-4">
+          <ExpandableCard
+            id="spend-heatmap"
+            title="Spend Heatmap"
+            className="h-[220px] lg:h-[240px] min-h-[220px]"
+          >
+            {({ isExpanded }) => (
+              <SpendHeatmap transactions={filteredTransactions} isExpanded={isExpanded} />
+            )}
+          </ExpandableCard>
+        </motion.div>
+
+        {/* Row 4: Category Distribution | Merchant Leaderboard */}
+        <motion.div variants={itemVariants} className="lg:col-span-2">
           <ExpandableCard
             id="categories"
             title="Category Distribution"
@@ -364,7 +416,7 @@ function AnalyticsContent() {
           </ExpandableCard>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="lg:col-span-2 lg:row-span-1">
+        <motion.div variants={itemVariants} className="lg:col-span-2">
           <ExpandableCard
             id="merchants"
             title="Merchant Leaderboard"
