@@ -36,6 +36,15 @@ export function CategoryTrend({ transactions, isExpanded = false }: CategoryTren
     );
   }
 
+  if (data.length < 2) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+        <LineChart className="h-8 w-8 opacity-20" />
+        <p className="text-sm">Select a wider time range to see trends over time.</p>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}

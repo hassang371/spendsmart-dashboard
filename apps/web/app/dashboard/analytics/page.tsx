@@ -14,7 +14,7 @@ import { KpiStrip } from './components/KpiStrip';
 import { SpendHeatmap } from './components/SpendHeatmap';
 import { DayOfWeekPattern } from './components/DayOfWeekPattern';
 import { CategoryTrend } from './components/CategoryTrend';
-import { SavingsRateGauge } from './components/SavingsRateGauge';
+import { CategoryBreakdown } from './components/CategoryBreakdown';
 import { MonthOverMonth } from './components/MonthOverMonth';
 import { ExpandableCard } from '../../../components/ui/ExpandableCard';
 import { getCachedData, setCachedData } from '../../../lib/utils/cache';
@@ -403,15 +403,15 @@ function AnalyticsContent() {
           </ExpandableCard>
         </motion.div>
 
-        {/* Row 4: Savings Rate Gauge | Month-over-Month */}
+        {/* Row 4: Category Breakdown | Month-over-Month (always historical, ignores filter) */}
         <motion.div variants={itemVariants} className="lg:col-span-2">
           <ExpandableCard
-            id="savings-gauge"
-            title="Savings Rate"
+            id="category-breakdown"
+            title="Top Spending Categories"
             className="h-[320px] lg:h-[400px] min-h-[320px]"
           >
             {({ isExpanded }) => (
-              <SavingsRateGauge transactions={filteredTransactions} isExpanded={isExpanded} />
+              <CategoryBreakdown transactions={filteredTransactions} isExpanded={isExpanded} />
             )}
           </ExpandableCard>
         </motion.div>
@@ -423,7 +423,7 @@ function AnalyticsContent() {
             className="h-[320px] lg:h-[400px] min-h-[320px]"
           >
             {({ isExpanded }) => (
-              <MonthOverMonth transactions={filteredTransactions} isExpanded={isExpanded} />
+              <MonthOverMonth transactions={transactions} isExpanded={isExpanded} />
             )}
           </ExpandableCard>
         </motion.div>
