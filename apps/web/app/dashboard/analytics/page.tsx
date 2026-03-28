@@ -395,7 +395,7 @@ function AnalyticsContent() {
           <ExpandableCard
             id="spend-heatmap"
             title="Spend Heatmap"
-            className="h-[220px] lg:h-[240px] min-h-[220px]"
+            className="h-[300px] lg:h-[320px] min-h-[300px]"
           >
             {({ isExpanded }) => (
               <SpendHeatmap transactions={filteredTransactions} isExpanded={isExpanded} />

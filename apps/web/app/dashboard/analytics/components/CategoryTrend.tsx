@@ -36,49 +36,6 @@ export function CategoryTrend({ transactions, isExpanded = false }: CategoryTren
     );
   }
 
-  // Single month fallback
-  if (data.length < 2) {
-    const point = data[0];
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex h-full flex-col items-center justify-center gap-4 px-6"
-      >
-        <p className="text-xs font-semibold uppercase tracking-widest text-white/40">
-          Category Trend ({point.month})
-        </p>
-        <div className="w-full flex flex-col gap-2">
-          {categories.map((cat, i) => {
-            const val = Number(point[cat] ?? 0);
-            const max = Math.max(...categories.map(c => Number(point[c] ?? 0)), 1);
-            return (
-              <div key={cat} className="flex items-center gap-3">
-                <span className="w-20 text-xs text-white/50 truncate">{cat}</span>
-                <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(val / max) * 100}%`,
-                      background: TREND_COLORS[i % TREND_COLORS.length],
-                    }}
-                  />
-                </div>
-                <span
-                  className="w-20 text-right font-mono text-xs font-bold"
-                  style={{ color: TREND_COLORS[i % TREND_COLORS.length] }}
-                >
-                  ₹{Math.round(val).toLocaleString('en-IN')}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-xs text-white/20">Add more months of data for trend view</p>
-      </motion.div>
-    );
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
