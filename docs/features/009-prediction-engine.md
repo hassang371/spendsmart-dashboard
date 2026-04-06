@@ -71,7 +71,7 @@ sequenceDiagram
     participant W as 📬 Polling Worker
     participant S3 as 🗄️ Storage
 
-    U->>API: POST /forecast/predict (or GET with DB lookup)
+    U->>API: POST /forecast/predict (CSV) or GET /forecast/predict (DB)
     API->>SVC: predict(user_id, transactions)
     SVC->>DB: fetch training_jobs for user
 
@@ -187,6 +187,7 @@ class TrainRequest(BaseModel):
 
 class TrainStatusResponse(BaseModel):
     status: str                        # "no_model" | "pending" | "running" | "completed" | "failed"
+    # API mapping: claimed/processing -> "running", no training_jobs row -> "no_model"
     last_trained: str | None
     checkpoint_path: str | None
     training_days: int | None          # Days of data used
@@ -201,7 +202,9 @@ No new tables. Existing `training_jobs` table is used.
 ```
 pending -> claimed -> processing -> completed
 pending -> processing -> completed    (direct claim)
-processing -> failed
+pending -> failed                     (validation/data error)
+claimed -> failed                     (pre-processing failure)
+processing -> failed                  (training error)
 failed -> pending                     (retry)
 ```
 
@@ -336,7 +339,7 @@ Chronos-2-Small (28M params) is loaded as a **singleton** at API startup. The mo
 
 - **Integration tests:**
   - `test_forecast_api.py`: Full request cycle through API -> service -> engine -> response
-  - `test_training_task.py`: Celery task creates job, trains, saves checkpoint, updates DB
+  - `test_training_task.py`: Training job is polled, trains model, saves checkpoint, updates DB status
 
 - **Edge case tests:**
   - Insufficient data returns appropriate error

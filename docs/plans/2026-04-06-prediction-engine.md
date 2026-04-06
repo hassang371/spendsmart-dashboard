@@ -279,7 +279,31 @@ def extract_variable_importance(
         return None
 ```
 
-- [ ] **Step 3: Update `test_trainer.py` imports**
+- [ ] **Step 3: Update `apps/worker/main.py` imports**
+
+In `apps/worker/main.py`, change lines 41-46 from:
+
+```python
+    from packages.forecasting.trainer import (
+        fetch_user_transactions,
+        prepare_training_data,
+        run_training,
+        save_checkpoint_to_supabase,
+    )
+```
+
+To:
+
+```python
+    from packages.forecasting.dataset import prepare_training_data
+    from packages.forecasting.trainer import (
+        fetch_user_transactions,
+        run_training,
+        save_checkpoint_to_supabase,
+    )
+```
+
+- [ ] **Step 4: Update `test_trainer.py` imports**
 
 In `packages/forecasting/tests/test_trainer.py`, change lines 4-7 from:
 
@@ -297,20 +321,24 @@ from packages.forecasting.dataset import _detect_paydays as detect_paydays
 from packages.forecasting.dataset import prepare_training_data
 ```
 
-- [ ] **Step 4: Run all forecasting tests**
+- [ ] **Step 5: Run all forecasting tests + worker smoke test**
 
 Run: `.venv/bin/python -m pytest packages/forecasting/tests/ -v`
 Expected: ALL PASS
 
-- [ ] **Step 5: Commit**
+Run: `.venv/bin/python -c "from apps.worker.main import train_model; print('import OK')"`
+Expected: Prints "import OK" (no ImportError)
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add packages/forecasting/inference.py packages/forecasting/tests/test_trainer.py
+git add packages/forecasting/inference.py packages/forecasting/tests/test_trainer.py apps/worker/main.py
 git commit -m "refactor: update imports after prepare_training_data consolidation
 
-Updates inference.py and test_trainer.py to import from dataset.py
-instead of trainer.py. Adds extract_variable_importance() to
-inference.py using proper DataLoader construction.
+Updates inference.py, test_trainer.py, and apps/worker/main.py to
+import prepare_training_data from dataset.py instead of trainer.py.
+Adds extract_variable_importance() to inference.py using proper
+DataLoader construction.
 
 Refs: docs/features/009-prediction-engine.md"
 ```
