@@ -80,15 +80,15 @@ def test_prepare_training_data_includes_payday_detection():
 
 def test_prepare_training_data_rejects_short_history():
     """prepare_training_data should raise ValueError if < 90 days."""
+    import pytest
+
+    from packages.forecasting.dataset import prepare_training_data
+
     dates = pd.date_range("2026-01-01", periods=30, freq="D")
     amounts = [-50.0] * 30
     df = pd.DataFrame({"date": dates, "amount": amounts})
 
-    import pytest
-
     with pytest.raises(ValueError, match="Insufficient data"):
-        from packages.forecasting.dataset import prepare_training_data
-
         prepare_training_data(df, min_days=90)
 ```
 
@@ -205,6 +205,112 @@ git commit -m "refactor: consolidate prepare_training_data into dataset.py
 Removes duplication between dataset.py and trainer.py. The canonical
 prepare_training_data now lives in dataset.py with payday detection,
 min_days validation, and month feature support.
+
+Refs: docs/features/009-prediction-engine.md"
+```
+
+---
+
+### Task 1.5: Update `inference.py` and `test_trainer.py` imports after consolidation
+
+**Why:** Task 1 moved `prepare_training_data` and `detect_paydays` to `dataset.py`. Files that import from `trainer.py` must be updated or they'll break.
+
+**Files:**
+- Modify: `packages/forecasting/inference.py:16-19`
+- Modify: `packages/forecasting/tests/test_trainer.py:4-7`
+
+- [ ] **Step 1: Update `inference.py` imports**
+
+In `packages/forecasting/inference.py`, change lines 16-19 from:
+
+```python
+from packages.forecasting.trainer import (
+    MAX_ENCODER_LENGTH,
+    prepare_training_data,
+)
+```
+
+To:
+
+```python
+from packages.forecasting.dataset import prepare_training_data
+from packages.forecasting.trainer import MAX_ENCODER_LENGTH
+```
+
+- [ ] **Step 2: Add `extract_variable_importance` to `inference.py`**
+
+Add to `packages/forecasting/inference.py`:
+
+```python
+def extract_variable_importance(
+    model: TemporalFusionTransformer,
+    df: pd.DataFrame,
+) -> list[dict[str, float]] | None:
+    """Extract variable importance from TFT model using interpret_output.
+
+    Returns list of {"feature": name, "weight": float} or None on failure.
+    """
+    try:
+        history_df = prepare_training_data(df)
+        if len(history_df) < MAX_ENCODER_LENGTH:
+            return None
+
+        # Rebuild reference dataset from model's saved parameters
+        params = model.dataset_parameters
+        from packages.forecasting.dataset import create_timeseries_dataset
+
+        reference_ds = create_timeseries_dataset(
+            history_df,
+            max_encoder_length=params.get("max_encoder_length", MAX_ENCODER_LENGTH),
+            max_prediction_length=params.get("max_prediction_length", 30),
+        )
+        pred_dl = reference_ds.to_dataloader(train=False, batch_size=64, num_workers=0)
+
+        raw_predictions = model.predict(pred_dl, mode="raw", return_x=True)
+        interpretation = model.interpret_output(raw_predictions, reduction="sum")
+
+        weights = interpretation.get("encoder_variables", {})
+        return [
+            {"feature": k, "weight": round(float(v), 4)}
+            for k, v in weights.items()
+        ]
+    except Exception as e:
+        logger.warning(f"Variable importance extraction failed: {e}")
+        return None
+```
+
+- [ ] **Step 3: Update `test_trainer.py` imports**
+
+In `packages/forecasting/tests/test_trainer.py`, change lines 4-7 from:
+
+```python
+from packages.forecasting.trainer import (
+    detect_paydays,
+    prepare_training_data,
+)
+```
+
+To:
+
+```python
+from packages.forecasting.dataset import _detect_paydays as detect_paydays
+from packages.forecasting.dataset import prepare_training_data
+```
+
+- [ ] **Step 4: Run all forecasting tests**
+
+Run: `.venv/bin/python -m pytest packages/forecasting/tests/ -v`
+Expected: ALL PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/forecasting/inference.py packages/forecasting/tests/test_trainer.py
+git commit -m "refactor: update imports after prepare_training_data consolidation
+
+Updates inference.py and test_trainer.py to import from dataset.py
+instead of trainer.py. Adds extract_variable_importance() to
+inference.py using proper DataLoader construction.
 
 Refs: docs/features/009-prediction-engine.md"
 ```
@@ -340,7 +446,7 @@ Expected: ALL PASS
 
 ```bash
 git add packages/forecasting/tft_model.py packages/forecasting/trainer.py packages/forecasting/tests/
-git commit -m "feat: upgrade TFT model hyperparameters
+git commit -m "refactor: upgrade TFT model hyperparameters
 
 hidden_size 16->64, attention_heads 1->4, lstm_layers 1->2,
 hidden_continuous_size 8->32, learning_rate 0.01->3e-4,
@@ -464,8 +570,8 @@ from chronos import ChronosPipeline
 
 logger = logging.getLogger(__name__)
 
-# Singleton: loaded once, reused across requests
-_PIPELINE: ChronosPipeline | None = None
+# Singleton engine: loaded once, reused across requests
+_ENGINE: "ChronosEngine | None" = None
 
 
 class ChronosEngine:
@@ -553,11 +659,10 @@ class ChronosEngine:
 
 def get_chronos_engine() -> ChronosEngine:
     """Returns a singleton ChronosEngine instance."""
-    global _PIPELINE
-    engine = ChronosEngine()
-    if _PIPELINE is not None:
-        engine._pipeline = _PIPELINE
-    return engine
+    global _ENGINE
+    if _ENGINE is None:
+        _ENGINE = ChronosEngine()
+    return _ENGINE
 ```
 
 - [ ] **Step 5: Run tests to verify they pass**
@@ -1096,7 +1201,7 @@ from apps.api.domains.forecasting.schemas import (
 from packages.forecasting.chronos_engine import get_chronos_engine
 from packages.forecasting.dataset import TransactionLoader, prepare_training_data
 from packages.forecasting.ensemble import ensemble_forecasts
-from packages.forecasting.inference import load_model, predict_with_tft
+from packages.forecasting.inference import extract_variable_importance, load_model, predict_with_tft
 
 logger = logging.getLogger(__name__)
 
@@ -1147,8 +1252,13 @@ class ForecastService:
                 logger.warning(f"TFT inference failed: {tft_result['error']}")
                 return self._build_response(chronos_result, confidence)
 
-            # Extract variable importance if available
-            var_importance = self._extract_variable_importance(tft_model, transactions_df)
+            # Extract variable importance if available (delegates to inference.py)
+            raw_importance = extract_variable_importance(tft_model, transactions_df)
+            var_importance = (
+                [VariableImportance(**vi) for vi in raw_importance]
+                if raw_importance
+                else None
+            )
 
             combined = ensemble_forecasts(tft_result, chronos_result)
             combined["variable_importance"] = var_importance
@@ -1216,22 +1326,6 @@ class ForecastService:
             self.trigger_training(user_id, force=False)
         except Exception as e:
             logger.warning(f"Failed to trigger training for {user_id}: {e}")
-
-    def _extract_variable_importance(
-        self, model, transactions_df: pd.DataFrame
-    ) -> list[VariableImportance] | None:
-        """Try to extract variable importance from TFT model."""
-        try:
-            interpretation = model.interpret_output(
-                model.predict(transactions_df, mode="raw"), reduction="sum"
-            )
-            weights = interpretation.get("encoder_variables", {})
-            return [
-                VariableImportance(feature=k, weight=round(float(v), 4))
-                for k, v in weights.items()
-            ]
-        except Exception:
-            return None
 
     def _build_response(
         self,
@@ -1512,11 +1606,9 @@ Remove the duplicate (keep only one pair).
 
 ```bash
 git add apps/worker/main.py
-git commit -m "fix: remove duplicate log lines in worker train_model
+git commit -m "chore: remove duplicate log lines in worker train_model
 
-Lines 91-94 had the summary and log statement duplicated.
-
-Refs: docs/features/009-prediction-engine.md"
+Lines 91-94 had the summary and log statement duplicated."
 ```
 
 ---
@@ -1593,6 +1685,46 @@ def test_established_user_no_model_triggers_training():
 
     assert result.model_type == "chronos2"
     assert result.confidence == "medium"
+
+
+def test_concurrent_training_dedup():
+    """If a training job is already pending/processing, don't create another."""
+    from apps.api.domains.forecasting.service import ForecastService
+
+    mock_supabase = MagicMock()
+    # Existing pending job
+    mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.in_.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[{"id": "existing-job", "status": "processing"}]
+    )
+
+    svc = ForecastService(mock_supabase)
+    result = svc.trigger_training("test-user", force=False)
+
+    assert result.status == "processing"
+    # Insert should NOT have been called
+    mock_supabase.table.return_value.insert.assert_not_called()
+
+
+def test_nan_prediction_falls_back_to_chronos():
+    """TFT producing NaN should fall back to Chronos-2."""
+    from apps.api.domains.forecasting.service import ForecastService
+
+    mock_supabase = MagicMock()
+    svc = ForecastService(mock_supabase)
+
+    dates = pd.date_range("2025-06-01", periods=180, freq="D")
+    df = pd.DataFrame({"date": dates, "amount": np.random.uniform(-100, 100, 180)})
+
+    # TFT returns error
+    tft_error_result = {"error": "NaN detected in predictions"}
+
+    with patch("apps.api.domains.forecasting.service.get_chronos_engine", return_value=_mock_chronos_engine()):
+        with patch("apps.api.domains.forecasting.service.load_model", return_value=MagicMock()):
+            with patch("apps.api.domains.forecasting.service.predict_with_tft", return_value=tft_error_result):
+                result = svc.predict(df, user_id="test-user", horizon=30)
+
+    # Should fall back to Chronos-2
+    assert result.model_type == "chronos2"
 ```
 
 - [ ] **Step 2: Run integration tests**
@@ -1631,9 +1763,9 @@ Expected: ALL PASS
 Run: `make test`
 Expected: ALL PASS (or document any pre-existing failures)
 
-- [ ] **Step 4: Update LLD status to In Progress**
+- [ ] **Step 4: Update LLD status to Implemented**
 
-In `docs/features/009-prediction-engine.md`, change `Status: Draft` to `Status: In Progress`.
+In `docs/features/009-prediction-engine.md`, change `Status: Draft` to `Status: Implemented`.
 
 - [ ] **Step 5: Commit**
 
