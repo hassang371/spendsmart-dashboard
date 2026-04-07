@@ -2,7 +2,7 @@
 
 > **Canonical source of truth for all agents (Claude, Gemini) and humans.**
 > When any agent's internal doc-standards file conflicts with this file, this file wins.
-> Last Updated: 2026-03-16
+> Last Updated: 2026-04-07
 
 ---
 
@@ -16,8 +16,13 @@
 | RFC (short) | `docs/rfcs/` | `RFC-NNN-kebab-name.md` | Yes (RFC-001…) |
 | HLD (living) | `docs/design/` | `kebab-name.md` | No |
 | Policies | `docs/policies/` | `kebab-name.md` | No |
+| Implementation Plan | `docs/plans/` | `YYYY-MM-DD-kebab-name.md` | No (date-prefixed) |
+| Research | `docs/research/` | `NNN-kebab-name.md` | Yes (001, 002…) |
+| Investigation | `docs/investigations/` | `kebab-name.md` | No |
 
 **`docs/adr/` is deprecated.** All decisions (large or small) go in `docs/rfcs/`. Use full RFC for significant changes, short-form RFC for small decisions.
+
+**`docs/archive/`** holds superseded or outdated docs. Move docs here instead of deleting them. No naming convention enforced — keep the original filename.
 
 ---
 
@@ -40,6 +45,8 @@ Additional fields by doc type:
 | Bug Report | `Severity: Critical \| High \| Medium \| Low` |
 | RFC (full) | `OKR Alignment: [which objective this serves]` |
 | HLD | `Last Updated: YYYY-MM-DD`, `Version: 1.x` |
+| Implementation Plan | `LLD: [path to Feature LLD or Bug Report this implements]` |
+| Research | `Scope: [what was researched]`, `Researchers: [who/what conducted the research]` |
 
 ---
 
@@ -134,6 +141,25 @@ Additional fields by doc type:
 3. Examples or templates (where applicable)
 4. Changelog (append-only — add entries when policy is created or updated)
 
+### Implementation Plan (all required)
+
+1. Header (goal, architecture, tech stack, LLD reference)
+2. File Structure (which files will be created or modified)
+3. Tasks (bite-sized, TDD: failing test -> implement -> pass -> commit)
+4. Each task must have: Files list, exact code, exact commands, commit message
+
+### Research (all required)
+
+1. Metadata (date, researchers, scope, decision reference)
+2. Table of Contents
+3. Findings organized by topic (with subsections per model/technique/paper)
+4. Recommendations Summary (with rationale)
+5. Sources (all URLs, paper references, benchmark links)
+
+### Investigation (lightweight — no formal sections required)
+
+Scratch notes for unconfirmed observations. Once confirmed, graduate to a formal Bug Report or Feature LLD. Keep brief — these are working notes, not published docs.
+
 ---
 
 ## Mermaid Diagram Requirements
@@ -145,6 +171,9 @@ Additional fields by doc type:
 | RFC (full) | 2 | Current state architecture + proposed state |
 | RFC (short) | 0 | Optional |
 | HLD | 3+ | Architecture + data flow + deployment |
+| Implementation Plan | 0 | Optional (code blocks serve as the primary visual) |
+| Research | 0 | Optional (tables and comparison matrices serve as the primary visual) |
+| Investigation | 0 | Optional |
 
 **All diagrams must:**
 
@@ -163,6 +192,9 @@ Additional fields by doc type:
 | RFC | `RFC-NNN-kebab.md` | `RFC-002-multi-currency.md` |
 | HLD | `system-component.md` | `api-design.md` |
 | Policy | `topic-policy.md` | `migration-policy.md` |
+| Implementation Plan | `YYYY-MM-DD-kebab.md` | `2026-04-06-prediction-engine.md` |
+| Research | `NNN-kebab.md` (3-digit zero-padded) | `001-prediction-engine-model-selection.md` |
+| Investigation | `kebab.md` | `stale-cache-hypothesis.md` |
 
 ---
 
@@ -222,6 +254,6 @@ something that no longer matches the code is a silent lie.
 
 | Item | Description | Status |
 |---|---|---|
-| Pre-commit Refs: check | Shell hook that blocks `fix:`/`feat:` commits without a `Refs:` line pointing to a real `docs/` file | Planned |
+| Pre-commit Refs: check | Shell hook that blocks `fix:`/`feat:` commits without a `Refs:` line pointing to a real `docs/` file | **Implemented** (`.pre-commit-config.yaml` — `Check Refs line on fix/feat commits`) |
 | CI doc-gate job | GitHub Action that requires every `fix:`/`feat:` PR to also modify a file in `docs/bugs/` or `docs/features/` | Planned |
 | Stale doc detector | `make check-docs` script: finds docs with `Status: In Progress` and no recent commits referencing them | Planned |
