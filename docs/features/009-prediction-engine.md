@@ -30,6 +30,10 @@ SCALE users need accurate, interpretable 30-day financial forecasts to plan spen
 - [ ] Service layer extracts business logic from router into `service.py`
 - [ ] All new code covered by tests (unit + integration)
 - [ ] CPU inference latency < 500ms per 30-day forecast
+- [ ] Every successful forecast response logs a row to `public.user_predictions` (one row per user per hour bucket; see RFC-003)
+- [ ] `ForecastPoint` exposes all 7 quantiles (p2/p10/p25/p50/p75/p90/p98) across both tiers — enforced by Pydantic validation and asserted in `test_schemas.py`
+- [ ] `ForecastInsights` sub-object populated on every successful response with ten derived fields per RFC-003 §1
+- [ ] `evaluate_past_predictions` Celery beat task fills `actual_outcomes`, `mape`, `pinball_loss` at `horizon_end + 1 day` (allowing a retried run the following day) for ≥ 95 % of rows, matching RFC-003 §"Success Metrics"
 
 ## Scope
 
@@ -163,7 +167,17 @@ The existing router (`apps/api/domains/forecasting/router.py`) has:
 
 > **Note:** The project rules (`.claude/rules/backend/fastapi.md`) specify `models.py` for Pydantic models, but this domain already has `schemas.py` as the convention. We use `schemas.py` to match the existing file.
 
+> **Superseded by RFC-003.** The 3-quantile `ForecastPoint` and insight-free `ForecastResponse` shown below are preserved here as historical record only. The authoritative shipping contract is defined in
+> `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` §1. That RFC:
+> 1. Expands `ForecastPoint` to all 7 quantiles (p2/p10/p25/p50/p75/p90/p98).
+> 2. Adds a nested `ForecastInsights` sub-object with ten server-computed derived fields.
+> 3. Adds `prediction_id: UUID` to the response.
+> 4. Tightens `TrainStatusResponse.status` to `Literal["no_model", "pending", "claimed", "processing", "completed", "failed"]` — aligned to the actual `apps/worker/job_states.py` state machine. **The historical `"running"` value below is obsolete; use `"claimed"` and `"processing"` separately.**
+>
+> All implementation work under this LLD uses the RFC-003 contract, not the snippet below.
+
 ```python
+# HISTORICAL — see RFC-003 for the shipping schema
 class ForecastPoint(BaseModel):
     date: str                          # "2026-04-07"
     p10: float                         # 10th percentile
@@ -193,9 +207,37 @@ class TrainStatusResponse(BaseModel):
     training_days: int | None          # Days of data used
 ```
 
+### Prediction Logging
+
+RFC-003 adds `public.user_predictions` — a new table that logs every successful forecast
+response (fire-and-forget insert from `ForecastService._log_prediction`) plus a daily
+Celery beat task `evaluate_past_predictions` registered on the existing beat at
+`apps/api/celery_app.py` which fills `actual_outcomes`, `mape`, and per-quantile
+`pinball_loss` at each prediction's horizon end. The full DDL, RLS policies, insert-path
+details, and evaluation task shape are specified in
+`docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` §4–§5.
+
+Key facts consumers of this LLD need to know:
+
+- One row per `(user_id, hour bucket of generated_at)` — logging is deduplicated at the
+  hour level to avoid per-page-view flooding.
+- `shown_to_user` defaults to `true` in v1; the column is a ratchet for the future
+  shadow-mode rollout (a separate RFC flips 10% to `false`).
+- `insights_version` is supplied by `ForecastService` from the module-level constant
+  `INSIGHTS_VERSION` in `packages/forecasting/insights.py`; the column has no DB default
+  so stale migrations cannot silently record a wrong version.
+- `prediction_id` is generated in `ForecastService` via `uuid4()` **before** the
+  fire-and-forget INSERT, so the response always carries a valid id even when the DB
+  write fails. The DB `DEFAULT gen_random_uuid()` is retained only as a safety net for
+  any direct-SQL inserts.
+- Evaluation task uses `FOR UPDATE SKIP LOCKED` with an atomic
+  `UPDATE … FROM claimable … RETURNING` claim-and-fetch — see RFC-003 §5 for the exact
+  query.
+
 ### Database Changes
 
-No new tables. Existing `training_jobs` table is used.
+One new table `public.user_predictions` (full DDL in RFC-003 §4). Existing `training_jobs`
+table also used (unchanged).
 
 **State machine** (defined in `apps/worker/job_states.py`):
 
@@ -268,6 +310,13 @@ class ChronosEngine:
         # ... format into ForecastPoint list
 ```
 
+> **Superseded by RFC-003.** The 3-quantile Chronos call above is replaced by a module-level
+> constant `QUANTILES = torch.tensor([0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98])` used in
+> `torch.quantile(samples[0].float(), QUANTILES, dim=0)` so the Chronos tier satisfies
+> the same 7-quantile `ForecastPoint` contract as the TFT tier. See
+> `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` §1 "Chronos-path
+> quantile expansion" for the full rationale and one-line code change.
+
 ### Data Consolidation
 
 `prepare_training_data` exists in two places with different signatures:
@@ -331,11 +380,14 @@ Chronos-2-Small (28M params) is loaded as a **singleton** at API startup. The mo
 ## Testing Strategy
 
 - **Unit tests:**
-  - `test_chronos.py`: ChronosEngine.predict() returns correct shape, quantile ordering (p10 <= p50 <= p90), handles empty input
-  - `test_ensemble.py`: Ensemble blends correctly at configured weights, handles missing TFT gracefully
+  - `test_chronos.py`: ChronosEngine.predict() returns correct shape, quantile ordering (p2 <= p10 <= p25 <= p50 <= p75 <= p90 <= p98), handles empty input; asserts all 7 quantiles present per RFC-003
+  - `test_ensemble.py`: Ensemble blends correctly at configured weights, handles missing TFT gracefully; blending works across 7-quantile `ForecastPoint`
   - `test_augmentation.py`: Each augmentation produces valid output, preserves temporal order
-  - `test_schemas.py`: Pydantic models validate/reject correctly
+  - `test_schemas.py`: Pydantic models validate/reject correctly (7 quantiles required and ordered p2 ≤ p10 ≤ … ≤ p98; `ForecastInsights` required; `prediction_id` is a valid `UUID`; `TrainStatusResponse.status` is rejected for values outside the `Literal["no_model", "pending", "claimed", "processing", "completed", "failed"]` set)
   - `test_service.py`: Tier selection logic (< 90 days -> chronos, >= 90 + model -> ensemble, >= 90 no model -> chronos + trigger train)
+  - `test_insights.py` (RFC-003): `compute_insights` pure-function suite; 15+ table-driven tests covering floor derivation, safe-to-spend, overdraft risk, month-end slicing, primary-drivers top-3, empty drivers for Chronos, band-width edge cases, division-by-zero guards
+  - `test_service_logging.py` (RFC-003): fire-and-forget INSERT path; assert response still returns when INSERT fails; assert hour-bucket dedup skips duplicate log within same hour
+  - `test_evaluate_predictions.py` (RFC-003): Celery task batch claim via `UPDATE … FROM claimable … RETURNING`; MAPE + pinball-loss math validated against scikit-learn reference on synthetic data
 
 - **Integration tests:**
   - `test_forecast_api.py`: Full request cycle through API -> service -> engine -> response
@@ -363,10 +415,13 @@ Chronos-2-Small (28M params) is loaded as a **singleton** at API startup. The mo
 
 ## Related Documents
 
-- HLD to update: `docs/design/system-architecture.md` (add prediction engine component)
+- HLD to update: `docs/design/system-architecture.md` (add prediction engine component + prediction logging flow)
 - HLD to update: `docs/design/api-design.md` (add forecast endpoints)
+- RFC (schema + logging authority): `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md`
+- Bug (blocks deployment): `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` — follow-up RFC will architect the inference cache fix
 - Existing code: `packages/forecasting/` (current TFT implementation)
 - Existing worker: `apps/worker/main.py` (polling worker with `train_model` function)
+- Existing Celery app: `apps/api/celery_app.py` (beat schedule host for `evaluate_past_predictions` per RFC-003)
 - State machine: `apps/worker/job_states.py` (JobStatus enum, VALID_TRANSITIONS)
 - Reference docs: `references/reference_txt/` (original research documents)
 
@@ -377,3 +432,4 @@ Chronos-2-Small (28M params) is loaded as a **singleton** at API startup. The mo
 | 2026-04-06 | Initial draft. Two-tier architecture (Chronos-2 + TFT-Hybrid) based on deep research evaluating 20+ models, 15+ optimizers. |
 | 2026-04-06 | Spec review fixes: Replaced Celery references with polling worker pattern (C1). Fixed GET->POST for /predict and added migration plan (C2). Fixed training job states to match actual state machine in job_states.py (C3). Consolidated prepare_training_data decision (H1). Fixed broken plan reference (H3). Added current state/migration section (H4). Added confidence logic, model init strategy, performance testing, schemas.py naming note. |
 | 2026-04-06 | DEVIATION: `optimizers/muon.py`, `optimizers/cautious.py` deferred — `pytorch-forecasting` library manages its own optimizer internally. Custom optimizers require a custom model implementation (v2.0). The `augmentation.py` module is scaffolded but not yet wired into the training pipeline — integration deferred to avoid scope creep. Safe-to-spend endpoint keeps existing statistical logic for now (wiring to two-tier engine is a future improvement). |
+| 2026-04-17 | DEVIATION per RFC-003: response contract expanded. `ForecastPoint` now exposes all 7 quantiles (p2/p10/p25/p50/p75/p90/p98); `ForecastResponse` gains a nested `ForecastInsights` sub-object with ten server-computed derived fields (`lowest_balance`, `month_end`, `predicted_monthly_spend`, `predicted_monthly_income`, `confidence_band_width`, `primary_drivers`, `safe_to_spend`, `overdraft_risk_score`, `floor_used`, `floor_source`) plus `prediction_id: UUID`; `TrainStatusResponse.status` tightened to `Literal["no_model", "pending", "claimed", "processing", "completed", "failed"]` — `"running"` is obsolete, use `"claimed"`/`"processing"` separately. Chronos engine upgraded to emit all 7 quantiles via a module-level `QUANTILES` constant, superseding the 3-quantile snippet in §"Chronos-2 Integration". New table `public.user_predictions` + daily Celery beat task `evaluate_past_predictions` added per RFC-003 §4–§5. Authoritative schema is RFC-003; the code snippets in this LLD are historical. |
