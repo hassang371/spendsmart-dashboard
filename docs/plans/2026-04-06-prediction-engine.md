@@ -6,9 +6,13 @@
 
 **Architecture:** Tier 1 (Chronos-2-Small, 28M params) provides immediate zero-shot forecasts for all users. Tier 2 (upgraded TFT via pytorch-forecasting) adds personalized, interpretable forecasts for users with 90+ days of history. A service layer routes between tiers and optionally ensembles both.
 
-**Tech Stack:** Python 3.14, FastAPI, pytorch-forecasting, chronos-forecasting, PyTorch Lightning, Supabase, polling worker
+**Tech Stack:** Python 3.14, FastAPI, pytorch-forecasting, chronos-forecasting, PyTorch Lightning, Supabase, polling worker (training jobs), Celery beat (periodic tasks)
 
-**LLD:** `docs/features/009-prediction-engine.md`
+**LLD:** `docs/features/009-prediction-engine.md` (see 2026-04-17 DEVIATION changelog entry)
+
+**Authoritative schema/logging contract:** `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` — this plan implements the RFC-003 contract, not the historical snippets in LLD 009 §"Response Schema" and §"Chronos-2 Integration".
+
+**Known deployment blocker:** `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` — inference LRU cache fix is a separate RFC (RFC-004, pending); this plan does not include it. Do not deploy the feature to production until BUG-018 is resolved.
 
 ---
 
@@ -29,12 +33,27 @@ packages/forecasting/
     test_augmentation.py  # CREATE
 
 apps/api/domains/forecasting/
-  schemas.py              # CREATE (replace empty stub)
-  service.py              # CREATE (replace empty stub)
+  schemas.py              # CREATE (replace empty stub) — RFC-003 shape
+  service.py              # CREATE (replace empty stub) — wires insights + logging
   router.py               # MODIFY — thin delegation to service
   tests/
     test_schemas.py       # CREATE
     test_service.py       # CREATE
+    test_service_logging.py # CREATE (RFC-003)
+
+packages/forecasting/
+  insights.py             # CREATE (RFC-003) — pure compute_insights + derive_floor + INSIGHTS_VERSION
+  tests/
+    test_insights.py      # CREATE (RFC-003)
+
+apps/api/celery_app.py    # MODIFY — include + beat schedule entry for evaluate_past_predictions
+apps/api/core/tasks/
+  evaluate_predictions.py # CREATE (RFC-003) — Celery beat task
+  tests/
+    test_evaluate_predictions.py # CREATE (RFC-003)
+
+supabase/migrations/
+  20260418000000_user_predictions.sql # CREATE (RFC-003) — new table + RLS
 
 apps/worker/
   main.py                 # MODIFY — fix duplicate log lines
@@ -486,6 +505,8 @@ Refs: docs/features/009-prediction-engine.md"
 ---
 
 ### Task 3: Create `chronos_engine.py` — Chronos-2 zero-shot wrapper
+
+> **Updated per RFC-003.** `QUANTILES` must be a module-level `torch.tensor([0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98])` and the `predict()` return dict must carry all 7 quantile keys (`p2, p10, p25, p50, p75, p90, p98`) per day. The code snippets below show the 3-quantile historical shape; when implementing, use the 7-quantile shape from RFC-003 §1 "Chronos-path quantile expansion". Tests must assert all 7 quantiles are present and ordered.
 
 **Files:**
 - Create: `packages/forecasting/chronos_engine.py`
@@ -968,6 +989,10 @@ Refs: docs/features/009-prediction-engine.md"
 
 ### Task 6: Create Pydantic schemas
 
+> **Updated per RFC-003.** The shapes below are the historical 3-quantile contract. When implementing, replace with the authoritative RFC-003 §1 schema: `ForecastPoint` with 7 quantiles (p2/p10/p25/p50/p75/p90/p98), `VariableImportance`, `QuantileSnapshot`, `LowestBalance`, `ForecastInsights` (ten derived fields), `ForecastResponse` with `insights` sub-object + `prediction_id: UUID`, and `TrainStatusResponse.status` typed as `Literal["no_model", "pending", "claimed", "processing", "completed", "failed"]`. Pydantic field validation: `horizon: Annotated[int, Field(ge=1, le=30)]`, `forecast: Annotated[list[ForecastPoint], Field(min_length=1, max_length=30)]`. Import `UUID` from `uuid`. Tests must assert 7 quantiles, ordered p2 ≤ p10 ≤ … ≤ p98; required `insights`; invalid `status` rejected.
+>
+> **⚠ Implementer action:** IGNORE the 3-quantile Step 1 test snippet below. Instead, write Step 1 tests against the RFC-003 §1 shape — 7-quantile `ForecastPoint`, required `insights` sub-object, `prediction_id: UUID`, `TrainStatusResponse.status` `Literal` rejection case. Keep the rest of the step structure (red → implement → green → commit) intact. The historical snippet is retained for context only; it would produce misleading TDD-red failures if used verbatim.
+
 **Files:**
 - Modify: `apps/api/domains/forecasting/schemas.py` (replace empty stub)
 - Create: `apps/api/domains/forecasting/tests/test_schemas.py`
@@ -1119,11 +1144,88 @@ Refs: docs/features/009-prediction-engine.md"
 
 ---
 
+### Task 6.5: Create `packages/forecasting/insights.py` — compute_insights + derive_floor
+
+**Source of truth:** `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` §2 and §3b.
+
+**Files:**
+- Create: `packages/forecasting/insights.py`
+- Create: `packages/forecasting/tests/test_insights.py`
+
+- [ ] **Step 1: Write failing tests (TDD)**
+
+Create `packages/forecasting/tests/test_insights.py` with at least the following test functions (use table-driven parametrization where natural):
+
+```
+test_derive_floor_uses_p10_of_history
+test_derive_floor_honours_user_override
+test_derive_floor_clamps_at_zero
+test_compute_insights_emits_ten_fields
+test_lowest_balance_picks_min_p10_day
+test_month_end_is_day_30_of_horizon
+test_predicted_monthly_spend_sums_negative_p50_deltas
+test_predicted_monthly_income_sums_positive_p50_deltas
+test_confidence_band_width_averages_p90_minus_p10
+test_primary_drivers_returns_top3_by_weight
+test_primary_drivers_empty_for_chronos_only
+test_safe_to_spend_all_days_above_floor
+test_safe_to_spend_zero_when_all_days_below_floor
+test_overdraft_risk_score_is_fraction_of_days_below_floor
+test_compute_insights_raises_on_missing_closing_balance_column
+test_compute_insights_handles_constant_balance_user
+test_insights_version_constant_exported
+```
+
+All tests use synthetic `forecast_matrix` numpy arrays and small `history_df` DataFrames. No DB, no HTTP, no PyTorch model.
+
+- [ ] **Step 2: Run tests — confirm red**
+
+Run: `.venv/bin/python -m pytest packages/forecasting/tests/test_insights.py -v`
+Expected: all fail (module does not exist).
+
+- [ ] **Step 3: Implement `insights.py`**
+
+Implement `compute_insights()`, `derive_floor()`, `_safe_default_insights()`, and module-level `INSIGHTS_VERSION: str = "v1"` per RFC-003 §3. Pure functions only: no DB, no HTTP, no logging side effects. Exceptions documented: `ValueError("cannot derive floor without closing_balance history")` when the history DataFrame lacks the column.
+
+- [ ] **Step 4: Run tests — confirm green**
+
+Run: `.venv/bin/python -m pytest packages/forecasting/tests/test_insights.py -v`
+Expected: all pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/forecasting/insights.py packages/forecasting/tests/test_insights.py
+git commit -m "feat: add compute_insights for server-side forecast derived fields
+
+Implements the pure-function insights layer per RFC-003: derive_floor (P10 of
+historical closing_balance with user-override slot), compute_insights (ten
+derived fields from the 7x30 forecast matrix + variable importance), and
+_safe_default_insights fallback. INSIGHTS_VERSION module constant tracks
+computation logic revisions.
+
+Refs: docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md
+Refs: docs/features/009-prediction-engine.md"
+```
+
+---
+
 ### Task 7: Create `service.py` — two-tier routing logic
+
+> **Updated per RFC-003.** In addition to tier-routing, `ForecastService.predict()` must:
+> 1. Call `compute_insights()` from `packages/forecasting/insights.py` and attach `ForecastInsights` to the response (wrap in guarded block; on exception, log and fall back to `_safe_default_insights` per RFC-003 §3).
+> 2. Generate `prediction_id = uuid4()` BEFORE any DB write; attach to response regardless of log success.
+> 3. Perform hour-bucket dedup check per RFC-003 §3b: SELECT existing `user_predictions` rows for this user with `generated_at >= current_hour_start` before INSERT; skip INSERT if one exists.
+> 4. Fire-and-forget INSERT into `public.user_predictions` with all columns including `insights_version=INSIGHTS_VERSION` and `shown_to_user=True`. Failure logs WARN + increments Prometheus counter `forecast_log_insert_failures_total`; never blocks the response.
+> 5. Use the user-scoped Supabase client (the `users insert own predictions` RLS policy in Task 10.5 permits this).
+> Additional test file required: `apps/api/domains/forecasting/tests/test_service_logging.py` covering (a) INSERT happens on first predict of the hour, (b) dup call within the hour reuses the existing row, (c) predict returns 200 even when INSERT raises, (d) response `prediction_id` is a valid UUID even when INSERT fails.
+>
+> **⚠ Implementer action:** IGNORE the 3-quantile Step 1 fixture snippet below (`{"date": "2026-04-07", "p10": 100, "p50": 200, "p90": 300}`). Instead, write Step 1 tests against the RFC-003 §1 shape — fixtures use 7-quantile `ForecastPoint` entries, and the mocked chronos engine returns 30 of them; assertions check `result.insights` presence and that `result.prediction_id` is a `UUID`. Feed `compute_insights()` a synthetic `forecast_matrix` with shape `(30, 7)`. Otherwise the red-cycle fails in the wrong place (fixture mismatch, not missing behavior).
 
 **Files:**
 - Modify: `apps/api/domains/forecasting/service.py` (replace empty stub)
 - Create: `apps/api/domains/forecasting/tests/test_service.py`
+- Create: `apps/api/domains/forecasting/tests/test_service_logging.py`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -1378,13 +1480,20 @@ Expected: ALL PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/domains/forecasting/service.py apps/api/domains/forecasting/tests/test_service.py
-git commit -m "feat: add ForecastService with two-tier routing logic
+git add apps/api/domains/forecasting/service.py \
+        apps/api/domains/forecasting/tests/test_service.py \
+        apps/api/domains/forecasting/tests/test_service_logging.py
+git commit -m "feat: add ForecastService with two-tier routing + prediction logging
 
-Routes to Chronos-2 for cold-start users (<90 days), TFT-Hybrid
-ensemble for established users, with automatic training trigger.
-Confidence mapping: low (<30d), medium (30-89d), high (90d+model).
+Routes to Chronos-2 for cold-start users (<90 days), TFT-Hybrid ensemble
+for established users, with automatic training trigger. Confidence
+mapping: low (<30d), medium (30-89d), high (90d+model). Per RFC-003,
+the service calls compute_insights to populate ForecastInsights,
+generates prediction_id via uuid4() before the fire-and-forget INSERT
+into public.user_predictions, and hour-buckets the log to prevent
+per-page-view flooding.
 
+Refs: docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md
 Refs: docs/features/009-prediction-engine.md"
 ```
 
@@ -1774,30 +1883,167 @@ Refs: docs/features/009-prediction-engine.md"
 
 ---
 
+### Task 10.5: user_predictions migration + Celery beat evaluation task
+
+**Source of truth:** `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` §4 and §5.
+
+**Files:**
+- Create: `supabase/migrations/20260418000000_user_predictions.sql`
+- Modify: `apps/api/celery_app.py`
+- Create: `apps/api/core/tasks/evaluate_predictions.py`
+- Create: `apps/api/core/tasks/tests/test_evaluate_predictions.py` (and `__init__.py` if missing)
+
+- [ ] **Step 1: Write the migration**
+
+Create `supabase/migrations/20260418000000_user_predictions.sql` with the exact DDL from
+RFC-003 §4: table `public.user_predictions`, two indexes
+(`idx_user_predictions_user_recent`, partial `idx_user_predictions_unevaluated`), RLS
+enabled, two policies (`users read own predictions` SELECT, `users insert own predictions`
+INSERT WITH CHECK). No UPDATE policy for authenticated — service role handles updates.
+`CHECK (horizon_days BETWEEN 1 AND 30)`.
+
+- [ ] **Step 2: Apply migration locally and verify**
+
+Run: `supabase db reset` (or `supabase migration up`) and verify:
+
+```sql
+\d public.user_predictions           -- columns, types, indexes
+SELECT policyname FROM pg_policies WHERE tablename = 'user_predictions';
+```
+
+Expected: two policies present; INSERT `WITH CHECK (auth.uid() = user_id)`; SELECT
+`USING (auth.uid() = user_id)`. Partial index shows `WHERE (evaluated_at IS NULL)` in
+`\d` output.
+
+- [ ] **Step 3: Write failing tests for the evaluation task**
+
+Create `apps/api/core/tasks/tests/test_evaluate_predictions.py` with test functions:
+
+```
+test_evaluate_skips_rows_with_horizon_end_in_future
+test_evaluate_claims_batch_atomically
+test_evaluate_writes_actual_outcomes_and_mape
+test_evaluate_writes_pinball_loss_matching_reference_implementation
+test_evaluate_handles_user_with_no_transactions_in_window
+test_evaluate_one_row_failure_does_not_abort_batch
+test_evaluate_batch_is_capped_at_500_rows
+test_evaluate_is_idempotent_on_already_evaluated_rows
+```
+
+The pinball-loss golden test compares the in-task implementation against
+`sklearn.metrics.mean_pinball_loss` on synthetic `(p, actual)` pairs across all 7
+quantile levels. Use a mocked Supabase client + synthetic `user_predictions` rows.
+
+- [ ] **Step 4: Run tests — confirm red**
+
+Run: `.venv/bin/python -m pytest apps/api/core/tasks/tests/test_evaluate_predictions.py -v`
+Expected: all fail.
+
+- [ ] **Step 5: Implement the Celery beat task**
+
+Create `apps/api/core/tasks/evaluate_predictions.py` importing `celery_app` from
+`apps.api.celery_app` and `get_service_client` from
+`apps.api.core.tasks.maintenance_tasks`. Task name `evaluate_past_predictions`. Single-
+transaction atomic claim-and-fetch per RFC-003 §5 (the `UPDATE public.user_predictions
+… FROM claimable … RETURNING` block). Per-row isolation: one failure does not abort the
+batch. Pinball-loss helper validated against scikit-learn reference in unit tests.
+
+- [ ] **Step 6: Register on the Celery beat schedule**
+
+Edit `apps/api/celery_app.py`:
+
+```python
+# extend include=[...]
+include=[
+    "apps.api.tasks.training_tasks",
+    "apps.api.core.tasks.maintenance_tasks",
+    "apps.api.core.tasks.evaluate_predictions",   # NEW
+],
+
+# append to beat_schedule dict
+celery_app.conf.beat_schedule = {
+    "cleanup-stale-training-jobs": {
+        "task": "cleanup_stale_jobs",
+        "schedule": 3600,
+    },
+    "evaluate-past-predictions": {                # NEW
+        "task": "evaluate_past_predictions",
+        "schedule": 86400,  # 24 h
+    },
+}
+```
+
+- [ ] **Step 7: Run tests — confirm green**
+
+Run: `.venv/bin/python -m pytest apps/api/core/tasks/tests/test_evaluate_predictions.py -v`
+Expected: all pass.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add supabase/migrations/20260418000000_user_predictions.sql \
+        apps/api/celery_app.py \
+        apps/api/core/tasks/evaluate_predictions.py \
+        apps/api/core/tasks/tests/test_evaluate_predictions.py
+git commit -m "feat: add user_predictions table + evaluate_past_predictions beat task
+
+Implements the prediction logging + daily evaluation pipeline per RFC-003:
+migration creates public.user_predictions (forecast + insights + actual_outcomes
++ mape + pinball_loss) with RLS allowing users to read and insert their own
+rows; evaluate_past_predictions Celery beat task claims matured predictions
+via atomic UPDATE … FROM claimable … RETURNING and fills mape + pinball_loss
+against actual transaction trajectories. Pinball-loss math validated against
+sklearn.metrics.mean_pinball_loss.
+
+Refs: docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md
+Refs: docs/features/009-prediction-engine.md"
+```
+
+---
+
 ### Task 11: Run full test suite and verify
 
-- [ ] **Step 1: Run all forecasting package tests**
+- [ ] **Step 1: Run all forecasting package tests (includes test_insights.py)**
 
 Run: `.venv/bin/python -m pytest packages/forecasting/tests/ -v`
 Expected: ALL PASS
 
-- [ ] **Step 2: Run all API forecasting tests**
+- [ ] **Step 2: Run all API forecasting tests (includes test_schemas.py, test_service_logging.py)**
 
 Run: `.venv/bin/python -m pytest apps/api/domains/forecasting/tests/ -v`
 Expected: ALL PASS
 
-- [ ] **Step 3: Run full project tests**
+- [ ] **Step 3: Run Celery task tests (test_evaluate_predictions.py)**
+
+Run: `.venv/bin/python -m pytest apps/api/core/tasks/tests/ -v`
+Expected: ALL PASS
+
+- [ ] **Step 4: Run full project tests**
 
 Run: `make test`
 Expected: ALL PASS (or document any pre-existing failures)
 
-- [ ] **Step 4: Update LLD status to Implemented**
+- [ ] **Step 5: Verify forecast end-to-end contract (smoke test)**
+
+With the dev stack running, hit `GET /forecast/predict?horizon=30` for a test user and
+assert the response payload carries: `forecast` list of length 30 with all 7 quantile
+keys per item, `insights` sub-object with all 10 derived fields, `prediction_id` is a
+valid UUID, `variable_importance` is `None` for Chronos-only users and a list for
+TFT users. Then check `SELECT * FROM public.user_predictions WHERE user_id = '<uuid>'
+ORDER BY generated_at DESC LIMIT 1` returns a row with `forecast`, `insights`,
+`insights_version='v1'`, `shown_to_user=true`, `evaluated_at IS NULL`.
+
+- [ ] **Step 6: Update LLD + RFC status to Implemented**
 
 In `docs/features/009-prediction-engine.md`, change `Status: Draft` to `Status: Implemented`.
+Also update RFC-003 status from `Proposed` → `Implemented`.
 
-- [ ] **Step 5: Commit**
+> **⚠ Deployment gate.** Marking these docs `Implemented` means **code lands on `main`**, not that the feature is shipped to production. Do NOT promote to production until `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` is resolved (tracked under the forthcoming RFC-004). The 500 ms latency target is not defensible without the bounded LRU cache + invalidation hook described there.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add docs/features/009-prediction-engine.md
-git commit -m "docs: update 009 prediction engine status to In Progress"
+git add docs/features/009-prediction-engine.md \
+        docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md
+git commit -m "docs: mark 009 prediction engine + RFC-003 as Implemented"
 ```
