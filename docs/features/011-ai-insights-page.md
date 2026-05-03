@@ -287,26 +287,86 @@ A personalised version ships after you've had at least 90 days of transactions.
 
 #### 10. WarmTrigger (client)
 
-Invisible component. Mounts once on `/insights` only. Does **not** mount from root `app/layout.tsx` (that layout wraps `/login`, `/signup`, and marketing pages where the user has no session; firing `/forecast/warm` pre-auth returns 401 and is wasted traffic). Fires `POST /api/v1/forecast/warm` in `useEffect` on mount. Ignores 4xx/429 silently. RFC-004 rate-limits to 1/5min/user; React 19 StrictMode double-fires the effect in dev — the second fire 429s and is discarded.
+Mounts once on `/insights` only. Does **not** mount from root `app/layout.tsx` (that layout wraps `/login`, `/signup`, and marketing pages where the user has no session; firing `/forecast/warm` pre-auth returns 401 and is wasted traffic).
 
-A module-level `let fired = false` sentinel prevents duplicate fires inside the same browser session across remounts / hot-reload cycles:
+**Codex Fix #4 — observable warm with bounded wait + fallback.** The earlier
+fire-and-forget design (`warmForecast().catch(() => {})`) hides every failure mode
+and does NOT guarantee the cache is hot before the first `/forecast/predict` lands.
+v1 contract:
+
+- `WarmTrigger` returns a `warmPromise` that resolves on 202/200 or rejects on 4xx/timeout.
+- The page component races `warmPromise` against a 1500ms timeout (the cold-load p95
+  budget per RFC-004 §Success Metrics). Whichever resolves first lets the predict
+  fetch proceed.
+- Outcome telemetry: every warm attempt emits a Prometheus client-side counter via
+  the existing structlog forwarding pattern — `forecast_warm_outcome_total{result="ok|429|timeout|error"}`.
+  Server-side already counts `tft_cache_hits_total` vs `_misses_total`; the client
+  counter closes the loop on warm success rate.
 
 ```typescript
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { warmForecast } from '@/lib/api/forecast';
 
-let fired = false;
+const WARM_TIMEOUT_MS = 1500;          // matches RFC-004 §Success Metrics cold-load p95 budget
 
-export function WarmTrigger() {
+let inflight: Promise<void> | null = null;
+let lastFiredAt = 0;
+
+export function useWarmForecast() {
+    const [state, setState] = useState<'idle' | 'warming' | 'ready' | 'failed'>('idle');
     useEffect(() => {
-        if (fired) return;
-        fired = true;
-        warmForecast().catch(() => {});          // fire-and-forget; 401/429 swallowed
+        const since = Date.now() - lastFiredAt;
+        if (since < 5 * 60_000 && inflight) {     // RFC-004 5-min rate limit window
+            inflight.then(() => setState('ready')).catch(() => setState('failed'));
+            return;
+        }
+        lastFiredAt = Date.now();
+        setState('warming');
+        const racer = Promise.race([
+            warmForecast().then(() => 'ok' as const),
+            new Promise<'timeout'>(r => setTimeout(() => r('timeout'), WARM_TIMEOUT_MS)),
+        ]);
+        inflight = racer.then(outcome => {
+            // Telemetry: emit forecast_warm_outcome_total{result=...}
+            void fetch('/api/v1/metrics/client-event', {
+                method: 'POST', credentials: 'include',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ event: 'forecast_warm_outcome', result: outcome }),
+            }).catch(() => {});
+            setState(outcome === 'ok' ? 'ready' : 'failed');
+        }).catch(err => {
+            void fetch('/api/v1/metrics/client-event', {
+                method: 'POST', credentials: 'include',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ event: 'forecast_warm_outcome',
+                                      result: err?.status === 429 ? '429' : 'error' }),
+            }).catch(() => {});
+            setState('failed');
+            throw err;
+        });
     }, []);
-    return null;
+    return state;
 }
 ```
+
+The page mount fires `useWarmForecast()` and `getForecast(30)` in parallel. If the
+warm completes within 1.5 s, the cache is hot and the predict request hits a warm
+path. If the warm times out or fails, the predict still proceeds — the user sees
+either a cold-path response (slower but correct) or, if both fail, the existing
+`error.tsx` fallback. Either way, telemetry records the outcome.
+
+**Server-side counter:** `apps/api/core/metrics.py` adds an
+eleventh counter `forecast_warm_outcome_total` with label `result` ∈
+`{ok, 429, timeout, error}`, fed via a new `POST /api/v1/metrics/client-event` route
+that accepts a small JSON body and increments the counter. The route is
+JWT-authenticated and rate-limited at 30/min/user via the existing
+`RateLimiter + rate_limit_dependency` pattern. (This route is added in the same
+implementation stage as the WarmTrigger for symmetry.)
+
+**Required test:** `WarmTrigger.test.tsx::test_predict_proceeds_when_warm_times_out`
+mocks `warmForecast` to never resolve; asserts the page still renders the forecast
+within an acceptable time once the predict response lands.
 
 The `fired` flag resets on full-page reload (module re-eval), which is the correct behaviour — a fresh load is a fresh 5-minute window to the user.
 
@@ -491,3 +551,4 @@ None. All reads and writes go through existing/LLD-010 endpoints.
 |---|---|
 | 2026-04-17 | Initial draft. Seven of ten Cowork-identified components shipped in v1: fan chart, safe-to-spend card, month-end snapshot, overdraft risk badge, confidence badge, primary drivers, scenario impact cards. Deferred: weekly spend breakdown, events timeline, financial weather. Hybrid RSC + client-boundary data flow proposed. Pre-warm fires from root layout + /insights. Shadcn/ui Dialog proposed. OpenAPI type-gen script assumed. Status: Draft. |
 | 2026-04-17 | Spec review pass 1 — corrected multiple factual errors about the codebase. (C1) Route protection: middleware lives at `apps/web/proxy.ts` (not `middleware.ts`), matcher currently dashboard-only, `lib/supabase/server.ts` does not exist. This LLD now explicitly extends `proxy.ts` matcher + `lib/supabase/middleware.ts` auth gate to cover `/insights`; does NOT introduce RSC or a server-side Supabase client (pivoted to all-client pattern matching `/dashboard`). (C2) OpenAPI type-gen script does not exist. Replaced with hand-written types in `apps/web/lib/api/forecast.types.ts` + checked-in `forecast.schema.json` snapshot + Python drift-check test. (C3) `shadcn/ui` is not a project dependency. Replaced with framer-motion-based modal (existing dep). (H1) API paths now correctly prefixed with `/api/v1` per `lib/api/client.ts` convention. (H2) `GET /forecast/predict` flagged as dependent on LLD 009 plan Task 8; fallback to POST with empty body if Task 8 has not shipped. (H3) WarmTrigger scoped to `/insights` route only — NOT root layout (root wraps pre-auth routes). (H4) Added module-level `fired` sentinel to WarmTrigger. (H5) Scenario cards capped at top 10 upcoming intents via `upcomingIntents()` helper. (H6) Fan-chart spec unified: typical 30 points; shorter horizons legal per RFC-003 schema. (H7) ColdStartBanner gating unified: `model_type === "chronos2"` OR `confidence === "low"`. Testing changed from Lighthouse-CI (not in project) to Playwright + axe-core (matches existing e2e infrastructure). Existing `lib/api/client.ts::ForecastResponse` renamed `LegacyForecastResponse` with deprecation marker to avoid type collision. Status: Draft. |
+| 2026-04-17 | **Codex Fix #4** (medium) — paired with RFC-004 update. WarmTrigger was fire-and-forget (`warmForecast().catch(() => {})`) with no first-request latency guarantee and no telemetry. Replaced with `useWarmForecast()` hook returning state; bounded 1500ms wait races warm against predict so cold path remains correct; outcome telemetry posts to new `POST /api/v1/metrics/client-event` route feeding `forecast_warm_outcome_total{result=...}` counter. New required test `WarmTrigger.test.tsx::test_predict_proceeds_when_warm_times_out`. |

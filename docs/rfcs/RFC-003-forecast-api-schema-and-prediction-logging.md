@@ -351,29 +351,51 @@ The DB column `insights_version` intentionally has no `DEFAULT` (see DDL above);
 forces the service layer to supply it on every insert, so a stale migration cannot
 silently record `"v1"` after the code has advanced.
 
-#### 3b. Logging dedup (v1)
+#### 3b. Logging dedup (v1) — DB-enforced atomic upsert
 
 Frontend components often fetch `GET /forecast/predict` multiple times per page view
 (re-renders, tab switches, React Query revalidation). Logging every call floods
 `user_predictions` without adding any accuracy signal since the model output for a user
 is stable within a short window. v1 policy: **one prediction row per
-(user_id, date_trunc('hour', generated_at))**. The service performs a cheap upsert:
+`(user_id, generated_hour)`** where `generated_hour` is a stored generated column =
+`date_trunc('hour', generated_at)`.
+
+**Dedup is enforced at the database, not in service code.** A `UNIQUE (user_id,
+generated_hour)` constraint guarantees atomicity under concurrent
+`/forecast/predict` calls; the service issues a single `INSERT … ON CONFLICT
+(user_id, generated_hour) DO NOTHING` and treats a `0 rowcount` as "row already
+exists for this hour, no-op". No SELECT-then-INSERT (that pattern is a
+check-then-act race; both concurrent calls can pass the existence check and
+both insert).
 
 ```python
 # apps/api/domains/forecasting/service.py
-existing = supabase.table("user_predictions").select("prediction_id")\
-    .eq("user_id", user_id)\
-    .gte("generated_at", now.replace(minute=0, second=0, microsecond=0).isoformat())\
-    .limit(1).execute()
-if existing.data:
-    return response  # reuse the hour's row; don't insert a dup
-supabase.table("user_predictions").insert(row).execute()
+# Single round trip; DB enforces exactly-one-per-hour. Concurrent calls either
+# win the INSERT or hit ON CONFLICT and no-op. Idempotent by construction.
+supabase.rpc(
+    "log_user_prediction",                    # SECURITY DEFINER wrapper around
+                                              # INSERT ... ON CONFLICT DO NOTHING
+                                              # so the user-scoped client cannot
+                                              # bypass the unique constraint
+    {"row": row},
+).execute()
 ```
 
-The hour bucket is intentional: it's long enough to collapse page-view noise and short
-enough to catch meaningful state changes (e.g., user imports new transactions mid-day).
-Tunable via a module-level `LOG_DEDUP_BUCKET = timedelta(hours=1)` constant; revisit once
-we have real-world traffic distributions.
+Implementation notes:
+- The RPC `public.log_user_prediction(row jsonb)` returns the `prediction_id` of
+  whichever row is now resident for the (user_id, generated_hour) pair — either
+  the just-inserted row (when the INSERT wins) or the pre-existing row (when ON
+  CONFLICT fires). The service uses this id for the response payload.
+- The hour bucket is intentional: long enough to collapse page-view noise, short
+  enough to catch meaningful state changes (e.g., user imports new transactions
+  mid-day). Tunable in v1.5 by changing the generated-column expression; v1
+  hard-codes `date_trunc('hour', ...)`.
+
+**Required test:** `test_service_logging.py::test_concurrent_predict_does_not_duplicate`
+fires N parallel `predict()` calls for the same user under `asyncio.gather`. After
+all complete, asserts exactly one row in `user_predictions` for that
+(user_id, hour) pair. Without the UNIQUE constraint this test fails; with it,
+N-1 calls hit ON CONFLICT and no-op.
 
 #### 4. Data model — new table `public.user_predictions`
 
@@ -384,6 +406,9 @@ CREATE TABLE public.user_predictions (
         -- supply prediction_id explicitly so the value is known before the INSERT completes.
     user_id             uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     generated_at        timestamptz NOT NULL DEFAULT now(),
+    -- Generated column used as the dedup key. STORED so the UNIQUE index works without
+    -- per-query function evaluation; immutable per row.
+    generated_hour      timestamptz NOT NULL GENERATED ALWAYS AS (date_trunc('hour', generated_at)) STORED,
     model_type          text        NOT NULL,    -- chronos2 | tft_hybrid | ensemble
     model_version       text        NOT NULL,
     horizon_days        int         NOT NULL CHECK (horizon_days BETWEEN 1 AND 30),
@@ -396,13 +421,28 @@ CREATE TABLE public.user_predictions (
     actual_outcomes     jsonb,                   -- filled by evaluate_past_predictions beat task
     mape                float,                   -- P50 MAPE, filled by evaluation task
     pinball_loss        jsonb,                   -- {p2, p10, p25, p50, p75, p90, p98}
-    evaluated_at        timestamptz,             -- set by evaluation task; partial-index key
+    -- Evaluation lease (Codex Fix #2). claimed_at is set when the worker claims the
+    -- row; lease_expires_at gives a re-claim deadline so a crashed/timed-out worker's
+    -- rows are recoverable. evaluated_at is the FINAL completion marker, set ONLY
+    -- after metrics are written. The unevaluated index keys on evaluated_at.
+    claimed_at          timestamptz,
+    lease_expires_at    timestamptz,
+    evaluated_at        timestamptz,
     created_at          timestamptz NOT NULL DEFAULT now()
 );
+
+-- Atomic dedup: exactly one row per (user_id, hour). Concurrent INSERTs collide on
+-- this constraint and the second one no-ops via ON CONFLICT.
+CREATE UNIQUE INDEX uniq_user_predictions_user_hour
+    ON public.user_predictions (user_id, generated_hour);
 
 CREATE INDEX idx_user_predictions_user_recent
     ON public.user_predictions (user_id, generated_at DESC);
 
+-- Partial index for the evaluation worker's claim query. A row is "claimable" when
+-- evaluated_at IS NULL AND (claimed_at IS NULL OR lease_expires_at < now()) — i.e.
+-- never claimed, OR claimed but its lease expired. The partial index keeps only
+-- unevaluated rows; the lease-expiry check happens in the WHERE of the claim query.
 CREATE INDEX idx_user_predictions_unevaluated
     ON public.user_predictions (horizon_end)
     WHERE evaluated_at IS NULL;
@@ -421,16 +461,75 @@ CREATE POLICY "users insert own predictions"
     WITH CHECK (auth.uid() = user_id);
 
 -- No UPDATE policy for authenticated; only the evaluation task (service-role key) updates
--- actual_outcomes / mape / pinball_loss / evaluated_at.
+-- actual_outcomes / mape / pinball_loss / evaluated_at / claimed_at / lease_expires_at.
+
+-- SECURITY DEFINER RPC for atomic insert-or-no-op. Service calls this via the
+-- user-scoped client; the function runs with definer privileges so it can write
+-- the row directly while RLS still gates the SELECT path. The function checks
+-- auth.uid() to refuse cross-tenant writes (defence-in-depth on top of the
+-- "users insert own predictions" policy).
+CREATE OR REPLACE FUNCTION public.log_user_prediction(payload jsonb)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    out_id uuid;
+    payload_user uuid := (payload->>'user_id')::uuid;
+BEGIN
+    IF payload_user IS NULL OR payload_user <> auth.uid() THEN
+        RAISE EXCEPTION 'log_user_prediction: user_id mismatch';
+    END IF;
+
+    INSERT INTO public.user_predictions (
+        prediction_id, user_id, generated_at,
+        model_type, model_version, horizon_days, horizon_end,
+        forecast, variable_importance, insights, insights_version,
+        shown_to_user
+    )
+    VALUES (
+        (payload->>'prediction_id')::uuid,
+        payload_user,
+        coalesce((payload->>'generated_at')::timestamptz, now()),
+        payload->>'model_type',
+        payload->>'model_version',
+        (payload->>'horizon_days')::int,
+        (payload->>'horizon_end')::date,
+        payload->'forecast',
+        payload->'variable_importance',
+        payload->'insights',
+        payload->>'insights_version',
+        coalesce((payload->>'shown_to_user')::boolean, true)
+    )
+    ON CONFLICT (user_id, generated_hour) DO NOTHING
+    RETURNING prediction_id INTO out_id;
+
+    -- ON CONFLICT path: return the existing row's id so the response payload
+    -- still references a real row (the one the user effectively "saw" this hour).
+    IF out_id IS NULL THEN
+        SELECT prediction_id INTO out_id
+        FROM public.user_predictions
+        WHERE user_id = payload_user
+          AND generated_hour = date_trunc('hour', coalesce((payload->>'generated_at')::timestamptz, now()))
+        LIMIT 1;
+    END IF;
+
+    RETURN out_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.log_user_prediction(jsonb) TO authenticated;
 ```
 
-**Client choice for writes:** the forecast router already uses
-`get_user_client(request)` (user-scoped JWT client) per
-`apps/api/domains/forecasting/router.py:29`. The `users insert own predictions` policy
-above makes that client sufficient for the fire-and-forget INSERT in
-`ForecastService._log_prediction` — no service-role escalation on the request path. The
-evaluation task runs inside the Celery beat worker and uses `get_service_client()` from
-`apps/api/core/tasks/maintenance_tasks.py`, which bypasses RLS for the UPDATE pass.
+**Client choice for writes:** the forecast router uses `get_user_client(request)`
+(user-scoped JWT client) per `apps/api/domains/forecasting/router.py:29`. The
+`users insert own predictions` policy + `log_user_prediction` SECURITY DEFINER RPC
+together let the user-scoped client perform an atomic insert-or-no-op without
+service-role escalation on the request path. The evaluation task runs inside the
+Celery beat worker and uses `get_service_client()` from
+`apps/api/core/tasks/maintenance_tasks.py`, which bypasses RLS for the UPDATE pass
+(claim, fill).
 
 **Insert-time freezing:** `insights` and `variable_importance` are **snapshots** of what
 the user saw. If `compute_insights` logic changes in v1.1, old rows preserve old values
@@ -490,7 +589,24 @@ Runs daily (24 h cadence; first fire ~24 h after beat starts). One batch per inv
 bounded by `LIMIT 500` to cap runtime. Per-row isolation: one failure does not abort the
 batch.
 
-**Claim-and-fetch query (single-transaction, idempotent):**
+**Claim-and-fetch query — lease-based, recoverable from crash:**
+
+The previous design set `evaluated_at = now()` at claim time, which conflated "this row
+is being worked on right now" with "this row's metrics have been computed". A worker
+crash between claim and fill-in left rows marked evaluated but with NULL metrics — those
+rows are then permanently invisible to the partial index `idx_user_predictions_unevaluated`
+and never re-claimed. **Codex Fix #2:** introduce a lease.
+
+Two state columns instead of one:
+
+- `claimed_at timestamptz` — set when a worker claims the row.
+- `lease_expires_at timestamptz` — claim deadline. After this, the row is re-claimable
+  even if `claimed_at` is non-null (covers the crashed-mid-eval case).
+- `evaluated_at timestamptz` — final completion marker. Only set after metrics
+  successfully written. Re-claim ignores `claimed_at` for rows where `evaluated_at`
+  is still NULL.
+
+Claim query (atomic, lease-acquiring):
 
 ```sql
 WITH claimable AS (
@@ -498,34 +614,54 @@ WITH claimable AS (
     FROM public.user_predictions
     WHERE horizon_end < CURRENT_DATE
       AND evaluated_at IS NULL
+      AND (claimed_at IS NULL OR lease_expires_at < now())     -- never claimed OR lease expired
     ORDER BY horizon_end
     LIMIT 500
     FOR UPDATE SKIP LOCKED
 )
 UPDATE public.user_predictions up
-SET evaluated_at = now()                                    -- optimistic claim
+SET claimed_at       = now(),
+    lease_expires_at = now() + interval '15 minutes'           -- generous; tunable per workload
 FROM claimable c
 WHERE up.prediction_id = c.prediction_id
 RETURNING up.prediction_id, up.user_id, up.generated_at, up.horizon_end,
           up.forecast, up.model_type;
 ```
 
-The `UPDATE ... FROM claimable ... RETURNING` pattern is atomic: it locks via `FOR UPDATE
-SKIP LOCKED` (so a second concurrent beat process would claim a disjoint batch without
-blocking) and returns the claimed rows to Python in one round trip. The task sets
-`evaluated_at` first as an optimistic claim, then computes metrics and issues a second
-UPDATE per row populating `actual_outcomes`, `mape`, `pinball_loss`. Claim-first prevents
-double-processing if a long-running row exceeds the task's time budget.
+The lease bound (15 min) is the worker's hard deadline. If the worker crashes,
+times out, or is OOM-killed before completing the row, the next beat fire (24 h
+later — far longer than 15 min) re-acquires the row because
+`lease_expires_at < now()`.
 
-For each claimed row:
+Fill-in update (per row, after metrics computed) — **only this update sets `evaluated_at`**:
+
+```sql
+UPDATE public.user_predictions
+SET actual_outcomes = $1,
+    mape            = $2,
+    pinball_loss    = $3,
+    evaluated_at    = now(),
+    claimed_at      = NULL,           -- release lease bookkeeping
+    lease_expires_at = NULL
+WHERE prediction_id = $4
+  AND evaluated_at IS NULL;          -- defensive; impossible if logic correct
+```
+
+Per claimed row, the worker:
 
 1. Fetch actual transactions for `user_id` over `[generated_at::date, horizon_end]`.
 2. Aggregate to daily closing-balance trajectory via existing `TransactionLoader.aggregate_daily()`.
 3. Compute `mape` on P50 vs actual daily closing_balance.
-4. Compute per-quantile pinball loss (the honest calibration metric — tells us whether P10
-   actually contained 10% of outcomes, which MAPE cannot).
-5. `UPDATE public.user_predictions SET actual_outcomes=..., mape=..., pinball_loss=...
-   WHERE prediction_id = $1`.
+4. Compute per-quantile pinball loss.
+5. Issue the fill-in UPDATE above. If this UPDATE fails (DB transient error,
+   serialization failure), the lease still expires in ≤ 15 min and the row is
+   re-claimed on the next beat fire — no data loss, only a one-cycle delay.
+
+**Required test:** `test_evaluate_predictions.py::test_crashed_worker_row_is_reclaimable`
+seeds a row with `claimed_at = now() - interval '20 minutes'`,
+`lease_expires_at = now() - interval '5 minutes'`, `evaluated_at = NULL`. Runs
+the claim query. Asserts the row is re-claimed (lease expired) and the test
+worker can complete the fill-in.
 
 **Failure modes:**
 
@@ -533,7 +669,8 @@ For each claimed row:
 |---|---|
 | User has no transactions in horizon window | `actual_outcomes = {"note": "no_data"}`, `mape = null`, `pinball_loss = null`, `evaluated_at = now()` (so the row leaves the unevaluated index) |
 | User was deleted | `ON DELETE CASCADE` already removed the row; job never sees it |
-| Exception during evaluation of one row | Log with `prediction_id`; continue batch; row stays unevaluated and retries tomorrow |
+| Exception during evaluation of one row | Log with `prediction_id`; continue batch. The row keeps `evaluated_at IS NULL` because only the successful fill-in update sets it. Its lease expires after 15 min, after which the next beat fire re-claims it. No data loss; max one-cycle delay (24 h). |
+| Worker crashes after claim, before fill-in (process killed, OOM, network drop) | `claimed_at` non-null but `lease_expires_at < now()` once 15 min elapse. Next beat fire's claim query picks it up via the `claimed_at IS NULL OR lease_expires_at < now()` predicate. Recovery is automatic. |
 | Beat worker not running | Rows accumulate in partial index. First restart processes up to 500. Operational alert on `idx_user_predictions_unevaluated` size > N (set in monitoring, not this RFC). |
 
 #### 6. Data-flow sequence
@@ -791,3 +928,4 @@ development on insights module vs logging pipeline.
 |---|---|
 | 2026-04-17 | Initial draft. Produced from the Cowork brainstorming session synthesis covering quantile exposure, derived insights, prediction logging, walk-forward evaluation, and shadow-mode groundwork. Scope: expansion-only changes that unblock the AI Insights page and the future counterfactual-aware model. Explicitly defers scenario comparison, user floor override, shadow-mode holdout rollout, and intervention detection to follow-up RFCs. |
 | 2026-04-17 | Spec review pass 1. Fixed C1 (evaluation task moved from a fictional `apps/worker/evaluate_predictions.py` Celery-beat path to the **existing** Celery beat at `apps/api/celery_app.py`, with the task module sibling to `maintenance_tasks.py`; LLD 009's polling-worker precedent retained for queued training jobs), C2 (Chronos engine upgraded to emit all 7 quantiles — module-level `QUANTILES` constant — so `ForecastPoint` contract is non-nullable for both tiers; supersedes LLD 009 line 266), C3 (removed duplicate `DriverWeight` Pydantic class; `primary_drivers` now typed as `list[VariableImportance]`). Fixed H1 (`prediction_id: UUID` typed; generated via `uuid4()` in `ForecastService` before INSERT), H2 (added `users insert own predictions` RLS policy so the user-scoped client can write; documented service-role use for evaluation UPDATE), H3 (rewrote claim-and-fetch as atomic `UPDATE … FROM claimable … RETURNING` with `FOR UPDATE SKIP LOCKED`), H4 (added "Insights versioning protocol" subsection; `insights_version` column has no DEFAULT so service must supply), H5 (replaced ambiguous "pinball calibration" metric with separate pinball-loss and P10–P90 coverage rows), H6 (corrected Alt-4 CHECK-constraint argument). Picked up M1 (`public.` prefix on DDL), M2 (corrected JSONB storage math + introduced v1 hour-bucket logging dedup), M3 (added `horizon_days` CHECK + Pydantic `Annotated[int, Field(ge=1, le=30)]`), M4 (test-discovery note), M5 (rollback paragraph). Status promoted `Draft → Proposed`. |
+| 2026-04-17 | Codex adversarial review pass. **Codex Fix #1** (high) — hourly logging dedup was a SELECT-then-INSERT race. Fixed via `generated_hour timestamptz GENERATED ALWAYS AS date_trunc('hour', generated_at) STORED` + `UNIQUE (user_id, generated_hour)` + new `log_user_prediction(payload jsonb)` SECURITY DEFINER RPC implementing `INSERT … ON CONFLICT DO NOTHING`. Service no longer reads-then-writes; one round trip. Concurrency test added to required test list. **Codex Fix #2** (high) — evaluation claim semantics could permanently lose metrics if a worker crashed between `evaluated_at = now()` and the metric-fill UPDATE. Replaced single `evaluated_at` claim flag with a lease pair (`claimed_at` + `lease_expires_at`); `evaluated_at` is set ONLY by the successful fill-in UPDATE. Lease default 15 min; re-claimable via `claimed_at IS NULL OR lease_expires_at < now()`. Failure-modes table updated. New invariant test `test_crashed_worker_row_is_reclaimable`. |

@@ -616,7 +616,7 @@ tft_model = cached.model if cached is not None else None
 >   a separate follow-up (flagged in §Impact Assessment; out of scope for this RFC if it
 >   would otherwise block).
 >
-> The nine metrics below are emitted via `TFTModelCache.stats()` refresh on every
+> The eleven metrics below are emitted via `TFTModelCache.stats()` refresh on every
 > request plus direct increments from `publish_invalidation`, the subscriber loop, and
 > `get_or_load`:
 
@@ -632,6 +632,7 @@ tft_model = cached.model if cached is not None else None
 | `tft_cache_pubsub_invalidations_skipped_stale_total` | Counter | Subscriber skipped because incoming timestamp older than cached entry (H4 guard) |
 | `tft_cache_pubsub_publish_failures_total` | Counter | `publish_invalidation` failures |
 | `tft_cache_subscriber_reconnects_total` | Counter | Subscriber thread reconnects |
+| `forecast_warm_outcome_total{result="ok\|429\|timeout\|error"}` | Counter (labelled) | Per Codex Fix #4 — closes the loop on FE-initiated `POST /forecast/warm` outcomes. Fed by the client via a new `POST /api/v1/metrics/client-event` route (JWT-authenticated, rate-limited 30/min). Lets ops detect a high `result="timeout"` rate (warm endpoint is slow) or `result="error"` rate (auth or network breakage) without inferring from cache hit/miss alone. |
 
 All histograms use seconds per Prometheus convention; no separate `_ms` metric.
 Grafana dashboard `dashboards/forecast-cache.json` out of scope for this RFC but tracked as a follow-up.
@@ -648,8 +649,9 @@ will own that migration.
 
 | Method | Endpoint | Change |
 |---|---|---|
+| POST | `/api/v1/metrics/client-event` | **New per Codex Fix #4.** Accepts `{event: "forecast_warm_outcome", result: "ok\|429\|timeout\|error"}`. Increments `forecast_warm_outcome_total{result=...}`. JWT-authenticated, rate-limited 30/min/user via `RateLimiter + rate_limit_dependency`. Body validated by Pydantic; unknown event names rejected 400. |
 | POST | `/forecast/warm` | **New.** Fire-and-forget TFT warm. Returns 202. JWT-authenticated. Rate-limited to 1 per 5 min per user. |
-| GET | `/metrics` | Existing Prometheus endpoint. Gains nine new series listed above. |
+| GET | `/metrics/prom` | Prometheus exposition endpoint stood up by this RFC's §8. Carries all eleven new metric series listed above. |
 
 No other endpoints change. `/forecast/predict` now consumes `get_tft_cache()` internally but the contract is unchanged from RFC-003.
 
@@ -694,7 +696,7 @@ No other endpoints change. `/forecast/predict` now consumes `get_tft_cache()` in
   - `packages/forecasting/cache_invalidation.py` — `publish_invalidation`, `start_subscriber`, `CHANNEL`
   - `packages/forecasting/tests/test_cache.py`
   - `packages/forecasting/tests/test_cache_invalidation.py`
-  - `apps/api/core/metrics.py` — module-level `CollectorRegistry` + counter/histogram/gauge factories + all nine RFC-004 metric singletons
+  - `apps/api/core/metrics.py` — module-level `CollectorRegistry` + counter/histogram/gauge factories + all eleven RFC-004 metric singletons
   - `apps/api/domains/forecasting/tests/test_warm_endpoint.py`
   - `apps/worker/tests/test_train_publishes_invalidation.py`
 - **Backend — modified files:**
@@ -762,7 +764,7 @@ Zero downtime. No user-visible changes until the frontend wires `/forecast/warm`
 | Phase 4 | 0.5 day | `apps/api/main.py` lifespan + `get_tft_cache` + `app.state.warm_rate_limiter` |
 | Phase 5 | 0.5 day | Worker `publish_invalidation` wiring + test (polling worker, NOT Celery) |
 | Phase 6 | 0.5 day | `POST /forecast/warm` endpoint + test via existing `RateLimiter + rate_limit_dependency` (no slowapi) |
-| Phase 7 | 1 day | Prometheus subsystem: add `prometheus-client` dependency, create `apps/api/core/metrics.py` (`CollectorRegistry` + factories + nine RFC-004 metrics), register `/metrics/prom` route, update ops-runbook note on the existing `/metrics` JSON route naming collision |
+| Phase 7 | 1 day | Prometheus subsystem: add `prometheus-client` dependency, create `apps/api/core/metrics.py` (`CollectorRegistry` + factories + eleven RFC-004 metrics), register `/metrics/prom` route, update ops-runbook note on the existing `/metrics` JSON route naming collision |
 | Phase 8 | 0.5 day | `inference.py` deletion + service-layer migration + integration tests |
 | Phase 9 | 1 day | End-to-end load test, latency benchmark, append observed p50/p95 per metric as a new Research doc `docs/research/NNN-rfc-004-load-test.md` |
 
@@ -789,3 +791,4 @@ Total: ~6 engineering-days. Parallelisable to ~4 days (cache module + invalidati
 |---|---|
 | 2026-04-17 | Initial draft. Architecture chosen after brainstorming BUG-018's four candidate options (pre-warm, mmap, consistent-hash, hybrid): hybrid prevails because it is the only option that addresses all four structural defects enumerated in BUG-018. Redis pub-sub selected over Supabase Realtime for the invalidation channel because Redis is already deployed as the Celery broker and has lower latency for the single-producer / few-consumer traffic pattern. Status: Proposed. |
 | 2026-04-17 | Spec review pass 1 fixes. C1: removed slowapi (doesn't exist in repo) — rewrote `/forecast/warm` endpoint to use the existing `RateLimiter + rate_limit_dependency` pattern from `apps/api/main.py`. C2: dropped the false "existing `prometheus_client` wiring" claim; the RFC now explicitly stands up the Prometheus subsystem (`prometheus-client` dependency, new `apps/api/core/metrics.py`, new `/metrics/prom` route, named-collision note vs the existing `/metrics` JSON route in categorization). C3: removed the server-initiated `warm_hot_models` Celery beat task because pre-warming into the Celery worker's memory cannot populate API-worker caches — deferred to a follow-on RFC; v1 relies on FE-initiated `POST /forecast/warm`. C4: replaced the `threading.Lock`-inside-`asyncio.to_thread` single-flight pattern (threadpool head-of-line blocking risk) with an `asyncio.Future`-based leader/follower pattern under a single `asyncio.Lock`, with cleanup on completion. H1: dropped the `top_active_users` RPC (no longer needed after C3). H4: `publish_invalidation` payload slimmed to `(user_id, checkpoint_updated_at)`; subscriber uses timestamp as stale-guard to skip out-of-order messages. H5: documented per-worker subscriber fan-out intent. Dropped `forecast_cold_load_latency_ms` (unit collision with `_seconds`); SLO watchdog fires off histogram bucket. Removed `from __future__ import annotations` imports (redundant on 3.14). |
+| 2026-04-17 | **Codex Fix #4** (medium) — paired with LLD-011 update. Warm path was fire-and-forget with no observability and no first-request latency contract. Added counter `forecast_warm_outcome_total{result="ok\|429\|timeout\|error"}` (eleventh metric) and new `POST /api/v1/metrics/client-event` route (JWT + rate-limited 30/min) so client warm outcomes are server-side measurable. LLD 011 takes the bounded-wait + race-with-predict pattern. |

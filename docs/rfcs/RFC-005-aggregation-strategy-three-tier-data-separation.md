@@ -413,9 +413,40 @@ CREATE TABLE public.scheduled_cashflows (
 CREATE INDEX idx_scheduled_cashflows_user_active
     ON public.scheduled_cashflows (user_id, is_active, next_occurrence);
 
--- Upsert key for heuristic detection idempotency
+-- Upsert key for heuristic detection idempotency.
+-- Codex Fix #3: must include EVERY recurrence-defining dimension. The original
+-- key (user_id, COALESCE(merchant,''), amount, rrule_freq) collapsed distinct
+-- rules — e.g. two monthly rules at the same merchant + amount but different
+-- day_of_month would overwrite each other on conflict, silently dropping
+-- obligations. The expanded key adds day_of_month, day_of_week, category_bucket,
+-- and source so each genuinely-distinct rule has its own row.
 CREATE UNIQUE INDEX uniq_scheduled_cashflows_rule
-    ON public.scheduled_cashflows (user_id, COALESCE(merchant, ''), amount, rrule_freq);
+    ON public.scheduled_cashflows (
+        user_id,
+        COALESCE(merchant, ''),
+        amount,
+        category_bucket,
+        rrule_freq,
+        COALESCE(day_of_month, -1),         -- -1 sentinel preserves NULL distinguishability
+        COALESCE(day_of_week,  -1),
+        source
+    );
+
+-- Migration backfill safety check: before applying the new unique index in
+-- production, run this audit to detect existing collisions that the v1 key
+-- would have already silently dropped. Any non-empty result means a manual
+-- merge / dedup pass is required before the migration completes.
+-- (Run via psql or supabase db psql; not part of the migration file itself.)
+--
+--   SELECT user_id, COALESCE(merchant,''), amount, category_bucket, rrule_freq,
+--          COALESCE(day_of_month,-1), COALESCE(day_of_week,-1), source,
+--          count(*)
+--   FROM public.scheduled_cashflows
+--   GROUP BY 1,2,3,4,5,6,7,8
+--   HAVING count(*) > 1;
+--
+-- v1 ships against an empty table (RFC-005 is a green-field migration), so the
+-- audit is precautionary only.
 
 ALTER TABLE public.scheduled_cashflows ENABLE ROW LEVEL SECURITY;
 
@@ -577,3 +608,4 @@ Total: ~5.5 engineering-days. Parallelisable to ~4 days (Phase 2 + Phase 3 + Pha
 |---|---|
 | 2026-04-17 | Initial draft. Derived from the Cowork brainstorming session's three-data-kinds insight: deterministic obligations (EMI, SIP, rent) → scheduler, semi-predictable behavioural (groceries, dining) → TFT, stochastic (medical, travel) → widen intervals. Category taxonomy fixed at 12 coarse buckets to decouple the ML contract from classifier evolution. Heuristic recurrence detector chosen over ML classifier to fit v1 timeline. Transaction-level Mamba deferred to v2 roadmap. Status: Proposed. |
 | 2026-04-17 | Spec review APPROVED for commit. Polish fixes applied: M1 corrected the old-checkpoint failure mechanism (`load_from_checkpoint` raises on state_dict mismatch; RFC-004 `_download_and_load` catches and returns None — not library-returns-None); H3 clarified that `scheduled_event_amount` is per-(date, bucket) not per-date and specified inference-time construction via `project_scheduled_cashflows` + dense-grid zero-fill; H1 added an implementation note requiring `CLASSIFIER_LABEL_TO_BUCKET` to enumerate real `Category` enum values from `packages/categorization/constants.py` with a 100 % coverage mapping-validator test. H2 (merchant column projection into `fetch_user_transactions`) deferred to Phase 2 plumbing. |
+| 2026-04-17 | **Codex Fix #3** (high) — recurring-rule unique key `(user_id, COALESCE(merchant,''), amount, rrule_freq)` collapsed distinct rules: two monthly rules at the same merchant + amount but different `day_of_month`, `category_bucket`, or `source` would silently overwrite each other on conflict, dropping obligations and corrupting known-future covariates. Expanded `uniq_scheduled_cashflows_rule` to include `category_bucket`, `COALESCE(day_of_month, -1)`, `COALESCE(day_of_week, -1)`, `source`. Added migration audit query (run pre-apply) to detect any existing collisions; v1 ships against an empty table so audit is precautionary. |
