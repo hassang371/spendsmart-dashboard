@@ -3,6 +3,12 @@
 Migrated from routers/forecast.py.
 Fixes BUG-07: Uses parse_file() instead of parse_csv_content() to
 preserve metadata columns.
+
+Stage 1 (LLD 009) refactor: the POST /predict handler is now a thin
+delegation layer over ``ForecastService`` (apps/api/domains/forecasting/
+service.py). The over-the-wire response shape is unchanged — Stage 5
+(RFC-003) is the migration that swaps the response_model to the new
+``ForecastResponse``.
 """
 
 import hashlib
@@ -13,6 +19,7 @@ import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from apps.api.core.auth import get_current_user_id, get_user_client
+from apps.api.domains.forecasting.service import ForecastService
 from packages.forecasting.dataset import TransactionLoader
 from packages.forecasting.inference import load_model, predict_with_tft
 from packages.ingestion_engine.import_transactions import parse_file
@@ -22,11 +29,17 @@ router = APIRouter(prefix="/forecast", tags=["forecast"])
 logger = structlog.get_logger()
 
 
+def _get_service(client: Client = Depends(get_user_client)) -> ForecastService:
+    """Construct a ForecastService scoped to the request's Supabase client."""
+    return ForecastService(client)
+
+
 @router.post("/predict")
 async def forecast_predict(
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
+    service: ForecastService = Depends(_get_service),
 ):
     """Accept a CSV of transactions and return predicted spending.
 
@@ -35,6 +48,10 @@ async def forecast_predict(
 
     IMP-05 fix: Auth check and duplicate-file check happen before any
     parsing work, so duplicate uploads fail fast.
+
+    Stage 1: forecast computation now lives in ``ForecastService.predict``;
+    this handler is responsible only for transport concerns (CSV parse,
+    upload-dedup, error mapping).
     """
     if file.content_type and "csv" not in file.content_type and "text" not in file.content_type:
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
@@ -70,34 +87,11 @@ async def forecast_predict(
         df = df.rename(columns={"transaction_date": "date"})
 
     try:
-        loader = TransactionLoader(df)
-        daily_df = loader.aggregate_daily()
-    except Exception:
+        return service.predict(df, user_id=user_id, horizon=7)
+    except ValueError:
+        # Roll back the upload marker so the user can retry with a fixed file.
         client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
         raise HTTPException(status_code=400, detail="Failed to aggregate transactions")
-
-    # Statistical forecast
-    horizon = 7
-    recent = daily_df.tail(min(30, len(daily_df)))
-    avg_daily_spend = float(recent["daily_spend"].mean()) if "daily_spend" in recent.columns else 0.0
-    avg_daily_income = float(recent["daily_income"].mean()) if "daily_income" in recent.columns else 0.0
-
-    predictions = [
-        {
-            "day_offset": day,
-            "predicted_spend": round(avg_daily_spend, 2),
-            "predicted_income": round(avg_daily_income, 2),
-            "predicted_net": round(avg_daily_income - avg_daily_spend, 2),
-        }
-        for day in range(1, horizon + 1)
-    ]
-
-    return {
-        "predictions": predictions,
-        "horizon_days": horizon,
-        "model": "statistical_mvp",
-        "note": "Using rolling average. TFT model used when trained checkpoint available.",
-    }
 
 
 @router.get("/safe-to-spend")
