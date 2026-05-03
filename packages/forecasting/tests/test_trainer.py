@@ -96,26 +96,37 @@ def test_prepare_training_data_minimum_days():
 
 
 def test_prepare_training_data_success():
-    """Full pipeline produces all expected columns."""
+    """Full pipeline produces a panel with all expected columns.
+
+    Per RFC-005 §3, the panel is one row per (date, category_bucket).
+    ``time_idx`` is monotonic *within* each bucket group; the global
+    DataFrame ordering is bucket-major.
+    """
     df = _make_raw_transactions(120)
     enriched = prepare_training_data(df)
 
     expected_cols = [
         "date",
+        "user_id",
+        "category_bucket",
+        "bucket_total",
         "daily_income",
         "daily_spend",
         "closing_balance",
+        "scheduled_event_amount",
         "time_idx",
         "day_of_week",
         "day_of_month",
-        "group_id",
+        "month",
         "is_payday",
     ]
     for col in expected_cols:
         assert col in enriched.columns, f"Missing column: {col}"
 
-    # time_idx should be monotonically increasing
-    assert enriched["time_idx"].is_monotonic_increasing
+    # time_idx is monotonic *within* each bucket group.
+    for _, group in enriched.groupby("category_bucket"):
+        assert group.sort_values("date")["time_idx"].is_monotonic_increasing
+
     # is_payday should be categorical
     assert enriched["is_payday"].dtype.name == "category"
 

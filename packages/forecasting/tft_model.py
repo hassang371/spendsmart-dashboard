@@ -5,14 +5,20 @@ from pytorch_forecasting.metrics import QuantileLoss
 def create_tft_model(
     training_dataset: TimeSeriesDataSet,
     learning_rate=0.03,
-    hidden_size=16,
-    attention_head_size=1,
+    hidden_size=128,
+    attention_head_size=8,
     dropout=0.1,
-    hidden_continuous_size=8,
-    lstm_layers=1,
+    hidden_continuous_size=64,
+    lstm_layers=3,
 ):
     """
     Creates a TemporalFusionTransformer model from the training dataset.
+
+    Default hyperparameters per RFC-005 §"TFT hyperparameter supersession":
+    ``hidden_size=128``, ``attention_head_size=8``, ``lstm_layers=3``,
+    ``hidden_continuous_size=64``. The 12-bucket panel produces ~12× more
+    rows per user than the v0 single-series schema, justifying the
+    capacity bump.
     """
     tft = TemporalFusionTransformer.from_dataset(
         training_dataset,

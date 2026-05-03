@@ -30,7 +30,14 @@ MAX_ENCODER_LENGTH = 60
 
 
 def fetch_user_transactions(supabase, user_id: str) -> pd.DataFrame:
-    """Fetch all transactions for a user (service-role client bypasses RLS)."""
+    """Fetch all transactions for a user (service-role client bypasses RLS).
+
+    Per RFC-005 H2, the projection includes ``merchant_name`` so the
+    heuristic recurrence detector can group on merchant. ``merchant`` is
+    surfaced as the canonical column name downstream consumers use; we
+    keep ``merchant_name`` available for rows where the upstream
+    classifier wrote there.
+    """
     response = (
         supabase.table("transactions")
         .select("transaction_date, amount, description, merchant_name, category")
@@ -45,6 +52,8 @@ def fetch_user_transactions(supabase, user_id: str) -> pd.DataFrame:
     df = pd.DataFrame(response.data)
     df = df.rename(columns={"transaction_date": "date"})
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
+    if "merchant_name" in df.columns and "merchant" not in df.columns:
+        df["merchant"] = df["merchant_name"]
     return df
 
 

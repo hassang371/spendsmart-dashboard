@@ -42,7 +42,11 @@ def test_aggregate_daily_basics():
 
 
 def test_prepare_training_data_includes_payday_detection():
-    """prepare_training_data should enrich with is_payday column and standard features."""
+    """prepare_training_data should emit a panel with is_payday + features.
+
+    Per RFC-005 §3 the canonical output is a panel: one row per
+    (date, category_bucket). Number of rows = N days × 12 buckets.
+    """
     rng = np.random.default_rng(42)
     dates = pd.date_range("2026-01-01", periods=100, freq="D")
     amounts = rng.choice([-50, -20, -10, 1000], size=100).astype(float)
@@ -58,8 +62,11 @@ def test_prepare_training_data_includes_payday_detection():
     assert "time_idx" in result.columns
     assert "day_of_week" in result.columns
     assert "day_of_month" in result.columns
-    assert "group_id" in result.columns
-    assert len(result) == 100
+    assert "category_bucket" in result.columns
+    assert "user_id" in result.columns
+    assert result["date"].nunique() == 100
+    assert result["category_bucket"].nunique() == 12
+    assert len(result) == 100 * 12
     # is_payday should be a string categorical (TFT requirement)
     assert result["is_payday"].dtype.name == "category"
 
@@ -80,6 +87,8 @@ def test_prepare_training_data_no_min_days_check_by_default():
     amounts = [-50.0] * 30
     df = pd.DataFrame({"date": dates, "amount": amounts})
 
-    # Should not raise
+    # Should not raise; panel = 30 days × 12 buckets
     result = prepare_training_data(df)
-    assert len(result) == 30
+    assert result["date"].nunique() == 30
+    assert result["category_bucket"].nunique() == 12
+    assert len(result) == 30 * 12

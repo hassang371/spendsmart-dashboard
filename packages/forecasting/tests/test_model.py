@@ -1,8 +1,22 @@
+import inspect
+
 import lightning.pytorch as pl
 import pandas as pd
 
 from packages.forecasting.dataset import TransactionLoader, create_timeseries_dataset
 from packages.forecasting.tft_model import create_tft_model
+
+
+def test_create_tft_model_default_params_match_rfc005():
+    """RFC-005 §"TFT hyperparameter supersession" — defaults are
+    hidden_size=128, attention_head_size=8, lstm_layers=3,
+    hidden_continuous_size=64.
+    """
+    params = inspect.signature(create_tft_model).parameters
+    assert params["hidden_size"].default == 128
+    assert params["attention_head_size"].default == 8
+    assert params["lstm_layers"].default == 3
+    assert params["hidden_continuous_size"].default == 64
 
 
 def test_tft_training_loop():
