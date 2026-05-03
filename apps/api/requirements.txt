@@ -15,8 +15,12 @@ bcrypt==4.2.0
 
 # Monitoring
 sentry-sdk==2.19.0
+prometheus-client>=0.20,<1.0
 
 structlog>=24.0.0
 pydantic-settings>=2.0.0
 python-json-logger>=2.0.0
 sentry-sdk[fastapi]>=2.0.0
+
+# Test-only — used in apps/worker + forecasting tests via fakeredis.aioredis
+fakeredis>=2.0

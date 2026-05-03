@@ -11,15 +11,17 @@ service.py). The over-the-wire response shape is unchanged — Stage 5
 ``ForecastResponse``.
 """
 
+import asyncio
 import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from apps.api.core.auth import get_current_user_id, get_user_client
 from apps.api.domains.forecasting.service import ForecastService
+from packages.forecasting.cache import TFTModelCache
 from packages.forecasting.dataset import TransactionLoader
 from packages.forecasting.inference import load_model, predict_with_tft
 from packages.ingestion_engine.import_transactions import parse_file
@@ -27,6 +29,36 @@ from supabase import Client
 
 router = APIRouter(prefix="/forecast", tags=["forecast"])
 logger = structlog.get_logger()
+
+
+# Warm endpoint timeout — the FE expects /forecast/warm to return
+# quickly with a status indicator. Anything longer than this is treated
+# as ``status="warming"`` (the load is still running in the background).
+WARM_BOUNDED_TIMEOUT_SECONDS = 0.5
+
+
+def _get_tft_cache(request: Request) -> TFTModelCache:
+    """Resolve the global ``TFTModelCache`` from ``app.state``.
+
+    The cache is constructed once in the FastAPI lifespan
+    (``apps/api/main.py``); this indirection lets tests substitute a
+    mock cache via ``app.dependency_overrides``.
+    """
+    cache = getattr(request.app.state, "tft_cache", None)
+    if cache is None:
+        raise HTTPException(
+            status_code=503,
+            detail="TFT cache not initialised; service is starting up.",
+        )
+    return cache
+
+
+def _warm_rate_limit(request: Request):
+    """Resolve the warm-endpoint rate-limit dependency from app state."""
+    dep = getattr(request.app.state, "warm_rate_limiter", None)
+    if dep is None:
+        return None
+    return dep
 
 
 def _get_service(client: Client = Depends(get_user_client)) -> ForecastService:
@@ -187,3 +219,50 @@ async def safe_to_spend(
         "note": model_note,
         "forecast_breakdown": forecast_breakdown,
     }
+
+
+@router.post("/warm", status_code=202)
+async def warm_model(
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+    cache: TFTModelCache = Depends(_get_tft_cache),
+):
+    """Pre-warm the TFT model for the current user.
+
+    Per RFC-004 §3 + §Codex Fix #4: the request races a bounded-wait
+    against ``cache.get_or_load`` — if the load completes within the
+    bounded window we return ``status="ready"``, otherwise the load is
+    detached as a background task and we return ``status="warming"``
+    immediately so the FE can race ``predict`` against the warm.
+
+    Rate-limited to 1 call per 5 minutes per user via the existing
+    ``RateLimiter + rate_limit_dependency`` pattern (see
+    ``apps/api/main.py`` lifespan).
+    """
+    # Apply rate limit (constructed in app.state; see lifespan).
+    dep = _warm_rate_limit(request)
+    if dep is not None:
+        await dep(request)
+
+    async def _load_and_log() -> None:
+        try:
+            await cache.get_or_load(user_id)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("tft_warm_task_failed", user_id=user_id, error=str(exc))
+
+    try:
+        result = await asyncio.wait_for(
+            cache.get_or_load(user_id),
+            timeout=WARM_BOUNDED_TIMEOUT_SECONDS,
+        )
+        status = "ready" if result is not None else "failed"
+        return {"status": status, "user_id": user_id}
+    except asyncio.TimeoutError:
+        # The load is still in flight on the cache's _inflight table;
+        # it will complete in the background and populate the cache.
+        # Detach a follower task so the load is not abandoned.
+        asyncio.create_task(_load_and_log())
+        return {"status": "warming", "user_id": user_id}
+    except Exception as exc:
+        logger.warning("tft_warm_failed", user_id=user_id, error=str(exc))
+        return {"status": "failed", "user_id": user_id}

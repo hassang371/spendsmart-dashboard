@@ -145,15 +145,33 @@ def process_next_job(supabase: Client) -> bool:
             try:
                 logs = train_model(job_id, user_id)
 
+                completed_at = datetime.now(timezone.utc).isoformat()
                 supabase.table("training_jobs").update(
                     {
                         "status": JobStatus.COMPLETED,
                         "logs": logs,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": completed_at,
                     }
                 ).eq("id", job_id).execute()
 
                 logger.info(f"Job {job_id} completed successfully.")
+
+                # RFC-004 — publish a cache-invalidation message AFTER
+                # the DB commit so any subscriber that reacts will see
+                # the new checkpoint when it reloads. Failure is
+                # non-fatal: counted + logged, never raised.
+                try:
+                    import redis as _redis
+
+                    from packages.forecasting.cache_invalidation import (
+                        publish_invalidation_sync,
+                    )
+
+                    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+                    redis_client = _redis.from_url(redis_url, socket_connect_timeout=2)
+                    publish_invalidation_sync(redis_client, user_id, completed_at)
+                except Exception as exc:
+                    logger.warning(f"Job {job_id}: cache invalidation publish failed: {exc}")
 
             except Exception as e:
                 logger.error(f"Job {job_id} failed: {e}")

@@ -40,6 +40,12 @@ from apps.api.domains.forecasting.router import router as forecasting_router
 
 # Domain routers (new)
 from apps.api.domains.ingestion.router import router as ingestion_router
+from apps.api.domains.metrics.router import (
+    client_event_router as metrics_client_event_router,
+)
+from apps.api.domains.metrics.router import (
+    prom_router as metrics_prom_router,
+)
 from apps.api.domains.training.router import router as training_router
 
 # Legacy routers (preserving for backward compat during migration)
@@ -126,6 +132,7 @@ async def lifespan(app: FastAPI):
     # Initialize Redis-backed rate limiter for the /ingest/import endpoint
     import redis as _redis
 
+    _redis_client = None
     try:
         _redis_client = _redis.from_url(
             os.getenv("REDIS_URL", "redis://localhost:6379/0"),
@@ -140,6 +147,56 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("rate_limiter_unavailable", error=str(e))
         app.state.import_rate_limiter = None
+        _redis_client = None
+
+    # RFC-004 — TFT model cache + warm endpoint rate limiter +
+    # client-event rate limiter + Redis pub-sub subscriber.
+    from packages.forecasting.cache import TFTModelCache
+    from packages.forecasting.cache_invalidation import start_subscriber
+
+    app.state.tft_cache = TFTModelCache()
+    logger.info(
+        "tft_cache_initialized",
+        max_entries=app.state.tft_cache._max_entries,
+        max_bytes=app.state.tft_cache._max_bytes,
+        ttl_seconds=app.state.tft_cache._ttl,
+    )
+
+    if _redis_client is not None:
+        try:
+            app.state.warm_rate_limiter = rate_limit_dependency(
+                RateLimiter(_redis_client, max_requests=1, window_seconds=300)
+            )
+            app.state.client_event_rate_limiter = rate_limit_dependency(
+                RateLimiter(_redis_client, max_requests=30, window_seconds=60)
+            )
+        except Exception as e:
+            logger.warning("warm_rate_limiter_unavailable", error=str(e))
+            app.state.warm_rate_limiter = None
+            app.state.client_event_rate_limiter = None
+    else:
+        app.state.warm_rate_limiter = None
+        app.state.client_event_rate_limiter = None
+
+    # Subscribe to cache-invalidation pub-sub. We use redis.asyncio to
+    # match the async subscriber loop. Failure to start is non-fatal —
+    # the cache still works, just without cross-worker invalidation.
+    app.state.tft_cache_subscriber_task = None
+    app.state.tft_cache_async_redis = None
+    try:
+        from redis import asyncio as redis_asyncio
+
+        async_redis = redis_asyncio.from_url(
+            os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            socket_connect_timeout=2,
+        )
+        # Touch the connection so a misconfigured REDIS_URL fails fast.
+        await async_redis.ping()
+        app.state.tft_cache_async_redis = async_redis
+        app.state.tft_cache_subscriber_task = start_subscriber(async_redis, app.state.tft_cache)
+        logger.info("tft_cache_subscriber_started")
+    except Exception as e:
+        logger.warning("tft_cache_subscriber_unavailable", error=str(e))
 
     # Eagerly initialize the MiniLM classifier in background thread
     # so the first import doesn't wait for model loading.
@@ -162,6 +219,21 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_warmup_classifier())
 
     yield
+
+    # Shutdown: stop the pub-sub subscriber and close async Redis.
+    sub_task = getattr(app.state, "tft_cache_subscriber_task", None)
+    if sub_task is not None:
+        sub_task.cancel()
+        try:
+            await sub_task
+        except (asyncio.CancelledError, Exception):
+            pass
+    async_redis = getattr(app.state, "tft_cache_async_redis", None)
+    if async_redis is not None:
+        try:
+            await async_redis.aclose()
+        except Exception:
+            pass
     logger.info("app_stopping")
 
 
@@ -247,6 +319,11 @@ app.include_router(training_router, prefix="/api/v1")
 app.include_router(anomaly_router, prefix="/api/v1")
 app.include_router(accounts_router, prefix="/api/v1")
 app.include_router(aggregator_router, prefix="/api/v1")
+app.include_router(metrics_client_event_router, prefix="/api/v1")
+
+# Prometheus exposition route — root-mounted (no /api/v1 prefix) so
+# scrape configs can hit a stable, prefix-free path.
+app.include_router(metrics_prom_router)
 
 
 @app.get("/health", tags=["health"])

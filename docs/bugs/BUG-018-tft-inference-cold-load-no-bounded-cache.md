@@ -3,7 +3,7 @@
 > **Doc ID:** BUG-018-tft-inference-cold-load-no-bounded-cache
 > **Date:** 2026-04-17
 > **Severity:** High
-> **Status:** Root Cause Found
+> **Status:** Fix Applied
 > **DRI:** Mohammed Hassan Mohiddin
 
 ## Observed Behavior
@@ -304,3 +304,4 @@ before they look at a forecast). The RFC will land on one of these.
 |---|---|
 | 2026-04-17 | Initial report. Defect surfaced during a Cowork brainstorming session on prediction engine architecture. Scope: document the four structural deficiencies of `_MODEL_CACHE` against the 500 ms latency target and enumerate the fix options for the follow-up RFC. Does not specify the fix; the architectural choice between pre-warm / mmap / consistent-hash is deferred to `docs/rfcs/RFC-NNN-tft-inference-cache-architecture.md` (to be authored). |
 | 2026-04-17 | Spec review pass. Fixed H1 (named `get_latest_checkpoint_path` + `load_model` signature precisely, clarified `supabase` vs `client` vs `self.supabase`), H2 (clarified warm p50/p95 estimates and flagged SLO-vs-Chronos-2 tension for the RFC), H3 (replaced grep CI check with pytest regression test), and M3 (pinned the follow-up RFC path + Gate 4 `Refs:` requirement). |
+| 2026-05-04 | Status `Root Cause Found → Fix Applied`. Stage 3 of the prediction-engine v1 master plan landed RFC-004 §Detailed Design 1–5 + 8: bounded LRU+TTL+byte-cap `TFTModelCache` with single-flight `get_or_load`, Redis pub-sub invalidation channel with reconnect + stale-guard, Prometheus subsystem (eleven metrics on a private `CollectorRegistry`), `POST /forecast/warm` endpoint, `GET /metrics/prom` exposition route, `POST /api/v1/metrics/client-event` telemetry route, and the worker-side `publish_invalidation_sync` hook fired AFTER the `training_jobs.status='completed'` DB commit. Tests: `packages/forecasting/tests/test_cache.py`, `packages/forecasting/tests/test_cache_invalidation.py`, `apps/api/domains/forecasting/tests/test_warm_endpoint.py`, `apps/api/domains/forecasting/tests/test_train_publishes_invalidation.py`, `apps/api/domains/forecasting/tests/test_metrics_prom_endpoint.py`, `apps/api/domains/forecasting/tests/test_client_event_endpoint.py` — 26 tests all green. Legacy `_MODEL_CACHE` / `load_model` / `invalidate_cache` shims preserved in `packages/forecasting/inference.py` per master-plan H3 fix; deletion deferred to Stage 5. Status flips to `Verified` once Stage 10 integration runs land in production with the cache resident-bytes gauge measured below the configured ceiling. |
