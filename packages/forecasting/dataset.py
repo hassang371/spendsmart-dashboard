@@ -159,12 +159,76 @@ def create_timeseries_dataset(data: pd.DataFrame, max_encoder_length=30, max_pre
     )
 
 
+def _detect_paydays(daily_df: pd.DataFrame, threshold_percentile: float = 90) -> pd.Series:
+    """Detect payday pattern: days with income above the 90th-percentile
+    that recur on a similar day_of_month across >= 2 months.
+
+    Returns an integer Series (0/1) aligned with ``daily_df`` index.
+    """
+    if "daily_income" not in daily_df.columns:
+        return pd.Series(0, index=daily_df.index)
+
+    income = daily_df["daily_income"]
+    positive_income = income[income > 0]
+
+    if positive_income.empty:
+        return pd.Series(0, index=daily_df.index)
+
+    threshold = positive_income.quantile(threshold_percentile / 100)
+    large_deposit = income >= threshold
+
+    if isinstance(daily_df.index, pd.DatetimeIndex):
+        dom = daily_df.index.day
+    elif "date" in daily_df.columns:
+        dom = pd.to_datetime(daily_df["date"]).dt.day
+    else:
+        return large_deposit.astype(int)
+
+    payday_days = []
+    for day in dom[large_deposit].unique():
+        if large_deposit[dom == day].sum() >= 2:
+            payday_days.append(day)
+
+    return pd.Series(dom.isin(payday_days).astype(int), index=daily_df.index)
+
+
 def prepare_training_data(
     transactions: pd.DataFrame,
     start_date=None,
     end_date=None,
+    min_days: int = 0,
 ) -> pd.DataFrame:
-    """Prepare enriched daily data used by forecasting training."""
+    """Canonical data preparation: aggregate -> validate -> payday detect -> enrich.
+
+    Args:
+        transactions: Raw transactions with ``date`` and ``amount`` columns.
+        start_date: Optional start-date filter.
+        end_date: Optional end-date filter.
+        min_days: Minimum required days of history. ``0`` (default) skips the check.
+
+    Returns:
+        Enriched DataFrame ready for TFT training/inference.
+
+    Raises:
+        ValueError: If history is shorter than ``min_days``.
+    """
     loader = TransactionLoader(transactions)
-    daily = loader.aggregate_daily(start_date=start_date, end_date=end_date)
-    return loader.enrich_features(daily)
+    daily_df = loader.aggregate_daily(start_date=start_date, end_date=end_date)
+
+    if min_days > 0 and len(daily_df) < min_days:
+        raise ValueError(
+            f"Insufficient data: {len(daily_df)} days available, "
+            f"but the model requires at least {min_days}. "
+            f"Please upload more transaction history."
+        )
+
+    # Payday detection (canonical home — moved from trainer.py)
+    daily_df["is_payday"] = _detect_paydays(daily_df)
+
+    # Standard time-feature enrichment
+    enriched = loader.enrich_features(daily_df)
+
+    # is_payday must be a string categorical for TFT
+    enriched["is_payday"] = enriched["is_payday"].astype(str).astype("category")
+
+    return enriched

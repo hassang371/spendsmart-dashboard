@@ -15,8 +15,11 @@ import pandas as pd
 from pytorch_forecasting import TimeSeriesDataSet
 
 from packages.forecasting.dataset import (
-    TransactionLoader,
+    _detect_paydays,
     create_timeseries_dataset,
+)
+from packages.forecasting.dataset import (
+    prepare_training_data as _prepare_training_data_canonical,
 )
 from packages.forecasting.tft_model import create_tft_model
 
@@ -28,45 +31,15 @@ MAX_ENCODER_LENGTH = 60
 
 
 # ---------------------------------------------------------------------------
-# Feature helpers
+# Backward-compatibility shims — canonical implementations live in dataset.py.
+# These shims are removed in Stage 1 Task 1.5 once all callers + tests import
+# from dataset.py directly.
 # ---------------------------------------------------------------------------
 
 
 def detect_paydays(daily_df: pd.DataFrame, threshold_percentile: float = 90) -> pd.Series:
-    """
-    Detect payday pattern: days with income above the 90th-percentile
-    that recur on a similar day_of_month across >=2 months.
-
-    Returns an integer Series (0/1) aligned with *daily_df* index.
-    """
-    if "daily_income" not in daily_df.columns:
-        return pd.Series(0, index=daily_df.index)
-
-    income = daily_df["daily_income"]
-    positive_income = income[income > 0]
-
-    if positive_income.empty:
-        return pd.Series(0, index=daily_df.index)
-
-    threshold = positive_income.quantile(threshold_percentile / 100)
-    large_deposit = income >= threshold
-
-    # Determine day-of-month for each row
-    if isinstance(daily_df.index, pd.DatetimeIndex):
-        dom = daily_df.index.day
-    elif "date" in daily_df.columns:
-        dom = pd.to_datetime(daily_df["date"]).dt.day
-    else:
-        return large_deposit.astype(int)
-
-    # A day_of_month is a "payday" if it had large deposits in >=2 months
-    payday_days = []
-    for day in dom[large_deposit].unique():
-        if large_deposit[dom == day].sum() >= 2:
-            payday_days.append(day)
-
-    is_payday = pd.Series(dom.isin(payday_days).astype(int), index=daily_df.index)
-    return is_payday
+    """Backward-compat shim — see ``packages.forecasting.dataset._detect_paydays``."""
+    return _detect_paydays(daily_df, threshold_percentile=threshold_percentile)
 
 
 # ---------------------------------------------------------------------------
@@ -94,31 +67,13 @@ def fetch_user_transactions(supabase, user_id: str) -> pd.DataFrame:
 
 
 def prepare_training_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Backward-compat shim around the canonical
+    ``packages.forecasting.dataset.prepare_training_data``.
+
+    Internal trainer call-site requires the ``MINIMUM_DAYS`` history check; the
+    canonical helper accepts ``min_days`` so the behaviour is preserved.
     """
-    Full pipeline: aggregate daily -> validate history length -> add is_payday -> enrich features.
-
-    Returns an enriched DataFrame ready for ``create_timeseries_dataset``.
-    """
-    loader = TransactionLoader(df)
-    daily_df = loader.aggregate_daily()
-
-    if len(daily_df) < MINIMUM_DAYS:
-        raise ValueError(
-            f"Insufficient data: {len(daily_df)} days available, "
-            f"but the model requires at least {MINIMUM_DAYS}. "
-            f"Please upload more transaction history."
-        )
-
-    # Payday detection
-    daily_df["is_payday"] = detect_paydays(daily_df)
-
-    # Standard time features
-    enriched = loader.enrich_features(daily_df)
-
-    # Ensure is_payday is a string categorical (required by TFT)
-    enriched["is_payday"] = enriched["is_payday"].astype(str).astype("category")
-
-    return enriched
+    return _prepare_training_data_canonical(df, min_days=MINIMUM_DAYS)
 
 
 # ---------------------------------------------------------------------------
