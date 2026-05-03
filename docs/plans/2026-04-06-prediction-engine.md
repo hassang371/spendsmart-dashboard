@@ -366,6 +366,16 @@ Refs: docs/features/009-prediction-engine.md"
 
 ### Task 2: Upgrade TFT model hyperparameters
 
+> **⚠ SKIPPED per RFC-005 (2026-04-17).** The intermediate
+> `hidden=64 / heads=4 / lstm=2` bump described below is not landed.
+> Stage 4 of the prediction-engine v1 master plan
+> (`docs/plans/2026-04-17-prediction-engine-v1-master.md`) instead bumps
+> straight to the RFC-005 panel-aware target of `hidden=128 /
+> attention_head_size=8 / lstm_layers=3 / hidden_continuous_size=64`.
+> Stage 1 of the master plan therefore executes Tasks 1, 1.5, 3, 4, 5,
+> 8, 9 only and skips this Task. Do not run the steps below as-is —
+> use Stage 4 of the master plan instead.
+
 **Files:**
 - Modify: `packages/forecasting/tft_model.py`
 - Test: `packages/forecasting/tests/test_model.py`
@@ -2047,3 +2057,11 @@ git add docs/features/009-prediction-engine.md \
         docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md
 git commit -m "docs: mark 009 prediction engine + RFC-003 as Implemented"
 ```
+
+---
+
+## Changelog
+
+| Date | Entry |
+|---|---|
+| 2026-05-04 | Task 2 (TFT hyperparameter bump to `64/4/2`) marked **SKIPPED per RFC-005**. Master plan `docs/plans/2026-04-17-prediction-engine-v1-master.md` Stage 4 lands the full RFC-005 panel-aware target of `128/8/3` instead. Stage 1 executes Tasks 1, 1.5, 3, 4, 5, 8, 9 only. The Task 2 section above is retained for historical context but bears a SKIPPED banner; do not execute its steps. |
