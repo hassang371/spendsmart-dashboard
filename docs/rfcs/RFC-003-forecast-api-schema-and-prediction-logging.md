@@ -375,17 +375,18 @@ both insert).
 supabase.rpc(
     "log_user_prediction",                    # SECURITY DEFINER wrapper around
                                               # INSERT ... ON CONFLICT DO NOTHING
-                                              # so the user-scoped client cannot
-                                              # bypass the unique constraint
-    {"row": row},
+    {"payload": row},                         # canonical param name = "payload"
 ).execute()
 ```
 
 Implementation notes:
-- The RPC `public.log_user_prediction(row jsonb)` returns the `prediction_id` of
-  whichever row is now resident for the (user_id, generated_hour) pair — either
-  the just-inserted row (when the INSERT wins) or the pre-existing row (when ON
-  CONFLICT fires). The service uses this id for the response payload.
+- The RPC `public.log_user_prediction(payload jsonb)` returns the `prediction_id`
+  of whichever row is now resident for the (user_id, generated_hour) pair —
+  either the just-inserted row (when the INSERT wins) or the pre-existing row
+  (when ON CONFLICT fires). The service uses this id for the response payload.
+- Canonical param name throughout = **`payload`**. DDL signature, code-block
+  call site, all test fixtures must use `payload` exactly. Mismatched names
+  silently bind to NULL.
 - The hour bucket is intentional: long enough to collapse page-view noise, short
   enough to catch meaningful state changes (e.g., user imports new transactions
   mid-day). Tunable in v1.5 by changing the generated-column expression; v1
@@ -463,11 +464,25 @@ CREATE POLICY "users insert own predictions"
 -- No UPDATE policy for authenticated; only the evaluation task (service-role key) updates
 -- actual_outcomes / mape / pinball_loss / evaluated_at / claimed_at / lease_expires_at.
 
--- SECURITY DEFINER RPC for atomic insert-or-no-op. Service calls this via the
--- user-scoped client; the function runs with definer privileges so it can write
--- the row directly while RLS still gates the SELECT path. The function checks
--- auth.uid() to refuse cross-tenant writes (defence-in-depth on top of the
--- "users insert own predictions" policy).
+-- SECURITY DEFINER RPC for atomic insert-or-no-op.
+--
+-- Trust boundary (Codex Fix #5/#6):
+-- The RPC is grantable to `authenticated` ONLY because every server-owned
+-- field that affects ML quality is derived inside the function — not taken
+-- from the caller-supplied payload. A malicious authenticated user invoking
+-- this RPC directly cannot:
+--   * write a row for another user (auth.uid() check)
+--   * back-date or future-date a prediction (generated_at = now() ALWAYS)
+--   * write a row for an arbitrary horizon (horizon_days clamped 1..30,
+--     horizon_end = (now()::date + horizon_days))
+--   * pollute model_type / model_version with junk strings (validated
+--     against allowed sets)
+--   * write to multiple hour buckets per call (single INSERT, generated_hour
+--     auto-derived from now())
+-- The fields the caller CAN supply (forecast, insights, variable_importance,
+-- insights_version, prediction_id, shown_to_user) are either content the
+-- model produced for that user (no integrity gain from forging) or
+-- bookkeeping the service controls.
 CREATE OR REPLACE FUNCTION public.log_user_prediction(payload jsonb)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -476,11 +491,39 @@ SET search_path = public
 AS $$
 DECLARE
     out_id uuid;
-    payload_user uuid := (payload->>'user_id')::uuid;
+    payload_user      uuid    := (payload->>'user_id')::uuid;
+    payload_horizon   int     := (payload->>'horizon_days')::int;
+    payload_model     text    := payload->>'model_type';
+    payload_pred_id   uuid    := (payload->>'prediction_id')::uuid;
+    payload_shown     boolean := coalesce((payload->>'shown_to_user')::boolean, true);
+    server_generated  timestamptz := now();          -- server-owned: always now
+    server_horizon_end date;
 BEGIN
+    -- Tenant guard
     IF payload_user IS NULL OR payload_user <> auth.uid() THEN
         RAISE EXCEPTION 'log_user_prediction: user_id mismatch';
     END IF;
+
+    -- Validate caller-supplied fields BEFORE touching the table. RAISE on
+    -- any junk so abuse attempts surface immediately rather than poisoning
+    -- the table.
+    IF payload_horizon IS NULL OR payload_horizon < 1 OR payload_horizon > 30 THEN
+        RAISE EXCEPTION 'log_user_prediction: horizon_days must be 1..30';
+    END IF;
+    IF payload_model NOT IN ('chronos2', 'tft_hybrid', 'ensemble') THEN
+        RAISE EXCEPTION 'log_user_prediction: invalid model_type';
+    END IF;
+    IF payload_pred_id IS NULL THEN
+        RAISE EXCEPTION 'log_user_prediction: prediction_id required';
+    END IF;
+    IF (payload->>'insights_version') IS NULL THEN
+        RAISE EXCEPTION 'log_user_prediction: insights_version required';
+    END IF;
+    IF (payload->'forecast')    IS NULL THEN RAISE EXCEPTION 'forecast required';    END IF;
+    IF (payload->'insights')    IS NULL THEN RAISE EXCEPTION 'insights required';    END IF;
+
+    -- Server-owned: derive the time-locked fields. Caller cannot back-date.
+    server_horizon_end := (server_generated::date) + (payload_horizon || ' days')::interval;
 
     INSERT INTO public.user_predictions (
         prediction_id, user_id, generated_at,
@@ -489,18 +532,18 @@ BEGIN
         shown_to_user
     )
     VALUES (
-        (payload->>'prediction_id')::uuid,
+        payload_pred_id,
         payload_user,
-        coalesce((payload->>'generated_at')::timestamptz, now()),
-        payload->>'model_type',
+        server_generated,                    -- ← server-owned
+        payload_model,
         payload->>'model_version',
-        (payload->>'horizon_days')::int,
-        (payload->>'horizon_end')::date,
+        payload_horizon,
+        server_horizon_end,                  -- ← server-owned
         payload->'forecast',
         payload->'variable_importance',
         payload->'insights',
         payload->>'insights_version',
-        coalesce((payload->>'shown_to_user')::boolean, true)
+        payload_shown
     )
     ON CONFLICT (user_id, generated_hour) DO NOTHING
     RETURNING prediction_id INTO out_id;
@@ -511,7 +554,7 @@ BEGIN
         SELECT prediction_id INTO out_id
         FROM public.user_predictions
         WHERE user_id = payload_user
-          AND generated_hour = date_trunc('hour', coalesce((payload->>'generated_at')::timestamptz, now()))
+          AND generated_hour = date_trunc('hour', server_generated)
         LIMIT 1;
     END IF;
 
@@ -521,6 +564,17 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.log_user_prediction(jsonb) TO authenticated;
 ```
+
+**Required test (Codex Fix #5/#6):** `test_log_user_prediction_rpc_hardening` —
+exercises each guard:
+- mismatched user_id → RPC raises
+- horizon_days = 0 / 31 / NULL → raises
+- model_type = "junk" → raises
+- prediction_id NULL / missing → raises
+- valid payload + caller forging `generated_at = '2030-01-01'` → row stored with
+  `generated_at = now()` (server-derived; back-dating ignored)
+- valid payload + caller forging `horizon_end = '2030-12-31'` → row stored
+  with server-recomputed `horizon_end = generated_at::date + horizon_days`
 
 **Client choice for writes:** the forecast router uses `get_user_client(request)`
 (user-scoped JWT client) per `apps/api/domains/forecasting/router.py:29`. The
@@ -929,3 +983,4 @@ development on insights module vs logging pipeline.
 | 2026-04-17 | Initial draft. Produced from the Cowork brainstorming session synthesis covering quantile exposure, derived insights, prediction logging, walk-forward evaluation, and shadow-mode groundwork. Scope: expansion-only changes that unblock the AI Insights page and the future counterfactual-aware model. Explicitly defers scenario comparison, user floor override, shadow-mode holdout rollout, and intervention detection to follow-up RFCs. |
 | 2026-04-17 | Spec review pass 1. Fixed C1 (evaluation task moved from a fictional `apps/worker/evaluate_predictions.py` Celery-beat path to the **existing** Celery beat at `apps/api/celery_app.py`, with the task module sibling to `maintenance_tasks.py`; LLD 009's polling-worker precedent retained for queued training jobs), C2 (Chronos engine upgraded to emit all 7 quantiles — module-level `QUANTILES` constant — so `ForecastPoint` contract is non-nullable for both tiers; supersedes LLD 009 line 266), C3 (removed duplicate `DriverWeight` Pydantic class; `primary_drivers` now typed as `list[VariableImportance]`). Fixed H1 (`prediction_id: UUID` typed; generated via `uuid4()` in `ForecastService` before INSERT), H2 (added `users insert own predictions` RLS policy so the user-scoped client can write; documented service-role use for evaluation UPDATE), H3 (rewrote claim-and-fetch as atomic `UPDATE … FROM claimable … RETURNING` with `FOR UPDATE SKIP LOCKED`), H4 (added "Insights versioning protocol" subsection; `insights_version` column has no DEFAULT so service must supply), H5 (replaced ambiguous "pinball calibration" metric with separate pinball-loss and P10–P90 coverage rows), H6 (corrected Alt-4 CHECK-constraint argument). Picked up M1 (`public.` prefix on DDL), M2 (corrected JSONB storage math + introduced v1 hour-bucket logging dedup), M3 (added `horizon_days` CHECK + Pydantic `Annotated[int, Field(ge=1, le=30)]`), M4 (test-discovery note), M5 (rollback paragraph). Status promoted `Draft → Proposed`. |
 | 2026-04-17 | Codex adversarial review pass. **Codex Fix #1** (high) — hourly logging dedup was a SELECT-then-INSERT race. Fixed via `generated_hour timestamptz GENERATED ALWAYS AS date_trunc('hour', generated_at) STORED` + `UNIQUE (user_id, generated_hour)` + new `log_user_prediction(payload jsonb)` SECURITY DEFINER RPC implementing `INSERT … ON CONFLICT DO NOTHING`. Service no longer reads-then-writes; one round trip. Concurrency test added to required test list. **Codex Fix #2** (high) — evaluation claim semantics could permanently lose metrics if a worker crashed between `evaluated_at = now()` and the metric-fill UPDATE. Replaced single `evaluated_at` claim flag with a lease pair (`claimed_at` + `lease_expires_at`); `evaluated_at` is set ONLY by the successful fill-in UPDATE. Lease default 15 min; re-claimable via `claimed_at IS NULL OR lease_expires_at < now()`. Failure-modes table updated. New invariant test `test_crashed_worker_row_is_reclaimable`. |
+| 2026-04-17 | Codex pass-2 fixes. **Codex Fix #5** (high) — RPC param name mismatch (`row` vs `payload`). Canonicalised to `payload` everywhere; updated service call site `{"payload": row}`. Added "canonical name" implementation note. **Codex Fix #6** (high) — `SECURITY DEFINER` RPC granted to `authenticated` let users forge synthetic rows by supplying `generated_at` / `horizon_end` / `model_type`. Hardened: `generated_at = now()` server-derived; `horizon_end = now()::date + horizon_days` server-derived; `horizon_days` validated 1..30; `model_type` validated against allowed set; `prediction_id` / `insights_version` / `forecast` / `insights` validated NOT NULL. Required test `test_log_user_prediction_rpc_hardening` exercises each guard. |
