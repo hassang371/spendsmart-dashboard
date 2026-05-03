@@ -4,6 +4,7 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 
+import pandas as pd
 from dotenv import load_dotenv
 
 from apps.worker.job_states import InvalidTransitionError, JobStatus, transition
@@ -34,12 +35,59 @@ def get_supabase() -> Client:
     return create_client(URL, KEY)
 
 
+def upsert_scheduled_cashflows(supabase: Client, user_id: str, rules) -> int:
+    """Upsert detected ``RecurrenceRule`` rows into ``scheduled_cashflows``.
+
+    Idempotent. Per RFC-005 §Data Model Changes the unique key includes
+    ``(user_id, merchant, amount, category_bucket, rrule_freq,
+    day_of_month, day_of_week, source)``; re-running with the same rules
+    refreshes ``next_occurrence`` / ``confidence`` only.
+
+    Returns the number of rows submitted (best-effort — Supabase upsert
+    response payload is the source of truth in production but we don't
+    block on it). Failures bubble up to the caller, which logs and
+    continues — RFC-005 explicitly classifies upstream upsert errors as
+    non-fatal for training.
+    """
+    if not rules:
+        return 0
+    payload: list[dict] = []
+    for rule in rules:
+        payload.append(
+            {
+                "user_id": user_id,
+                "merchant": rule.merchant,
+                "amount": float(rule.amount),
+                "category_bucket": rule.category_bucket,
+                "rrule_freq": rule.rrule_freq,
+                "day_of_month": rule.day_of_month,
+                "day_of_week": rule.day_of_week,
+                "next_occurrence": rule.next_occurrence.isoformat(),
+                "end_date": rule.end_date.isoformat() if rule.end_date else None,
+                "confidence": float(rule.confidence),
+                "source": rule.source,
+                "is_active": True,
+            }
+        )
+    supabase.table("scheduled_cashflows").upsert(
+        payload,
+        on_conflict="user_id,merchant,amount,category_bucket,rrule_freq,day_of_month,day_of_week,source",
+    ).execute()
+    return len(payload)
+
+
 def train_model(job_id: str, user_id: str):
     """
     Executes the TFT training pipeline:
       fetch transactions -> prepare features -> train model -> save checkpoint.
     """
+    from datetime import date, timedelta
+
     from packages.forecasting.dataset import prepare_training_data
+    from packages.forecasting.scheduler import (
+        detect_recurring_cashflows,
+        project_scheduled_cashflows,
+    )
     from packages.forecasting.trainer import (
         MINIMUM_DAYS,
         fetch_user_transactions,
@@ -60,9 +108,43 @@ def train_model(job_id: str, user_id: str):
     tx_count = len(df)
     update_logs(f"Loaded {tx_count} transactions. Preparing features...")
 
-    # 2. Prepare features
-    enriched = prepare_training_data(df, min_days=MINIMUM_DAYS)
-    update_logs(f"Prepared {len(enriched)} daily datapoints. Starting TFT training...")
+    # 1a. RFC-005 Layer 1 — detect recurring cashflows + upsert. Failure
+    # to upsert is non-fatal so a transient DB blip on this auxiliary
+    # table never blocks training.
+    rules = []
+    try:
+        rules = detect_recurring_cashflows(df)
+        upsert_scheduled_cashflows(supabase, user_id, rules)
+    except Exception as exc:
+        logger.warning(f"[{job_id}] scheduled_cashflows upsert failed (non-fatal): {exc}")
+
+    # 1b. Project scheduled events across the training horizon so the
+    # panel can attach them as known-future covariates. We project from
+    # the first transaction date through ``today + MAX_PREDICTION_LENGTH``
+    # so future inference draws from the same projection surface.
+    scheduled_df = None
+    try:
+        if rules:
+            today = date.today()
+            horizon_start = pd.to_datetime(df["date"]).min().date()
+            horizon_end = today + timedelta(days=30)
+            scheduled_df = project_scheduled_cashflows(rules, horizon_start, horizon_end)
+    except Exception as exc:
+        logger.warning(f"[{job_id}] scheduled cashflow projection failed (non-fatal): {exc}")
+        scheduled_df = None
+
+    # 2. Prepare features (panel)
+    enriched = prepare_training_data(
+        df,
+        min_days=MINIMUM_DAYS,
+        user_id=user_id,
+        scheduled_df=scheduled_df,
+    )
+    update_logs(
+        f"Prepared {len(enriched)} panel rows "
+        f"({enriched['date'].nunique()} days × {enriched['category_bucket'].nunique()} buckets). "
+        f"Starting TFT training..."
+    )
 
     # 3. Train
     trainer, model, dataset = run_training(enriched, max_epochs=30)
