@@ -91,8 +91,6 @@ def train_model(job_id: str, user_id: str):
 
     summary = f"Training complete. Val loss: {best_val_loss:.6f}. Checkpoint: {checkpoint_path}"
     logger.info(f"[{job_id}] {summary}")
-    summary = f"Training complete. Val loss: {best_val_loss:.6f}. Checkpoint: {checkpoint_path}"
-    logger.info(f"[{job_id}] {summary}")
     return summary
 
 
