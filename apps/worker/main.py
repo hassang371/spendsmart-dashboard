@@ -39,9 +39,10 @@ def train_model(job_id: str, user_id: str):
     Executes the TFT training pipeline:
       fetch transactions -> prepare features -> train model -> save checkpoint.
     """
+    from packages.forecasting.dataset import prepare_training_data
     from packages.forecasting.trainer import (
+        MINIMUM_DAYS,
         fetch_user_transactions,
-        prepare_training_data,
         run_training,
         save_checkpoint_to_supabase,
     )
@@ -60,7 +61,7 @@ def train_model(job_id: str, user_id: str):
     update_logs(f"Loaded {tx_count} transactions. Preparing features...")
 
     # 2. Prepare features
-    enriched = prepare_training_data(df)
+    enriched = prepare_training_data(df, min_days=MINIMUM_DAYS)
     update_logs(f"Prepared {len(enriched)} daily datapoints. Starting TFT training...")
 
     # 3. Train

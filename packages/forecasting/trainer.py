@@ -14,13 +14,7 @@ import lightning.pytorch as pl
 import pandas as pd
 from pytorch_forecasting import TimeSeriesDataSet
 
-from packages.forecasting.dataset import (
-    _detect_paydays,
-    create_timeseries_dataset,
-)
-from packages.forecasting.dataset import (
-    prepare_training_data as _prepare_training_data_canonical,
-)
+from packages.forecasting.dataset import create_timeseries_dataset
 from packages.forecasting.tft_model import create_tft_model
 
 logger = logging.getLogger(__name__)
@@ -28,18 +22,6 @@ logger = logging.getLogger(__name__)
 MINIMUM_DAYS = 90
 MAX_PREDICTION_LENGTH = 30
 MAX_ENCODER_LENGTH = 60
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatibility shims — canonical implementations live in dataset.py.
-# These shims are removed in Stage 1 Task 1.5 once all callers + tests import
-# from dataset.py directly.
-# ---------------------------------------------------------------------------
-
-
-def detect_paydays(daily_df: pd.DataFrame, threshold_percentile: float = 90) -> pd.Series:
-    """Backward-compat shim — see ``packages.forecasting.dataset._detect_paydays``."""
-    return _detect_paydays(daily_df, threshold_percentile=threshold_percentile)
 
 
 # ---------------------------------------------------------------------------
@@ -64,16 +46,6 @@ def fetch_user_transactions(supabase, user_id: str) -> pd.DataFrame:
     df = df.rename(columns={"transaction_date": "date"})
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
     return df
-
-
-def prepare_training_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Backward-compat shim around the canonical
-    ``packages.forecasting.dataset.prepare_training_data``.
-
-    Internal trainer call-site requires the ``MINIMUM_DAYS`` history check; the
-    canonical helper accepts ``min_days`` so the behaviour is preserved.
-    """
-    return _prepare_training_data_canonical(df, min_days=MINIMUM_DAYS)
 
 
 # ---------------------------------------------------------------------------

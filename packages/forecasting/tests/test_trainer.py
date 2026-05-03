@@ -2,10 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from packages.forecasting.trainer import (
-    detect_paydays,
-    prepare_training_data,
-)
+from packages.forecasting.dataset import _detect_paydays as detect_paydays
+from packages.forecasting.dataset import prepare_training_data
 
 
 def _make_daily_df(n_days: int, income_day: int = 1, income_amount: float = 50000):
@@ -89,10 +87,12 @@ def _make_raw_transactions(n_days: int):
 
 
 def test_prepare_training_data_minimum_days():
-    """ValueError raised when data spans fewer than MINIMUM_DAYS."""
+    """ValueError raised when data spans fewer than the requested min_days."""
+    from packages.forecasting.trainer import MINIMUM_DAYS
+
     df = _make_raw_transactions(30)
     with pytest.raises(ValueError, match="Insufficient data"):
-        prepare_training_data(df)
+        prepare_training_data(df, min_days=MINIMUM_DAYS)
 
 
 def test_prepare_training_data_success():

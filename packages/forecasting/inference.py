@@ -12,11 +12,8 @@ from typing import Any, Dict, Optional
 import pandas as pd
 from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet
 
-from packages.forecasting.dataset import create_timeseries_dataset
-from packages.forecasting.trainer import (
-    MAX_ENCODER_LENGTH,
-    prepare_training_data,
-)
+from packages.forecasting.dataset import create_timeseries_dataset, prepare_training_data
+from packages.forecasting.trainer import MAX_ENCODER_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -242,3 +239,36 @@ def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon
         "model_version": "tft_v1",  # placeholder
         "horizon": horizon,
     }
+
+
+def extract_variable_importance(
+    model: TemporalFusionTransformer,
+    df: pd.DataFrame,
+) -> list[dict[str, float]] | None:
+    """Extract variable importance from a TFT model via ``interpret_output``.
+
+    Returns a list of ``{"feature": name, "weight": float}`` dicts on success,
+    or ``None`` if the model cannot produce an interpretation (e.g. history
+    shorter than the encoder length, or any internal failure).
+    """
+    try:
+        history_df = prepare_training_data(df)
+        if len(history_df) < MAX_ENCODER_LENGTH:
+            return None
+
+        params = model.dataset_parameters
+        reference_ds = create_timeseries_dataset(
+            history_df,
+            max_encoder_length=params.get("max_encoder_length", MAX_ENCODER_LENGTH),
+            max_prediction_length=params.get("max_prediction_length", 30),
+        )
+        pred_dl = reference_ds.to_dataloader(train=False, batch_size=64, num_workers=0)
+
+        raw_predictions = model.predict(pred_dl, mode="raw", return_x=True)
+        interpretation = model.interpret_output(raw_predictions, reduction="sum")
+
+        weights = interpretation.get("encoder_variables", {})
+        return [{"feature": k, "weight": round(float(v), 4)} for k, v in weights.items()]
+    except Exception as e:
+        logger.warning(f"Variable importance extraction failed: {e}")
+        return None
