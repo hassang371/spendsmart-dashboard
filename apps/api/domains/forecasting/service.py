@@ -429,32 +429,42 @@ class ForecastService:
     def _safe_get_cached_model(self, user_id: str) -> Any:
         """Resolve the user's TFT model from cache, swallowing all errors.
 
-        ``TFTModelCache.get_or_load`` is async; we drive it via
-        ``asyncio.run`` (single short-lived loop) when called from a
-        synchronous request handler. Any failure (no model trained,
-        loader raised, cache misconfigured) returns ``None`` so the
-        caller falls back to Chronos-only.
+        ``TFTModelCache.get_or_load`` is async. We always run it on a fresh
+        event loop in a background thread (BUG-023). The previous
+        implementation called ``run_coroutine_threadsafe`` against the
+        FastAPI serving loop and synchronously blocked on the result —
+        that deadlocks the loop against itself, times out at 30s with an
+        empty ``str(TimeoutError())`` and forces every predict to
+        fall back to Chronos-only.
         """
         import asyncio
+        import threading
 
-        try:
+        result_box: list[Any] = [None]
+        err_box: list[BaseException | None] = [None]
+
+        def _runner() -> None:
             try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
+                result_box[0] = asyncio.run(self.tft_cache.get_or_load(user_id))
+            except BaseException as exc:  # noqa: BLE001
+                err_box[0] = exc
 
-            if loop is not None and loop.is_running():
-                # Running inside an event loop already — schedule on it.
-                # This path is only hit by tests that run predict inside
-                # asyncio.run; in production /forecast/predict is a sync
-                # def handler so we hit the asyncio.run path below.
-                future = asyncio.run_coroutine_threadsafe(self.tft_cache.get_or_load(user_id), loop)
-                return future.result(timeout=30)
+        t = threading.Thread(target=_runner, name=f"tft-cache-load:{user_id}", daemon=True)
+        t.start()
+        t.join(timeout=60)
 
-            return asyncio.run(self.tft_cache.get_or_load(user_id))
-        except Exception as exc:
-            logger.warning("tft_cache_load_failed", user_id=user_id, error=str(exc))
+        if t.is_alive():
+            logger.warning("tft_cache_load_timeout", user_id=user_id)
             return None
+        if err_box[0] is not None:
+            exc = err_box[0]
+            logger.warning(
+                "tft_cache_load_failed",
+                user_id=user_id,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            return None
+        return result_box[0]
 
     def _log_prediction(self, *, prediction_id: Any, user_id: str, response: ForecastResponse) -> None:
         """Fire-and-forget INSERT into ``user_predictions`` via RPC.
