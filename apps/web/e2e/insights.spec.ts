@@ -2,7 +2,7 @@ import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 /**
- * `/insights` accessibility + smoke test.
+ * `/dashboard/insights` accessibility + smoke test.
  *
  * Skips automatically when no Supabase test-user JWT is available locally.
  * Local devs with a configured `.env.local` containing a real session will
@@ -20,13 +20,16 @@ import { expect, test } from '@playwright/test';
 
 const AUTH_STATE_PATH = process.env.PLAYWRIGHT_AUTH_STATE;
 
-test.describe('/insights accessibility smoke', () => {
-  test.skip(!AUTH_STATE_PATH, 'No PLAYWRIGHT_AUTH_STATE — skip authenticated /insights e2e');
+test.describe('/dashboard/insights accessibility smoke', () => {
+  test.skip(
+    !AUTH_STATE_PATH,
+    'No PLAYWRIGHT_AUTH_STATE — skip authenticated /dashboard/insights e2e'
+  );
 
   test.use({ storageState: AUTH_STATE_PATH });
 
   test('main components render and axe reports no serious+ violations', async ({ page }) => {
-    await page.goto('/insights');
+    await page.goto('/dashboard/insights');
     await expect(page.getByTestId('insights-page')).toBeVisible();
 
     // Seven required components per LLD 011 §Success Criteria.

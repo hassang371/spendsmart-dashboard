@@ -38,7 +38,7 @@ export async function updateSession(request: NextRequest) {
   // Routes requiring an authenticated Supabase session. Extending this list
   // also requires an entry in ``apps/web/proxy.ts`` matcher so the middleware
   // actually fires on those paths.
-  const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/insights');
+  const isProtectedRoute = pathname.startsWith('/dashboard');
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const isLandingRoute = pathname === '/';
 
