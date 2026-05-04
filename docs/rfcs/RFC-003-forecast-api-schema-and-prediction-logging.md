@@ -483,8 +483,17 @@ CREATE POLICY "users insert own predictions"
 -- insights_version, prediction_id, shown_to_user) are either content the
 -- model produced for that user (no integrity gain from forging) or
 -- bookkeeping the service controls.
+-- NOTE (2026-05-04 stale prose marker): the shipped migration
+-- supabase/migrations/20260418000000_user_predictions.sql implements this RPC
+-- with `RETURNS boolean` (true=inserted, false=dedup-skipped) instead of
+-- `RETURNS uuid`. The boolean shape is simpler because the caller already
+-- generates `prediction_id` client-side via uuid4() before invoking the RPC,
+-- so there is no need to round-trip the id back. The hardening / validation
+-- semantics below are unchanged. See the 2026-05-04 changelog DEVIATION
+-- entry for context. The pseudocode below is preserved as the original
+-- design intent; treat the migration file as authoritative.
 CREATE OR REPLACE FUNCTION public.log_user_prediction(payload jsonb)
-RETURNS uuid
+RETURNS uuid    -- shipped: RETURNS boolean (see note above)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
