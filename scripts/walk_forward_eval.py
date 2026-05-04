@@ -33,6 +33,7 @@ import pandas as pd
 
 from packages.forecasting.eval.configs import resolve_config
 from packages.forecasting.eval.harness import run_walk_forward
+from packages.forecasting.eval.metrics import QUANTILE_LEVELS
 from packages.forecasting.eval.report import render_diff_markdown
 from packages.forecasting.eval.sampling import select_stratified_users
 
@@ -78,6 +79,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--fold-interval", type=int, default=30, help="Days between folds")
     p_run.add_argument("--min-history", type=int, default=90, help="Min training window days")
     p_run.add_argument("--seed", type=int, default=42, help="RNG seed")
+    p_run.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        help=(
+            "Number of folds to train in parallel via ProcessPoolExecutor "
+            "(RFC-006 §8). Default 1 = sequential. Per-worker BLAS thread "
+            "counts are pinned to 1 so fold parallelism is the only "
+            "source of CPU multiplexing."
+        ),
+    )
     p_run.add_argument(
         "--dry-run",
         action="store_true",
@@ -147,27 +159,215 @@ def _real_fetch_history(supabase: Any) -> Any:
     return fetch
 
 
-def _real_train_predict(supabase: Any) -> Any:
-    """Build the train_predict callable used in real runs.
+def _extract_quantile_matrix(
+    raw_output: Any,
+    *,
+    horizon: int,
+    n_quantiles: int = 7,
+) -> np.ndarray:
+    """Convert a pytorch-forecasting quantile prediction to a (horizon, 7) ndarray.
 
-    Stage 7 ships the wiring; Stage 9 runs the harness against real data.
-    The real implementation would call:
-      1. aggregate_daily_panel(history, ...) → panel
-      2. trainer.run_training(panel, **config kwargs)
-      3. model.predict(...) → (horizon, 7) matrix
-    Since this requires a populated DB + Supabase client, we raise
-    NotImplementedError when called from a stub-less context. Callers
-    in Stage 9 will replace this with the full training pipeline.
+    pytorch-forecasting's ``model.predict(mode="quantiles", return_x=True)``
+    returns a ``Prediction`` namedtuple whose ``.output`` carries a tensor
+    of shape ``(batch=1, horizon, n_quantiles)``. With ``return_x=False``
+    the tensor itself is returned. This helper accepts either form and
+    reduces to a 2-D ndarray indexed by RFC-003 quantile levels.
+
+    Raises:
+        ValueError: When the underlying tensor's horizon or quantile-count
+            does not match the RFC-003 contract — surfaces an upstream
+            pytorch-forecasting shape change loudly rather than silently
+            producing wrong forecasts.
     """
+    # Unwrap Prediction namedtuple → tensor.
+    tensor = getattr(raw_output, "output", raw_output)
 
-    def _train_predict(history, config, horizon):  # pragma: no cover — Stage 9
-        raise NotImplementedError(
-            "Real train_predict wiring is implemented in Stage 9. "
-            "Use the harness via run_walk_forward(...) with explicit "
-            "callables for unit testing."
+    # Strip batch dim if present.
+    if hasattr(tensor, "detach"):
+        tensor = tensor.detach().cpu()
+    arr = np.asarray(tensor, dtype=float)
+
+    if arr.ndim == 3:
+        if arr.shape[0] != 1:
+            raise ValueError(f"_extract_quantile_matrix: expected batch=1, got batch={arr.shape[0]}")
+        arr = arr[0]
+
+    if arr.ndim != 2:
+        raise ValueError(f"_extract_quantile_matrix: expected 2D matrix after batch strip, " f"got shape {arr.shape}")
+
+    if arr.shape[0] != horizon:
+        raise ValueError(
+            f"_extract_quantile_matrix: horizon mismatch — got {arr.shape[0]}, "
+            f"expected {horizon}. pytorch-forecasting output shape may have "
+            f"changed; investigate model.predict(mode='quantiles')."
+        )
+    if arr.shape[1] != n_quantiles:
+        raise ValueError(
+            f"_extract_quantile_matrix: quantile-count mismatch — got "
+            f"{arr.shape[1]}, expected {n_quantiles} (RFC-003 quantile set: "
+            f"{QUANTILE_LEVELS}). The TFT output_size or QuantileLoss preset "
+            f"may have drifted; investigate trainer/tft_model."
+        )
+    return arr
+
+
+def _build_future_panel_rows(panel: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    """Build a horizon-day extension of ``panel`` for forecasting.
+
+    The panel-aware TFT requires every (date, category_bucket) cell to
+    exist for every decoder step. This helper constructs ``horizon`` days
+    of future rows for each of the 12 buckets present in ``panel``,
+    populates the known calendar features, and zero-fills the unknown
+    reals (which are masked out of the decoder by pytorch-forecasting).
+
+    Returns a DataFrame with the same column order as ``panel``.
+    """
+    last_date = panel["date"].max()
+    last_time_idx_per_bucket = panel.groupby("category_bucket")["time_idx"].max().to_dict()
+    user_id = panel["user_id"].iloc[0]
+
+    future_dates = pd.date_range(
+        start=last_date + pd.Timedelta(days=1),
+        periods=horizon,
+        freq="D",
+    )
+
+    # Carry forward the historical payday day-of-month set (RFC-005 parity
+    # with inference.py legacy single-series handling).
+    payday_doms = set(panel.loc[panel["is_payday"].astype(str) == "1", "date"].dt.day.unique().tolist())
+
+    rows: list[pd.DataFrame] = []
+    for bucket in panel["category_bucket"].unique():
+        last_idx = int(last_time_idx_per_bucket[bucket])
+        rows.append(
+            pd.DataFrame(
+                {
+                    "date": future_dates,
+                    "user_id": user_id,
+                    "category_bucket": bucket,
+                    "bucket_total": 0.0,
+                    "daily_income": 0.0,
+                    "daily_spend": 0.0,
+                    "closing_balance": 0.0,
+                    "scheduled_event_amount": 0.0,
+                    "is_payday": pd.Series(
+                        ["1" if d.day in payday_doms else "0" for d in future_dates],
+                        dtype="object",
+                    ),
+                    "day_of_week": future_dates.dayofweek.astype(str),
+                    "day_of_month": future_dates.day.astype(str),
+                    "month": future_dates.month.astype(str),
+                    "time_idx": np.arange(last_idx + 1, last_idx + 1 + horizon, dtype=np.int64),
+                    "group_id": user_id,
+                }
+            )
         )
 
-    return _train_predict
+    future = pd.concat(rows, ignore_index=True)
+    # Match dtypes of the training panel — categorical columns must use
+    # the same category set as the panel to avoid encoder KeyErrors.
+    for cat_col in ("is_payday", "day_of_week", "day_of_month", "month"):
+        if cat_col in panel.columns:
+            cats = panel[cat_col].cat.categories if hasattr(panel[cat_col], "cat") else None
+            if cats is not None:
+                future[cat_col] = pd.Categorical(future[cat_col], categories=cats)
+            else:
+                future[cat_col] = future[cat_col].astype("category")
+    return future[panel.columns.tolist()]
+
+
+def _train_predict_impl(history: pd.DataFrame, config: Any, horizon: int) -> np.ndarray:
+    """Train a fresh TFT on ``history`` and return a (horizon, 7) quantile matrix.
+
+    Top-level function so it is picklable across the ProcessPoolExecutor
+    boundary used when ``--parallel N`` > 1. Steps:
+
+        1. ``aggregate_daily_panel(loader)`` → category-level panel
+        2. ``trainer.run_training(panel, **config kwargs)``
+        3. Build ``horizon``-day future rows (zero-filled unknown reals)
+        4. ``model.predict(loader, mode="quantiles", return_x=True)``
+        5. ``_extract_quantile_matrix(raw)`` → (horizon, 7) ndarray
+
+    The ``horizon`` argument MUST match the trainer's
+    ``MAX_PREDICTION_LENGTH`` (currently 30 — LLD 009). The TFT was
+    trained at a fixed prediction length and pytorch-forecasting clips
+    decoder steps to that length; passing horizon ≠ 30 raises in
+    ``_extract_quantile_matrix``.
+    """
+    # Local imports so the harness module can be imported in environments
+    # without torch / pytorch-forecasting (e.g. lightweight CI lanes).
+    from pytorch_forecasting import TimeSeriesDataSet
+
+    from packages.forecasting.dataset import (
+        TransactionLoader,
+        aggregate_daily_panel,
+    )
+    from packages.forecasting.trainer import run_training
+
+    if history is None or len(history) == 0:
+        raise ValueError("_train_predict_impl: empty history DataFrame")
+
+    # Step 1 — aggregate to RFC-005 panel.
+    loader = TransactionLoader(history)
+    panel = aggregate_daily_panel(loader)
+    if panel.empty:
+        raise ValueError("_train_predict_impl: aggregate_daily_panel returned empty")
+
+    # Step 2 — train.
+    _trainer, model, training_dataset = run_training(
+        panel,
+        max_epochs=config.max_epochs,
+        early_stop_patience=config.patience,
+        weight_decay=config.weight_decay,
+        batch_size=config.batch_size,
+        learning_rate=config.learning_rate,
+    )
+
+    # Step 3 — append future rows so the decoder window covers
+    # [train_end, train_end + horizon).
+    future_rows = _build_future_panel_rows(panel, horizon)
+    combined = pd.concat([panel, future_rows], ignore_index=True)
+    combined = combined.sort_values(["category_bucket", "time_idx"]).reset_index(drop=True)
+
+    # Step 4 — build a prediction dataset over the combined panel;
+    # ``predict=True`` clips to the last encoder window per group,
+    # whose decoder now sits over the future rows.
+    pred_ds = TimeSeriesDataSet.from_dataset(
+        training_dataset,
+        combined,
+        predict=True,
+        stop_randomization=True,
+    )
+    pred_dl = pred_ds.to_dataloader(train=False, batch_size=1, num_workers=0)
+
+    raw = model.predict(pred_dl, mode="quantiles", return_x=True)
+
+    # Step 5 — reduce.
+    # pytorch-forecasting's panel mode emits one prediction per group.
+    # The harness scores the whole-account closing balance; the panel
+    # has 12 groups but every group carries the same closing-balance
+    # target, so we average across groups to recover the account-level
+    # forecast trajectory.
+    tensor = getattr(raw, "output", raw)
+    if hasattr(tensor, "detach"):
+        tensor = tensor.detach().cpu()
+    arr = np.asarray(tensor, dtype=float)
+    if arr.ndim == 3 and arr.shape[0] > 1:
+        arr = arr.mean(axis=0, keepdims=True)
+    return _extract_quantile_matrix(arr, horizon=horizon, n_quantiles=len(QUANTILE_LEVELS))
+
+
+def _real_train_predict(supabase: Any) -> Any:
+    """Return the top-level train_predict callable (Stage 9 wiring).
+
+    Note: ``supabase`` is unused — training does not need DB access; the
+    harness pre-fetches history via ``fetch_history`` on the main process.
+    The kwarg is retained for API symmetry with ``_real_fetch_history``
+    and ``_real_fetch_actuals``. Returning the bare top-level function
+    (not a closure) keeps it picklable across the ProcessPoolExecutor
+    boundary used when ``--parallel`` > 1.
+    """
+    return _train_predict_impl
 
 
 def _real_fetch_actuals(supabase: Any) -> Any:
@@ -271,6 +471,7 @@ def cmd_run(args: argparse.Namespace, supabase: Any | None = None) -> int:
         fold_interval_days=args.fold_interval,
         min_history_days=args.min_history,
         seed=args.seed,
+        parallel=args.parallel,
     )
 
     print(f"Wrote {args.output}")
