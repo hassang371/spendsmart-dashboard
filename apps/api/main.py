@@ -48,6 +48,24 @@ warnings.filterwarnings(
     message="Not all dimensions are equal for tensors shapes",
     category=UserWarning,
 )
+# Chronos-Bolt fires this every predict because we ask for quantile
+# levels (0.02, 0.98) outside its training range (0.1, 0.9). The
+# clamping is a known, acceptable trade-off documented in BUG-026
+# residue. Silence the fixed-text per-predict spam.
+warnings.filterwarnings(
+    "ignore",
+    message="Quantiles to be predicted",
+    category=UserWarning,
+)
+# Lightning's per-predict tips (litlogger / litmodels suggestions,
+# tensorboardX-removed notice, "GPU available" / "TPU available"
+# banners) flood the backend log on every /forecast/predict. Bump
+# the lightning logger to WARNING so the per-predict INFOs go away
+# while real warnings/errors still surface.
+import logging as _logging  # noqa: E402
+
+_logging.getLogger("lightning.pytorch").setLevel(_logging.WARNING)
+_logging.getLogger("pytorch_lightning").setLevel(_logging.WARNING)
 
 import structlog
 from fastapi import FastAPI, Request

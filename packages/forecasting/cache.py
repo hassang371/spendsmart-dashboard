@@ -134,6 +134,11 @@ class TFTModelCache:
         # load future. Cleared in the leader's ``finally`` block.
         self._inflight: dict[str, asyncio.Future[Optional[CachedModel]]] = {}
         self._inflight_lock = asyncio.Lock()
+        # Threaded single-flight for the sync path (BUG-031). Per-user
+        # mutex so concurrent same-user loads dedupe on the cold-load
+        # without competing checkpoint downloads.
+        self._sync_inflight_locks: dict[str, threading.Lock] = {}
+        self._sync_inflight_meta_lock = threading.Lock()
         # Test seam: pluggable loader. Production wiring sets this to a
         # callable closing over the Supabase client.
         self._loader: Optional[Callable[[str], Optional[CachedModel]]] = loader
@@ -237,20 +242,34 @@ class TFTModelCache:
     # ------------------------------------------------------------------ #
 
     def get_or_load_sync(self, user_id: str) -> Optional[CachedModel]:
-        """Loop-agnostic sync variant. Bypasses ``asyncio.Lock``-backed
-        single-flight so callers can run the load in any thread without
-        the lock binding to a specific event loop (BUG-024).
+        """Loop-agnostic sync variant with thread-based single-flight.
 
-        Trades single-flight for simplicity: at most one duplicate cold
-        download on a same-user race; cache hits on subsequent calls.
+        Bypasses ``asyncio.Lock`` (BUG-024 — bound it to a specific
+        event loop). Uses ``threading.Lock`` per ``user_id`` so
+        concurrent same-user loads share one download instead of
+        racing two parallel checkpoint fetches (the duplicate
+        ``GET tft_best.ckpt`` Hassan saw in backend logs).
         """
         cached = self._get(user_id)
         if cached is not None:
             return cached
-        result = self._download_and_load(user_id)
-        if result is not None:
-            self._put(user_id, result)
-        return result
+
+        with self._sync_inflight_meta_lock:
+            user_lock = self._sync_inflight_locks.get(user_id)
+            if user_lock is None:
+                user_lock = threading.Lock()
+                self._sync_inflight_locks[user_id] = user_lock
+
+        with user_lock:
+            # Re-check under lock — the leader may have populated the cache
+            # while we were queued behind them.
+            cached = self._get(user_id)
+            if cached is not None:
+                return cached
+            result = self._download_and_load(user_id)
+            if result is not None:
+                self._put(user_id, result)
+            return result
 
     async def get_or_load(self, user_id: str) -> Optional[CachedModel]:
         """Single-flight async load. Returns the cached entry on hit,

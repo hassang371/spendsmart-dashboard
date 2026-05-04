@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import threading
 import time
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -41,10 +42,25 @@ warnings.filterwarnings(
     message="The 'val_dataloader' does not have many workers",
     category=UserWarning,
 )
+# Chronos-Bolt clamping warning — fires per predict, fixed text.
+warnings.filterwarnings(
+    "ignore",
+    message="Quantiles to be predicted",
+    category=UserWarning,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+# httpx logs every Supabase REST call at INFO. The scheduled_cashflows
+# duplicate-key 409s (intentional swallow per BUG-022) and the every-30s
+# polling GETs flood the worker log. Bump httpx to WARNING; real network
+# failures still surface.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+# Lightning per-predict tips (litlogger, litmodels, tensorboardX banner,
+# "GPU available" lines) — redundant with our own progress logging.
+logging.getLogger("lightning.pytorch").setLevel(logging.WARNING)
+logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)
 
 # Load environment variables from root .env only
 load_dotenv()
@@ -345,13 +361,62 @@ def process_next_job(supabase: Client) -> bool:
         return False
 
 
+# Realtime: thread-local Event set whenever a new training_jobs row is
+# INSERTed via Supabase Realtime. Replaces the prior 5s polling tax with
+# instant push. Polling is kept as a 30s fallback so a websocket blip can
+# never strand a queued job.
+_new_job_event = threading.Event()
+
+
+async def _realtime_loop() -> None:
+    """Subscribe to training_jobs INSERT events; set _new_job_event on each."""
+    from realtime import AsyncRealtimeClient
+
+    if not URL or not KEY:
+        return
+    ws_url = URL.rstrip("/").replace("https://", "wss://").replace("http://", "ws://") + "/realtime/v1"
+
+    while True:
+        try:
+            client = AsyncRealtimeClient(ws_url, KEY)
+            await client.connect()
+            channel = client.channel("worker:training_jobs:inserts")
+
+            def _on_insert(payload: dict) -> None:
+                _new_job_event.set()
+
+            await channel.on_postgres_changes(
+                "INSERT", schema="public", table="training_jobs", callback=_on_insert
+            ).subscribe()
+            logger.info("realtime_listener_connected")
+            # Block while connected; reconnect on disconnect.
+            while client.is_connected:
+                await asyncio.sleep(15)
+        except Exception as exc:
+            logger.warning(f"realtime_listener_error retry_in=10s: {exc}")
+            await asyncio.sleep(10)
+
+
+def _start_realtime_listener_thread() -> None:
+    """Run the async realtime loop in a daemon thread."""
+    try:
+        asyncio.run(_realtime_loop())
+    except Exception as exc:
+        logger.error(f"realtime_listener_terminated: {exc}")
+
+
 def main():
     if not URL or not KEY:
         logger.error("Missing configuration. Exiting.")
         return
 
     supabase = get_supabase()
-    logger.info("Worker started. Polling for jobs...")
+    logger.info("Worker started. Push-listening for jobs (poll fallback every 30s)...")
+
+    # Push-based job pickup. Daemon thread keeps a websocket open to
+    # Supabase Realtime; INSERT events on training_jobs flip the
+    # threading.Event, breaking the main loop's wait() instantly.
+    threading.Thread(target=_start_realtime_listener_thread, name="worker-realtime", daemon=True).start()
 
     last_auto_sync: datetime | None = None
     AUTO_SYNC_INTERVAL = timedelta(hours=1)  # Check eligibility every hour; sync_task skips if < 24h stale
@@ -371,8 +436,17 @@ def main():
                 logger.error("auto_sync_loop_error: %s", exc)
             last_auto_sync = now
 
-        if not had_job:
-            time.sleep(5)
+        if had_job:
+            # Drain the queue if multiple jobs are waiting before
+            # going back to sleep — otherwise we'd wait 30s between
+            # back-to-back jobs unnecessarily.
+            continue
+
+        # Block until either:
+        #   - Realtime fires _new_job_event (instant), or
+        #   - 30s timeout (fallback poll cadence).
+        _new_job_event.wait(timeout=30)
+        _new_job_event.clear()
 
 
 if __name__ == "__main__":
