@@ -11,8 +11,10 @@ real run on 50 stratified users.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import logging
+import os
 from collections.abc import Iterable
 from dataclasses import asdict
 from datetime import date, timedelta
@@ -38,6 +40,19 @@ logger = logging.getLogger(__name__)
 WindowType = Literal["expanding", "rolling", "both"]
 
 
+def _pool_init() -> None:
+    """ProcessPoolExecutor initializer — pin BLAS thread counts to 1.
+
+    pytorch-forecasting + Lightning instantiate a Trainer per fold; each
+    Trainer can claim multiple CPU threads via OpenMP / MKL. Pinning to 1
+    keeps fold-level parallelism the only source of CPU multiplexing —
+    otherwise N pool workers × M BLAS threads can BLAS-block the box.
+    """
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -56,6 +71,7 @@ def run_walk_forward(
     fold_interval_days: int = 30,
     min_history_days: int = 90,
     seed: int = 42,
+    parallel: int = 1,
 ) -> dict[str, Any]:
     """Run the walk-forward harness across a set of users.
 
@@ -80,6 +96,15 @@ def run_walk_forward(
         fold_interval_days: Days between fold cursor advances. Default 30.
         min_history_days:  Skip folds with fewer training days than this.
         seed:              RNG seed (recorded in run JSON).
+        parallel:          Number of ProcessPoolExecutor workers to run
+            folds in parallel. Default 1 = sequential (Stage 7 behaviour).
+            When > 1, ``train_predict`` must be picklable (top-level
+            function or pickleable callable, not a closure capturing a
+            supabase client). I/O callables (``fetch_history``,
+            ``fetch_actuals``) always run in the main process, so they
+            may capture supabase. Per RFC-006 §8: per-worker BLAS thread
+            counts are pinned to 1 so fold parallelism is the only
+            source of CPU multiplexing.
 
     Returns:
         Aggregated run metrics dict with the same keys consumed by
@@ -89,8 +114,14 @@ def run_walk_forward(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     windows: list[str] = ["expanding", "rolling"] if window == "both" else [window]
-    fold_results: list[dict[str, Any]] = []
+    if parallel < 1:
+        raise ValueError(f"parallel must be >= 1; got {parallel}")
 
+    # Phase 1 — enumerate fold tasks + pre-fetch I/O on the main process.
+    # I/O callables may capture a supabase client (not picklable), so they
+    # MUST run in this process. Only ``train_predict`` (which trains a
+    # fresh TFT) is dispatched to the worker pool.
+    fold_tasks: list[dict[str, Any]] = []
     for user_id in user_ids:
         try:
             user_history = fetch_history(user_id, None, None)
@@ -126,11 +157,10 @@ def run_walk_forward(
 
                 try:
                     history = fetch_history(user_id, train_start, train_end)
-                    forecast_matrix = train_predict(history, config, horizon)
                     actuals = fetch_actuals(user_id, test_start, test_end)
                 except Exception as exc:  # pragma: no cover — defensive
                     logger.warning(
-                        "fold failed user=%s window=%s fold=%d: %s",
+                        "fold I/O failed user=%s window=%s fold=%d: %s",
                         user_id,
                         window_name,
                         fold_idx,
@@ -138,24 +168,116 @@ def run_walk_forward(
                     )
                     continue
 
-                metrics = _score_fold(forecast_matrix, actuals)
-                fold_results.append(
+                fold_tasks.append(
                     {
                         "user_id": user_id,
                         "window": window_name,
                         "fold_idx": fold_idx,
-                        "train_start": train_start.isoformat(),
-                        "train_end": train_end.isoformat(),
-                        "test_start": test_start.isoformat(),
-                        "test_end": test_end.isoformat(),
-                        **metrics,
+                        "train_start": train_start,
+                        "train_end": train_end,
+                        "test_start": test_start,
+                        "test_end": test_end,
+                        "history": history,
+                        "actuals": actuals,
                     }
                 )
+
+    # Phase 2 — run train_predict either sequentially or in a process pool.
+    fold_results = _execute_fold_tasks(
+        fold_tasks=fold_tasks,
+        train_predict=train_predict,
+        config=config,
+        horizon=horizon,
+        parallel=parallel,
+    )
+
+    # Phase 3 — sort by (user_id, window, fold_idx) so the JSON is
+    # deterministic regardless of fold completion order in the pool.
+    fold_results.sort(key=lambda f: (f["user_id"], f["window"], f["fold_idx"]))
 
     summary = _aggregate(fold_results, config=config, window=window, seed=seed)
     summary["folds"] = fold_results
     output_path.write_text(json.dumps(summary, indent=2, default=_json_default), encoding="utf-8")
     return summary
+
+
+def _execute_fold_tasks(
+    *,
+    fold_tasks: list[dict[str, Any]],
+    train_predict: Any,
+    config: TrainingConfig,
+    horizon: int,
+    parallel: int,
+) -> list[dict[str, Any]]:
+    """Run each fold's train_predict step and score the result.
+
+    Sequential when ``parallel == 1``; ProcessPoolExecutor with
+    ``max_workers=parallel`` and BLAS threads pinned to 1 otherwise.
+    """
+    if parallel == 1:
+        results: list[dict[str, Any]] = []
+        for task in fold_tasks:
+            row = _train_score_one(task, train_predict, config, horizon)
+            if row is not None:
+                results.append(row)
+        return results
+
+    results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=parallel, initializer=_pool_init) as pool:
+        future_to_task = {
+            pool.submit(_train_score_one, task, train_predict, config, horizon): task for task in fold_tasks
+        }
+        for future in concurrent.futures.as_completed(future_to_task):
+            task = future_to_task[future]
+            try:
+                row = future.result()
+            except Exception as exc:  # pragma: no cover — defensive
+                logger.warning(
+                    "fold worker failed user=%s window=%s fold=%d: %s",
+                    task["user_id"],
+                    task["window"],
+                    task["fold_idx"],
+                    exc,
+                )
+                continue
+            if row is not None:
+                results.append(row)
+    return results
+
+
+def _train_score_one(
+    task: dict[str, Any],
+    train_predict: Any,
+    config: TrainingConfig,
+    horizon: int,
+) -> dict[str, Any] | None:
+    """Train + predict + score a single fold task.
+
+    Top-level so it is picklable across the ProcessPoolExecutor boundary.
+    """
+    try:
+        forecast_matrix = train_predict(task["history"], config, horizon)
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.warning(
+            "train_predict failed user=%s window=%s fold=%d: %s",
+            task["user_id"],
+            task["window"],
+            task["fold_idx"],
+            exc,
+        )
+        return None
+
+    metrics = _score_fold(forecast_matrix, task["actuals"])
+    return {
+        "user_id": task["user_id"],
+        "window": task["window"],
+        "fold_idx": task["fold_idx"],
+        "train_start": task["train_start"].isoformat(),
+        "train_end": task["train_end"].isoformat(),
+        "test_start": task["test_start"].isoformat(),
+        "test_end": task["test_end"].isoformat(),
+        **metrics,
+    }
 
 
 # ---------------------------------------------------------------------------
