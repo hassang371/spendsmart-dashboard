@@ -182,7 +182,7 @@ def process_next_job(supabase: Client) -> bool:
         # Training jobs for the forecasting worker only.
         # Adapter-training jobs are queued via Celery and carry
         # source_row_count/celery_task_id metadata.
-        response = supabase.table("training_jobs").select("*").eq("status", JobStatus.PENDING).limit(20).execute()
+        response = supabase.table("training_jobs").select("*").eq("status", JobStatus.PENDING.value).limit(20).execute()
 
         if response.data:
             candidates = [
@@ -214,9 +214,9 @@ def process_next_job(supabase: Client) -> bool:
             # Mark processing
             claim_response = (
                 supabase.table("training_jobs")
-                .update({"status": JobStatus.PROCESSING, "updated_at": now_iso})
+                .update({"status": JobStatus.PROCESSING.value, "updated_at": now_iso})
                 .eq("id", job_id)
-                .eq("status", JobStatus.PENDING)
+                .eq("status", JobStatus.PENDING.value)
                 .execute()
             )
 
@@ -230,7 +230,7 @@ def process_next_job(supabase: Client) -> bool:
                 completed_at = datetime.now(timezone.utc).isoformat()
                 supabase.table("training_jobs").update(
                     {
-                        "status": JobStatus.COMPLETED,
+                        "status": JobStatus.COMPLETED.value,
                         "logs": logs,
                         "updated_at": completed_at,
                     }
