@@ -1,0 +1,1401 @@
+{
+  "ForecastInsights": {
+    "$defs": {
+      "LowestBalance": {
+        "description": "The horizon day where P10 is minimised, plus its P10/P50.",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          }
+        },
+        "required": ["date", "p10", "p50"],
+        "title": "LowestBalance",
+        "type": "object"
+      },
+      "QuantileSnapshot": {
+        "description": "A point-in-time snapshot of the P10/P50/P90 distribution.",
+        "properties": {
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          },
+          "p90": {
+            "title": "P90",
+            "type": "number"
+          }
+        },
+        "required": ["p10", "p50", "p90"],
+        "title": "QuantileSnapshot",
+        "type": "object"
+      },
+      "VariableImportance": {
+        "description": "One ``(feature, weight)`` pair from the TFT Variable Selection Network.\n\nUsed both for the full ``ForecastResponse.variable_importance`` list\n(every feature the VSN reports) and for the top-3 subset surfaced in\n``ForecastInsights.primary_drivers``. Empty for Chronos-only forecasts.",
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": ["feature", "weight"],
+        "title": "VariableImportance",
+        "type": "object"
+      }
+    },
+    "description": "Server-computed derived insights for one forecast call.\n\nSee RFC-003 \u00a71 for field semantics. ``floor_source`` is constrained\nto the two recognised provenances; v1 only emits\n``\"auto_p10_history\"`` (override slot reserved for v1.5).",
+    "properties": {
+      "confidence_band_width": {
+        "title": "Confidence Band Width",
+        "type": "number"
+      },
+      "floor_source": {
+        "enum": ["auto_p10_history", "user_override"],
+        "title": "Floor Source",
+        "type": "string"
+      },
+      "floor_used": {
+        "title": "Floor Used",
+        "type": "number"
+      },
+      "lowest_balance": {
+        "$ref": "#/$defs/LowestBalance"
+      },
+      "month_end": {
+        "$ref": "#/$defs/QuantileSnapshot"
+      },
+      "overdraft_risk_score": {
+        "title": "Overdraft Risk Score",
+        "type": "number"
+      },
+      "predicted_monthly_income": {
+        "title": "Predicted Monthly Income",
+        "type": "number"
+      },
+      "predicted_monthly_spend": {
+        "title": "Predicted Monthly Spend",
+        "type": "number"
+      },
+      "primary_drivers": {
+        "items": {
+          "$ref": "#/$defs/VariableImportance"
+        },
+        "title": "Primary Drivers",
+        "type": "array"
+      },
+      "safe_to_spend": {
+        "title": "Safe To Spend",
+        "type": "number"
+      }
+    },
+    "required": [
+      "lowest_balance",
+      "month_end",
+      "predicted_monthly_spend",
+      "predicted_monthly_income",
+      "confidence_band_width",
+      "primary_drivers",
+      "safe_to_spend",
+      "overdraft_risk_score",
+      "floor_used",
+      "floor_source"
+    ],
+    "title": "ForecastInsights",
+    "type": "object"
+  },
+  "ForecastPoint": {
+    "description": "One predicted day's full 7-quantile distribution.\n\nAll 7 quantiles are required floats. Both tiers (TFT-Hybrid and\nChronos-2) emit the same 7-quantile set; see RFC-003\n\u00a7\"Chronos-path quantile expansion\" for the engine upgrade that makes\nthis true.",
+    "properties": {
+      "date": {
+        "title": "Date",
+        "type": "string"
+      },
+      "p10": {
+        "title": "P10",
+        "type": "number"
+      },
+      "p2": {
+        "title": "P2",
+        "type": "number"
+      },
+      "p25": {
+        "title": "P25",
+        "type": "number"
+      },
+      "p50": {
+        "title": "P50",
+        "type": "number"
+      },
+      "p75": {
+        "title": "P75",
+        "type": "number"
+      },
+      "p90": {
+        "title": "P90",
+        "type": "number"
+      },
+      "p98": {
+        "title": "P98",
+        "type": "number"
+      }
+    },
+    "required": ["date", "p2", "p10", "p25", "p50", "p75", "p90", "p98"],
+    "title": "ForecastPoint",
+    "type": "object"
+  },
+  "ForecastResponse": {
+    "$defs": {
+      "ForecastInsights": {
+        "description": "Server-computed derived insights for one forecast call.\n\nSee RFC-003 \u00a71 for field semantics. ``floor_source`` is constrained\nto the two recognised provenances; v1 only emits\n``\"auto_p10_history\"`` (override slot reserved for v1.5).",
+        "properties": {
+          "confidence_band_width": {
+            "title": "Confidence Band Width",
+            "type": "number"
+          },
+          "floor_source": {
+            "enum": ["auto_p10_history", "user_override"],
+            "title": "Floor Source",
+            "type": "string"
+          },
+          "floor_used": {
+            "title": "Floor Used",
+            "type": "number"
+          },
+          "lowest_balance": {
+            "$ref": "#/$defs/LowestBalance"
+          },
+          "month_end": {
+            "$ref": "#/$defs/QuantileSnapshot"
+          },
+          "overdraft_risk_score": {
+            "title": "Overdraft Risk Score",
+            "type": "number"
+          },
+          "predicted_monthly_income": {
+            "title": "Predicted Monthly Income",
+            "type": "number"
+          },
+          "predicted_monthly_spend": {
+            "title": "Predicted Monthly Spend",
+            "type": "number"
+          },
+          "primary_drivers": {
+            "items": {
+              "$ref": "#/$defs/VariableImportance"
+            },
+            "title": "Primary Drivers",
+            "type": "array"
+          },
+          "safe_to_spend": {
+            "title": "Safe To Spend",
+            "type": "number"
+          }
+        },
+        "required": [
+          "lowest_balance",
+          "month_end",
+          "predicted_monthly_spend",
+          "predicted_monthly_income",
+          "confidence_band_width",
+          "primary_drivers",
+          "safe_to_spend",
+          "overdraft_risk_score",
+          "floor_used",
+          "floor_source"
+        ],
+        "title": "ForecastInsights",
+        "type": "object"
+      },
+      "ForecastPoint": {
+        "description": "One predicted day's full 7-quantile distribution.\n\nAll 7 quantiles are required floats. Both tiers (TFT-Hybrid and\nChronos-2) emit the same 7-quantile set; see RFC-003\n\u00a7\"Chronos-path quantile expansion\" for the engine upgrade that makes\nthis true.",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p2": {
+            "title": "P2",
+            "type": "number"
+          },
+          "p25": {
+            "title": "P25",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          },
+          "p75": {
+            "title": "P75",
+            "type": "number"
+          },
+          "p90": {
+            "title": "P90",
+            "type": "number"
+          },
+          "p98": {
+            "title": "P98",
+            "type": "number"
+          }
+        },
+        "required": ["date", "p2", "p10", "p25", "p50", "p75", "p90", "p98"],
+        "title": "ForecastPoint",
+        "type": "object"
+      },
+      "LowestBalance": {
+        "description": "The horizon day where P10 is minimised, plus its P10/P50.",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          }
+        },
+        "required": ["date", "p10", "p50"],
+        "title": "LowestBalance",
+        "type": "object"
+      },
+      "QuantileSnapshot": {
+        "description": "A point-in-time snapshot of the P10/P50/P90 distribution.",
+        "properties": {
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          },
+          "p90": {
+            "title": "P90",
+            "type": "number"
+          }
+        },
+        "required": ["p10", "p50", "p90"],
+        "title": "QuantileSnapshot",
+        "type": "object"
+      },
+      "VariableImportance": {
+        "description": "One ``(feature, weight)`` pair from the TFT Variable Selection Network.\n\nUsed both for the full ``ForecastResponse.variable_importance`` list\n(every feature the VSN reports) and for the top-3 subset surfaced in\n``ForecastInsights.primary_drivers``. Empty for Chronos-only forecasts.",
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": ["feature", "weight"],
+        "title": "VariableImportance",
+        "type": "object"
+      }
+    },
+    "description": "Full forecast payload returned by both predict endpoints.",
+    "properties": {
+      "confidence": {
+        "enum": ["low", "medium", "high"],
+        "title": "Confidence",
+        "type": "string"
+      },
+      "forecast": {
+        "items": {
+          "$ref": "#/$defs/ForecastPoint"
+        },
+        "maxItems": 30,
+        "minItems": 1,
+        "title": "Forecast",
+        "type": "array"
+      },
+      "horizon": {
+        "maximum": 30,
+        "minimum": 1,
+        "title": "Horizon",
+        "type": "integer"
+      },
+      "insights": {
+        "$ref": "#/$defs/ForecastInsights"
+      },
+      "model_type": {
+        "enum": ["chronos2", "tft_hybrid", "ensemble"],
+        "title": "Model Type",
+        "type": "string"
+      },
+      "model_version": {
+        "title": "Model Version",
+        "type": "string"
+      },
+      "prediction_id": {
+        "format": "uuid",
+        "title": "Prediction Id",
+        "type": "string"
+      },
+      "variable_importance": {
+        "anyOf": [
+          {
+            "items": {
+              "$ref": "#/$defs/VariableImportance"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Variable Importance"
+      }
+    },
+    "required": [
+      "forecast",
+      "model_type",
+      "model_version",
+      "horizon",
+      "confidence",
+      "variable_importance",
+      "insights",
+      "prediction_id"
+    ],
+    "title": "ForecastResponse",
+    "type": "object"
+  },
+  "IntentCreateRequest": {
+    "$defs": {
+      "IntentConfidence": {
+        "description": "Tiered confidence per LLD 010 \u00a7Design (Confidence interaction).",
+        "enum": ["low", "medium", "high"],
+        "title": "IntentConfidence",
+        "type": "string"
+      },
+      "IntentType": {
+        "description": "Seven intent types per LLD 010.",
+        "enum": [
+          "income_change",
+          "planned_large_expense",
+          "life_event",
+          "obligation_change",
+          "savings_goal",
+          "fd_maturity",
+          "expected_bonus"
+        ],
+        "title": "IntentType",
+        "type": "string"
+      }
+    },
+    "description": "POST /forecast/intents body.",
+    "properties": {
+      "amount": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount"
+      },
+      "amount_delta": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount Delta"
+      },
+      "category_bucket": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Category Bucket"
+      },
+      "confidence": {
+        "$ref": "#/$defs/IntentConfidence",
+        "default": "medium"
+      },
+      "end_date": {
+        "anyOf": [
+          {
+            "format": "date",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "End Date"
+      },
+      "intent_type": {
+        "$ref": "#/$defs/IntentType"
+      },
+      "is_recurring": {
+        "default": false,
+        "title": "Is Recurring",
+        "type": "boolean"
+      },
+      "notes": {
+        "anyOf": [
+          {
+            "maxLength": 280,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Notes"
+      },
+      "rrule_freq": {
+        "anyOf": [
+          {
+            "enum": ["monthly", "weekly", "biweekly", "quarterly", "annual"],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Rrule Freq"
+      },
+      "start_date": {
+        "format": "date",
+        "title": "Start Date",
+        "type": "string"
+      }
+    },
+    "required": ["intent_type", "start_date"],
+    "title": "IntentCreateRequest",
+    "type": "object"
+  },
+  "IntentUpdateRequest": {
+    "$defs": {
+      "IntentConfidence": {
+        "description": "Tiered confidence per LLD 010 \u00a7Design (Confidence interaction).",
+        "enum": ["low", "medium", "high"],
+        "title": "IntentConfidence",
+        "type": "string"
+      }
+    },
+    "description": "PATCH /forecast/intents/{id} body \u2014 all fields optional.",
+    "properties": {
+      "amount": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount"
+      },
+      "amount_delta": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount Delta"
+      },
+      "confidence": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/IntentConfidence"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "end_date": {
+        "anyOf": [
+          {
+            "format": "date",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "End Date"
+      },
+      "is_active": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Is Active"
+      },
+      "notes": {
+        "anyOf": [
+          {
+            "maxLength": 280,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Notes"
+      },
+      "start_date": {
+        "anyOf": [
+          {
+            "format": "date",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Start Date"
+      }
+    },
+    "title": "IntentUpdateRequest",
+    "type": "object"
+  },
+  "ScenarioDelta": {
+    "description": "Per-field delta (B \u2212 A) on the comparable insights metrics.",
+    "properties": {
+      "confidence_band_width_delta": {
+        "title": "Confidence Band Width Delta",
+        "type": "number"
+      },
+      "month_end_p50_delta": {
+        "title": "Month End P50 Delta",
+        "type": "number"
+      },
+      "overdraft_risk_score": {
+        "title": "Overdraft Risk Score",
+        "type": "number"
+      },
+      "predicted_monthly_income": {
+        "title": "Predicted Monthly Income",
+        "type": "number"
+      },
+      "predicted_monthly_spend": {
+        "title": "Predicted Monthly Spend",
+        "type": "number"
+      },
+      "safe_to_spend": {
+        "title": "Safe To Spend",
+        "type": "number"
+      }
+    },
+    "required": [
+      "safe_to_spend",
+      "overdraft_risk_score",
+      "predicted_monthly_spend",
+      "predicted_monthly_income",
+      "month_end_p50_delta",
+      "confidence_band_width_delta"
+    ],
+    "title": "ScenarioDelta",
+    "type": "object"
+  },
+  "ScenarioRequest": {
+    "$defs": {
+      "IntentConfidence": {
+        "description": "Tiered confidence per LLD 010 \u00a7Design (Confidence interaction).",
+        "enum": ["low", "medium", "high"],
+        "title": "IntentConfidence",
+        "type": "string"
+      },
+      "IntentCreateRequest": {
+        "description": "POST /forecast/intents body.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount"
+          },
+          "amount_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Delta"
+          },
+          "category_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Bucket"
+          },
+          "confidence": {
+            "$ref": "#/$defs/IntentConfidence",
+            "default": "medium"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "End Date"
+          },
+          "intent_type": {
+            "$ref": "#/$defs/IntentType"
+          },
+          "is_recurring": {
+            "default": false,
+            "title": "Is Recurring",
+            "type": "boolean"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "rrule_freq": {
+            "anyOf": [
+              {
+                "enum": ["monthly", "weekly", "biweekly", "quarterly", "annual"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rrule Freq"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": ["intent_type", "start_date"],
+        "title": "IntentCreateRequest",
+        "type": "object"
+      },
+      "IntentType": {
+        "description": "Seven intent types per LLD 010.",
+        "enum": [
+          "income_change",
+          "planned_large_expense",
+          "life_event",
+          "obligation_change",
+          "savings_goal",
+          "fd_maturity",
+          "expected_bonus"
+        ],
+        "title": "IntentType",
+        "type": "string"
+      }
+    },
+    "description": "POST /forecast/scenario body.",
+    "properties": {
+      "ephemeral_intents": {
+        "items": {
+          "$ref": "#/$defs/IntentCreateRequest"
+        },
+        "maxItems": 20,
+        "title": "Ephemeral Intents",
+        "type": "array"
+      },
+      "horizon": {
+        "default": 30,
+        "maximum": 30,
+        "minimum": 1,
+        "title": "Horizon",
+        "type": "integer"
+      },
+      "intent_ids_to_exclude": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "title": "Intent Ids To Exclude",
+        "type": "array"
+      }
+    },
+    "title": "ScenarioRequest",
+    "type": "object"
+  },
+  "ScenarioResponse": {
+    "$defs": {
+      "ForecastInsights": {
+        "description": "Server-computed derived insights for one forecast call.\n\nSee RFC-003 \u00a71 for field semantics. ``floor_source`` is constrained\nto the two recognised provenances; v1 only emits\n``\"auto_p10_history\"`` (override slot reserved for v1.5).",
+        "properties": {
+          "confidence_band_width": {
+            "title": "Confidence Band Width",
+            "type": "number"
+          },
+          "floor_source": {
+            "enum": ["auto_p10_history", "user_override"],
+            "title": "Floor Source",
+            "type": "string"
+          },
+          "floor_used": {
+            "title": "Floor Used",
+            "type": "number"
+          },
+          "lowest_balance": {
+            "$ref": "#/$defs/LowestBalance"
+          },
+          "month_end": {
+            "$ref": "#/$defs/QuantileSnapshot"
+          },
+          "overdraft_risk_score": {
+            "title": "Overdraft Risk Score",
+            "type": "number"
+          },
+          "predicted_monthly_income": {
+            "title": "Predicted Monthly Income",
+            "type": "number"
+          },
+          "predicted_monthly_spend": {
+            "title": "Predicted Monthly Spend",
+            "type": "number"
+          },
+          "primary_drivers": {
+            "items": {
+              "$ref": "#/$defs/VariableImportance"
+            },
+            "title": "Primary Drivers",
+            "type": "array"
+          },
+          "safe_to_spend": {
+            "title": "Safe To Spend",
+            "type": "number"
+          }
+        },
+        "required": [
+          "lowest_balance",
+          "month_end",
+          "predicted_monthly_spend",
+          "predicted_monthly_income",
+          "confidence_band_width",
+          "primary_drivers",
+          "safe_to_spend",
+          "overdraft_risk_score",
+          "floor_used",
+          "floor_source"
+        ],
+        "title": "ForecastInsights",
+        "type": "object"
+      },
+      "ForecastPoint": {
+        "description": "One predicted day's full 7-quantile distribution.\n\nAll 7 quantiles are required floats. Both tiers (TFT-Hybrid and\nChronos-2) emit the same 7-quantile set; see RFC-003\n\u00a7\"Chronos-path quantile expansion\" for the engine upgrade that makes\nthis true.",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p2": {
+            "title": "P2",
+            "type": "number"
+          },
+          "p25": {
+            "title": "P25",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          },
+          "p75": {
+            "title": "P75",
+            "type": "number"
+          },
+          "p90": {
+            "title": "P90",
+            "type": "number"
+          },
+          "p98": {
+            "title": "P98",
+            "type": "number"
+          }
+        },
+        "required": ["date", "p2", "p10", "p25", "p50", "p75", "p90", "p98"],
+        "title": "ForecastPoint",
+        "type": "object"
+      },
+      "ForecastResponse": {
+        "description": "Full forecast payload returned by both predict endpoints.",
+        "properties": {
+          "confidence": {
+            "enum": ["low", "medium", "high"],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "forecast": {
+            "items": {
+              "$ref": "#/$defs/ForecastPoint"
+            },
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Forecast",
+            "type": "array"
+          },
+          "horizon": {
+            "maximum": 30,
+            "minimum": 1,
+            "title": "Horizon",
+            "type": "integer"
+          },
+          "insights": {
+            "$ref": "#/$defs/ForecastInsights"
+          },
+          "model_type": {
+            "enum": ["chronos2", "tft_hybrid", "ensemble"],
+            "title": "Model Type",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "prediction_id": {
+            "format": "uuid",
+            "title": "Prediction Id",
+            "type": "string"
+          },
+          "variable_importance": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/VariableImportance"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable Importance"
+          }
+        },
+        "required": [
+          "forecast",
+          "model_type",
+          "model_version",
+          "horizon",
+          "confidence",
+          "variable_importance",
+          "insights",
+          "prediction_id"
+        ],
+        "title": "ForecastResponse",
+        "type": "object"
+      },
+      "IntentConfidence": {
+        "description": "Tiered confidence per LLD 010 \u00a7Design (Confidence interaction).",
+        "enum": ["low", "medium", "high"],
+        "title": "IntentConfidence",
+        "type": "string"
+      },
+      "IntentType": {
+        "description": "Seven intent types per LLD 010.",
+        "enum": [
+          "income_change",
+          "planned_large_expense",
+          "life_event",
+          "obligation_change",
+          "savings_goal",
+          "fd_maturity",
+          "expected_bonus"
+        ],
+        "title": "IntentType",
+        "type": "string"
+      },
+      "LowestBalance": {
+        "description": "The horizon day where P10 is minimised, plus its P10/P50.",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          }
+        },
+        "required": ["date", "p10", "p50"],
+        "title": "LowestBalance",
+        "type": "object"
+      },
+      "QuantileSnapshot": {
+        "description": "A point-in-time snapshot of the P10/P50/P90 distribution.",
+        "properties": {
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          },
+          "p90": {
+            "title": "P90",
+            "type": "number"
+          }
+        },
+        "required": ["p10", "p50", "p90"],
+        "title": "QuantileSnapshot",
+        "type": "object"
+      },
+      "ScenarioDelta": {
+        "description": "Per-field delta (B \u2212 A) on the comparable insights metrics.",
+        "properties": {
+          "confidence_band_width_delta": {
+            "title": "Confidence Band Width Delta",
+            "type": "number"
+          },
+          "month_end_p50_delta": {
+            "title": "Month End P50 Delta",
+            "type": "number"
+          },
+          "overdraft_risk_score": {
+            "title": "Overdraft Risk Score",
+            "type": "number"
+          },
+          "predicted_monthly_income": {
+            "title": "Predicted Monthly Income",
+            "type": "number"
+          },
+          "predicted_monthly_spend": {
+            "title": "Predicted Monthly Spend",
+            "type": "number"
+          },
+          "safe_to_spend": {
+            "title": "Safe To Spend",
+            "type": "number"
+          }
+        },
+        "required": [
+          "safe_to_spend",
+          "overdraft_risk_score",
+          "predicted_monthly_spend",
+          "predicted_monthly_income",
+          "month_end_p50_delta",
+          "confidence_band_width_delta"
+        ],
+        "title": "ScenarioDelta",
+        "type": "object"
+      },
+      "UserIntent": {
+        "description": "Full read-shape of a row in ``public.user_intents``.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount"
+          },
+          "amount_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Delta"
+          },
+          "category_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Bucket"
+          },
+          "confidence": {
+            "$ref": "#/$defs/IntentConfidence"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "End Date"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intent_type": {
+            "$ref": "#/$defs/IntentType"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_recurring": {
+            "default": false,
+            "title": "Is Recurring",
+            "type": "boolean"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
+          "rrule_freq": {
+            "anyOf": [
+              {
+                "enum": ["monthly", "weekly", "biweekly", "quarterly", "annual"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rrule Freq"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "intent_type",
+          "start_date",
+          "confidence",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserIntent",
+        "type": "object"
+      },
+      "VariableImportance": {
+        "description": "One ``(feature, weight)`` pair from the TFT Variable Selection Network.\n\nUsed both for the full ``ForecastResponse.variable_importance`` list\n(every feature the VSN reports) and for the top-3 subset surfaced in\n``ForecastInsights.primary_drivers``. Empty for Chronos-only forecasts.",
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": ["feature", "weight"],
+        "title": "VariableImportance",
+        "type": "object"
+      }
+    },
+    "description": "A/B forecast comparison + delta \u2014 see LLD 010 \u00a7Scenario Endpoint Design.",
+    "properties": {
+      "applied_intents": {
+        "items": {
+          "$ref": "#/$defs/UserIntent"
+        },
+        "title": "Applied Intents",
+        "type": "array"
+      },
+      "delta": {
+        "$ref": "#/$defs/ScenarioDelta"
+      },
+      "excluded_intents": {
+        "items": {
+          "$ref": "#/$defs/UserIntent"
+        },
+        "title": "Excluded Intents",
+        "type": "array"
+      },
+      "with_intents": {
+        "$ref": "#/$defs/ForecastResponse"
+      },
+      "without_intents": {
+        "$ref": "#/$defs/ForecastResponse"
+      }
+    },
+    "required": ["with_intents", "without_intents", "delta"],
+    "title": "ScenarioResponse",
+    "type": "object"
+  },
+  "UserIntent": {
+    "$defs": {
+      "IntentConfidence": {
+        "description": "Tiered confidence per LLD 010 \u00a7Design (Confidence interaction).",
+        "enum": ["low", "medium", "high"],
+        "title": "IntentConfidence",
+        "type": "string"
+      },
+      "IntentType": {
+        "description": "Seven intent types per LLD 010.",
+        "enum": [
+          "income_change",
+          "planned_large_expense",
+          "life_event",
+          "obligation_change",
+          "savings_goal",
+          "fd_maturity",
+          "expected_bonus"
+        ],
+        "title": "IntentType",
+        "type": "string"
+      }
+    },
+    "description": "Full read-shape of a row in ``public.user_intents``.",
+    "properties": {
+      "amount": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount"
+      },
+      "amount_delta": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Amount Delta"
+      },
+      "category_bucket": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Category Bucket"
+      },
+      "confidence": {
+        "$ref": "#/$defs/IntentConfidence"
+      },
+      "created_at": {
+        "title": "Created At",
+        "type": "string"
+      },
+      "end_date": {
+        "anyOf": [
+          {
+            "format": "date",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "End Date"
+      },
+      "id": {
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "intent_type": {
+        "$ref": "#/$defs/IntentType"
+      },
+      "is_active": {
+        "default": true,
+        "title": "Is Active",
+        "type": "boolean"
+      },
+      "is_recurring": {
+        "default": false,
+        "title": "Is Recurring",
+        "type": "boolean"
+      },
+      "notes": {
+        "anyOf": [
+          {
+            "maxLength": 280,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Notes"
+      },
+      "rrule_freq": {
+        "anyOf": [
+          {
+            "enum": ["monthly", "weekly", "biweekly", "quarterly", "annual"],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Rrule Freq"
+      },
+      "start_date": {
+        "format": "date",
+        "title": "Start Date",
+        "type": "string"
+      },
+      "updated_at": {
+        "title": "Updated At",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "uuid",
+        "title": "User Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "user_id",
+      "intent_type",
+      "start_date",
+      "confidence",
+      "created_at",
+      "updated_at"
+    ],
+    "title": "UserIntent",
+    "type": "object"
+  }
+}
