@@ -17,6 +17,7 @@ Refs: docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md §3, §3b
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from uuid import uuid4
 
@@ -28,6 +29,12 @@ from apps.api.core.metrics import forecast_log_insert_failures_total
 from apps.api.domains.forecasting.schemas import (
     ForecastPoint,
     ForecastResponse,
+    IntentConfidence,
+    IntentCreateRequest,
+    IntentType,
+    ScenarioDelta,
+    ScenarioResponse,
+    UserIntent,
     VariableImportance,
 )
 from packages.forecasting.chronos_engine import QUANTILE_LABELS, get_chronos_engine
@@ -43,6 +50,41 @@ from packages.forecasting.insights import (
 logger = structlog.get_logger(__name__)
 
 COLD_START_THRESHOLD: int = 90  # days
+
+
+def _compute_scenario_delta(*, a: ForecastResponse, b: ForecastResponse) -> ScenarioDelta:
+    """Compute B − A on the six comparable insight metrics."""
+    ai = a.insights
+    bi = b.insights
+    return ScenarioDelta(
+        safe_to_spend=float(bi.safe_to_spend - ai.safe_to_spend),
+        overdraft_risk_score=float(bi.overdraft_risk_score - ai.overdraft_risk_score),
+        predicted_monthly_spend=float(bi.predicted_monthly_spend - ai.predicted_monthly_spend),
+        predicted_monthly_income=float(bi.predicted_monthly_income - ai.predicted_monthly_income),
+        month_end_p50_delta=float(bi.month_end.p50 - ai.month_end.p50),
+        confidence_band_width_delta=float(bi.confidence_band_width - ai.confidence_band_width),
+    )
+
+
+def _filter_widener_intents(intents: list[UserIntent]) -> list[UserIntent]:
+    """LLD 010 — pick the intents that should enter RFC-005's widener list.
+
+    Per the LLD: ``LIFE_EVENT`` always widens (a baby is unpredictable
+    even when you're sure it's coming); plus any non-LIFE_EVENT intent at
+    ``low`` or ``medium`` confidence.
+
+    Inactive intents are skipped — soft-deleted intents must not affect
+    the forecast.
+    """
+    out: list[UserIntent] = []
+    for i in intents:
+        if not i.is_active:
+            continue
+        if i.intent_type is IntentType.LIFE_EVENT:
+            out.append(i)
+        elif i.confidence in (IntentConfidence.LOW, IntentConfidence.MEDIUM):
+            out.append(i)
+    return out
 
 
 def _compute_confidence(days_of_data: int, *, has_model: bool = False) -> str:
@@ -91,6 +133,8 @@ class ForecastService:
         *,
         user_id: str,
         horizon: int = 30,
+        active_intents: list[UserIntent] | None = None,
+        log_prediction: bool = True,
     ) -> ForecastResponse:
         """Run the tier-routed forecast for ``user_id`` over ``horizon`` days.
 
@@ -172,12 +216,21 @@ class ForecastService:
                 chronos_df.copy() if "closing_balance" in chronos_df.columns else daily_df.reset_index()
             )
             vi_dict = {item.feature: item.weight for item in var_importance} if var_importance else None
+            # LLD 010 — propagate active intents to the widener. Default
+            # path fetches stored intents from supabase; scenario_predict
+            # passes an explicit list (baseline / counterfactual).
+            if active_intents is None:
+                stored = self._fetch_active_intents(user_id)
+            else:
+                stored = active_intents
+            widener_intents = _filter_widener_intents(stored)
             insights = compute_insights(
                 forecast_matrix=matrix,
                 future_dates=future_dates,
                 history_df=history_for_insights,
                 variable_importance=vi_dict,
                 user_floor_override=None,
+                active_intents=widener_intents or None,
             )
         except Exception as exc:
             logger.warning("insights_compute_failed", user_id=user_id, error=str(exc))
@@ -202,14 +255,118 @@ class ForecastService:
 
         # ------------------------------------------------------------------
         # Fire-and-forget log via RPC. RPC failure is non-fatal.
+        # Scenario forecasts pass log_prediction=False — RFC-003 §4 dedups
+        # one row per (user, hour), so logging hypothetical A/B forecasts
+        # would pollute that table.
         # ------------------------------------------------------------------
-        self._log_prediction(prediction_id=prediction_id, user_id=user_id, response=response)
+        if log_prediction:
+            self._log_prediction(prediction_id=prediction_id, user_id=user_id, response=response)
 
         return response
+
+    async def scenario_predict(
+        self,
+        transactions_df: pd.DataFrame,
+        *,
+        user_id: str,
+        excludes: list[Any] | None = None,
+        ephemeral: list[IntentCreateRequest] | None = None,
+        horizon: int = 30,
+    ) -> ScenarioResponse:
+        """A/B forecast comparison — LLD 010 §Scenario Endpoint Design.
+
+        Runs two forecasts concurrently:
+          * ``without_intents`` (A) — baseline = stored active intents
+            minus ``excludes``.
+          * ``with_intents`` (B) — A plus ``ephemeral`` (transient,
+            never persisted).
+
+        Computes the field-by-field delta (B − A) on the comparable
+        insight metrics. Does NOT log either forecast to
+        ``user_predictions`` — that table is reserved for the production
+        ``predict`` path (RFC-003 §4).
+        """
+        excludes = excludes or []
+        ephemeral = ephemeral or []
+        exclude_ids = {str(eid) for eid in excludes}
+
+        stored = self._fetch_active_intents(user_id)
+        kept = [i for i in stored if str(i.id) not in exclude_ids]
+        excluded = [i for i in stored if str(i.id) in exclude_ids]
+
+        # Materialise ephemeral intents as transient UserIntent objects
+        # so the same widener filter applies. They never touch the DB.
+        from uuid import uuid4
+
+        ephemeral_intents = [
+            UserIntent(
+                id=uuid4(),
+                user_id=uuid4(),
+                intent_type=req.intent_type,
+                amount=req.amount,
+                amount_delta=req.amount_delta,
+                category_bucket=req.category_bucket,
+                start_date=req.start_date,
+                end_date=req.end_date,
+                confidence=req.confidence,
+                is_recurring=req.is_recurring,
+                rrule_freq=req.rrule_freq,
+                notes=req.notes,
+                is_active=True,
+                created_at="1970-01-01T00:00:00+00:00",
+                updated_at="1970-01-01T00:00:00+00:00",
+            )
+            for req in ephemeral
+        ]
+
+        applied = kept + ephemeral_intents
+
+        loop = asyncio.get_running_loop()
+
+        def _run_predict(active: list[UserIntent]) -> ForecastResponse:
+            return self.predict(
+                transactions_df,
+                user_id=user_id,
+                horizon=horizon,
+                active_intents=active,
+                log_prediction=False,
+            )
+
+        # Concurrency: run both forecasts in parallel via threadpool —
+        # predict() is sync (not async). asyncio.gather schedules the
+        # two thread executions concurrently.
+        without_task = loop.run_in_executor(None, _run_predict, kept)
+        with_task = loop.run_in_executor(None, _run_predict, applied)
+        without_resp, with_resp = await asyncio.gather(without_task, with_task)
+
+        delta = _compute_scenario_delta(a=without_resp, b=with_resp)
+        return ScenarioResponse(
+            with_intents=with_resp,
+            without_intents=without_resp,
+            delta=delta,
+            applied_intents=applied,
+            excluded_intents=excluded,
+        )
 
     # ------------------------------------------------------------------ #
     # Internals
     # ------------------------------------------------------------------ #
+
+    def _fetch_active_intents(self, user_id: str) -> list[UserIntent]:
+        """Read the user's active intents via the user-scoped client.
+
+        Returns ``[]`` on any failure (no intents table yet, RLS gap,
+        transient supabase error). The forecast must continue even
+        when the intent table is unavailable — backward compatibility
+        per LLD 010 §Success Criteria.
+        """
+        try:
+            resp = self.client.table("user_intents").select("*").eq("user_id", user_id).eq("is_active", True).execute()
+            rows = resp.data or []
+            return [UserIntent(**row) for row in rows]
+        except Exception as exc:
+            logger.warning("fetch_active_intents_failed", user_id=user_id, error=str(exc))
+            return []
 
     def _safe_get_cached_model(self, user_id: str) -> Any:
         """Resolve the user's TFT model from cache, swallowing all errors.

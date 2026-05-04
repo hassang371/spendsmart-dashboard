@@ -179,3 +179,132 @@ def test_predict_rejects_empty_dataframe():
     svc = ForecastService(_make_supabase_mock(), tft_cache=_make_cache_mock())
     with pytest.raises(ValueError):
         svc.predict(pd.DataFrame(columns=["date", "amount"]), user_id="x", horizon=30)
+
+
+def test_predict_passes_filtered_intents_to_compute_insights():
+    """LLD 010 — predict must filter active intents to LIFE_EVENT +
+    (low | medium) confidence and pass them as ``active_intents`` to
+    :func:`compute_insights`."""
+    from datetime import date
+    from uuid import uuid4
+
+    from apps.api.domains.forecasting.schemas import (
+        IntentConfidence,
+        IntentType,
+        UserIntent,
+    )
+    from apps.api.domains.forecasting.service import ForecastService
+
+    df = _make_transactions(n_days=50)
+    chronos = MagicMock()
+    chronos.predict.return_value = _stub_chronos_result(horizon=30)
+
+    def _intent(intent_type, confidence, is_active=True) -> UserIntent:
+        return UserIntent(
+            id=uuid4(),
+            user_id=uuid4(),
+            intent_type=intent_type,
+            amount=10000.0 if intent_type is not IntentType.LIFE_EVENT else None,
+            amount_delta=None,
+            category_bucket=None,
+            start_date=date(2026, 5, 15),
+            end_date=None,
+            confidence=confidence,
+            is_recurring=False,
+            rrule_freq=None,
+            notes=None,
+            is_active=is_active,
+            created_at="2026-04-17T00:00:00+00:00",
+            updated_at="2026-04-17T00:00:00+00:00",
+        )
+
+    intents = [
+        _intent(IntentType.LIFE_EVENT, IntentConfidence.HIGH),  # widens (LIFE_EVENT)
+        _intent(IntentType.PLANNED_LARGE_EXPENSE, IntentConfidence.LOW),  # widens (low)
+        _intent(IntentType.PLANNED_LARGE_EXPENSE, IntentConfidence.HIGH),  # NOT widened
+        _intent(IntentType.LIFE_EVENT, IntentConfidence.MEDIUM, is_active=False),  # skipped
+    ]
+
+    svc = ForecastService(_make_supabase_mock(), tft_cache=_make_cache_mock())
+    svc._fetch_active_intents = MagicMock(return_value=intents)
+
+    captured = {}
+
+    def _capture(**kwargs):
+        captured["active_intents"] = kwargs.get("active_intents")
+        from apps.api.domains.forecasting.schemas import (
+            ForecastInsights,
+            LowestBalance,
+            QuantileSnapshot,
+        )
+
+        return ForecastInsights(
+            lowest_balance=LowestBalance(date="2026-01-01", p10=0.0, p50=0.0),
+            month_end=QuantileSnapshot(p10=0.0, p50=0.0, p90=0.0),
+            predicted_monthly_spend=0.0,
+            predicted_monthly_income=0.0,
+            confidence_band_width=0.0,
+            primary_drivers=[],
+            safe_to_spend=0.0,
+            overdraft_risk_score=0.0,
+            floor_used=0.0,
+            floor_source="auto_p10_history",
+        )
+
+    with (
+        patch("apps.api.domains.forecasting.service.get_chronos_engine", return_value=chronos),
+        patch("apps.api.domains.forecasting.service.compute_insights", side_effect=_capture),
+    ):
+        svc.predict(df, user_id="user-x", horizon=30)
+
+    forwarded = captured["active_intents"]
+    assert forwarded is not None
+    types = {(i.intent_type, i.confidence) for i in forwarded}
+    assert (IntentType.LIFE_EVENT, IntentConfidence.HIGH) in types
+    assert (IntentType.PLANNED_LARGE_EXPENSE, IntentConfidence.LOW) in types
+    # High-confidence non-LIFE_EVENT and inactive intents must be filtered out.
+    assert (IntentType.PLANNED_LARGE_EXPENSE, IntentConfidence.HIGH) not in types
+    assert all(i.is_active for i in forwarded)
+
+
+def test_predict_with_no_intents_passes_none_to_compute_insights():
+    """Backward-compat — users with zero intents see no change."""
+    from apps.api.domains.forecasting.service import ForecastService
+
+    df = _make_transactions(n_days=50)
+    chronos = MagicMock()
+    chronos.predict.return_value = _stub_chronos_result(horizon=30)
+
+    svc = ForecastService(_make_supabase_mock(), tft_cache=_make_cache_mock())
+    svc._fetch_active_intents = MagicMock(return_value=[])
+
+    captured = {}
+
+    def _capture(**kwargs):
+        captured["active_intents"] = kwargs.get("active_intents")
+        from apps.api.domains.forecasting.schemas import (
+            ForecastInsights,
+            LowestBalance,
+            QuantileSnapshot,
+        )
+
+        return ForecastInsights(
+            lowest_balance=LowestBalance(date="2026-01-01", p10=0.0, p50=0.0),
+            month_end=QuantileSnapshot(p10=0.0, p50=0.0, p90=0.0),
+            predicted_monthly_spend=0.0,
+            predicted_monthly_income=0.0,
+            confidence_band_width=0.0,
+            primary_drivers=[],
+            safe_to_spend=0.0,
+            overdraft_risk_score=0.0,
+            floor_used=0.0,
+            floor_source="auto_p10_history",
+        )
+
+    with (
+        patch("apps.api.domains.forecasting.service.get_chronos_engine", return_value=chronos),
+        patch("apps.api.domains.forecasting.service.compute_insights", side_effect=_capture),
+    ):
+        svc.predict(df, user_id="user-noi", horizon=30)
+
+    assert captured["active_intents"] is None
