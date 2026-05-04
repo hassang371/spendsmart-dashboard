@@ -1,11 +1,23 @@
-"""
-TFT Inference Module.
+"""TFT inference helpers.
 
-Handles loading models from Supabase Storage, caching them in memory,
-and running predictions on new data.
+Stage 5 deletion: the legacy module-level ``_MODEL_CACHE`` dict + the
+``load_model`` / ``invalidate_cache`` shims were removed in favour of
+the bounded :class:`packages.forecasting.cache.TFTModelCache`. Callers
+that previously wrote ``model = load_model(supabase, user_id)`` now use
+``cached = await cache.get_or_load(user_id); model = cached.model``.
+
+What remains in this module is pure inference math:
+* :func:`get_latest_checkpoint_path` — used by the production
+  ``default_supabase_loader`` to find a user's latest training-job row.
+* :func:`predict_with_tft` — given a loaded model + history DataFrame,
+  produce the seven-quantile forecast.
+* :func:`extract_variable_importance` — Variable Selection Network
+  weight extraction for ``ForecastInsights.primary_drivers``.
+
+Refs: docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md
+Refs: docs/rfcs/RFC-004-tft-inference-cache-architecture.md
 """
 
-import io
 import logging
 from typing import Any, Dict, Optional
 
@@ -16,9 +28,6 @@ from packages.forecasting.dataset import create_timeseries_dataset, prepare_trai
 from packages.forecasting.trainer import MAX_ENCODER_LENGTH
 
 logger = logging.getLogger(__name__)
-
-# Simple in-memory cache: user_id -> loaded_model_object
-_MODEL_CACHE: Dict[str, Any] = {}
 
 
 def get_latest_checkpoint_path(supabase, user_id: str) -> Optional[str]:
@@ -40,52 +49,6 @@ def get_latest_checkpoint_path(supabase, user_id: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Error fetching latest checkpoint for {user_id}: {e}")
     return None
-
-
-def load_model(supabase, user_id: str) -> Optional[TemporalFusionTransformer]:
-    """
-    Load the TFT model for the user from Supabase Storage.
-    Uses in-memory caching to avoid re-downloading on every request.
-    """
-    # Check cache first
-    if user_id in _MODEL_CACHE:
-        return _MODEL_CACHE[user_id]
-
-    # Get path
-    checkpoint_path = get_latest_checkpoint_path(supabase, user_id)
-    if not checkpoint_path:
-        logger.warning(f"No trained model found for user {user_id}")
-        return None
-
-    logger.info(f"Downloading checkpoint: {checkpoint_path}")
-
-    # Download from Storage
-    try:
-        res = supabase.storage.from_("model-checkpoints").download(checkpoint_path)
-        # res is binary content (bytes)
-    except Exception as e:
-        logger.error(f"Failed to download checkpoint {checkpoint_path}: {e}")
-        return None
-
-    # Load into PyTorch
-    try:
-        with io.BytesIO(res) as buffer:
-            # map_location="cpu" is safer for inference servers
-            tft = TemporalFusionTransformer.load_from_checkpoint(buffer, map_location="cpu")
-            tft.eval()
-            tft.freeze()  # optimizing for inference
-            _MODEL_CACHE[user_id] = tft
-            return tft
-    except Exception as e:
-        logger.error(f"Failed to load model from bytes: {e}")
-        return None
-
-
-def invalidate_cache(user_id: str):
-    """Clear the cached model for a user (e.g. after retraining)."""
-    if user_id in _MODEL_CACHE:
-        del _MODEL_CACHE[user_id]
-        logger.info(f"Invalidated model cache for user {user_id}")
 
 
 def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon: int = 30) -> Dict[str, Any]:

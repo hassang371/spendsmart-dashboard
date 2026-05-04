@@ -151,10 +151,27 @@ async def lifespan(app: FastAPI):
 
     # RFC-004 — TFT model cache + warm endpoint rate limiter +
     # client-event rate limiter + Redis pub-sub subscriber.
-    from packages.forecasting.cache import TFTModelCache
+    import functools
+
+    from packages.forecasting.cache import TFTModelCache, default_supabase_loader
     from packages.forecasting.cache_invalidation import start_subscriber
 
     app.state.tft_cache = TFTModelCache()
+
+    # Stage 5: wire the production Supabase-backed loader. The cache
+    # was instantiated without a loader by Stage 3 (so unit tests could
+    # plug in mocks); production wiring lives here. We capture the
+    # service-role client so the loader can read training_jobs (RLS-
+    # bypassed) and download checkpoints from Storage.
+    try:
+        from supabase import create_client
+
+        _service_supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+        app.state.tft_cache.set_loader(functools.partial(default_supabase_loader, _service_supabase))
+        logger.info("tft_cache_loader_wired")
+    except Exception as exc:
+        logger.warning("tft_cache_loader_unavailable", error=str(exc))
+
     logger.info(
         "tft_cache_initialized",
         max_entries=app.state.tft_cache._max_entries,
