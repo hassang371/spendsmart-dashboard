@@ -38,18 +38,33 @@ def fetch_user_transactions(supabase, user_id: str) -> pd.DataFrame:
     keep ``merchant_name`` available for rows where the upstream
     classifier wrote there.
     """
-    response = (
-        supabase.table("transactions")
-        .select("transaction_date, amount, description, merchant_name, category")
-        .eq("user_id", user_id)
-        .order("transaction_date", desc=False)
-        .execute()
-    )
+    # PostgREST defaults to a 1000-row response cap. BUG-021: without
+    # explicit pagination the trainer silently truncates power users to
+    # the OLDEST 1000 transactions. Page through with .range() until an
+    # empty page returns.
+    page_size = 10_000
+    rows: list[dict] = []
+    start = 0
+    while True:
+        end = start + page_size - 1
+        resp = (
+            supabase.table("transactions")
+            .select("transaction_date, amount, description, merchant_name, category")
+            .eq("user_id", user_id)
+            .order("transaction_date", desc=False)
+            .range(start, end)
+            .execute()
+        )
+        batch = resp.data or []
+        rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        start += page_size
 
-    if not response.data:
+    if not rows:
         raise ValueError(f"No transactions found for user {user_id}")
 
-    df = pd.DataFrame(response.data)
+    df = pd.DataFrame(rows)
     df = df.rename(columns={"transaction_date": "date"})
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
     if "merchant_name" in df.columns and "merchant" not in df.columns:

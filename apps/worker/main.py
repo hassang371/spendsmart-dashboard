@@ -98,11 +98,20 @@ def upsert_scheduled_cashflows(supabase: Client, user_id: str, rules) -> int:
                 "is_active": True,
             }
         )
-    supabase.table("scheduled_cashflows").upsert(
-        payload,
-        on_conflict="user_id,merchant,amount,category_bucket,rrule_freq,day_of_month,day_of_week,source",
-    ).execute()
-    return len(payload)
+    # BUG-022: PostgREST ON CONFLICT cannot target the expression-based
+    # unique index `uniq_scheduled_cashflows_rule` (uses COALESCE wrappers).
+    # Fall back to per-row INSERT with duplicate-key swallow.
+    inserted = 0
+    for row in payload:
+        try:
+            supabase.table("scheduled_cashflows").insert(row).execute()
+            inserted += 1
+        except Exception as exc:
+            msg = str(exc)
+            if "23505" in msg or "duplicate key" in msg:
+                continue  # Rule already persisted; skip silently.
+            logger.warning(f"scheduled_cashflows insert non-fatal failure: {exc}")
+    return inserted
 
 
 def train_model(job_id: str, user_id: str):

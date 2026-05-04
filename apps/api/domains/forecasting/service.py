@@ -387,16 +387,20 @@ class ForecastService:
         if days_of_data < COLD_START_THRESHOLD:
             return
         try:
+            # BUG-020: skip if ANY active job exists. Worker overwrites
+            # logs once it claims, so the `forecasting:autoenq` marker
+            # disappears — using it as a filter let duplicate enqueues
+            # through and produced storms of stale `processing` rows.
             active = (
                 self.client.table("training_jobs")
-                .select("id, logs")
+                .select("id")
                 .eq("user_id", user_id)
                 .in_("status", ["pending", "queued", "running", "processing"])
-                .limit(20)
+                .limit(1)
                 .execute()
             )
-            if any(str(row.get("logs") or "").startswith("forecasting:") for row in (active.data or [])):
-                return  # Forecasting job already in flight.
+            if active.data:
+                return  # Some training job is already in flight.
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
             recent_complete = (
