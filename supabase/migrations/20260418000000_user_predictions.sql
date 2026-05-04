@@ -17,9 +17,17 @@ CREATE TABLE public.user_predictions (
         -- known before the INSERT completes.
     user_id             uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     generated_at        timestamptz NOT NULL DEFAULT now(),
-    -- Generated column used as the dedup key. STORED so the UNIQUE index
-    -- works without per-query function evaluation; immutable per row.
-    generated_hour      timestamptz NOT NULL GENERATED ALWAYS AS (date_trunc('hour', generated_at)) STORED,
+    -- BUG-019: dedup is enforced by a UNIQUE expression index on
+    --   (user_id, date_trunc('hour', generated_at, 'UTC'))
+    -- The original design used date_trunc('hour', generated_at) — the
+    -- two-argument form (text, timestamptz) is STABLE (depends on the
+    -- session TimeZone GUC), so PostgreSQL rejects both a STORED
+    -- generated column and a unique expression index keyed on it
+    -- (SQLSTATE 42P17). The three-argument form
+    -- date_trunc(text, timestamptz, text) IS marked IMMUTABLE because
+    -- the explicit timezone argument removes the GUC dependency. The
+    -- "exactly one row per (user_id, UTC hour)" dedup contract is
+    -- preserved bit-for-bit.
     model_type          text        NOT NULL,    -- chronos2 | tft_hybrid | ensemble
     model_version       text        NOT NULL,
     horizon_days        int         NOT NULL CHECK (horizon_days BETWEEN 1 AND 30),
@@ -43,10 +51,16 @@ CREATE TABLE public.user_predictions (
     created_at          timestamptz NOT NULL DEFAULT now()
 );
 
--- Atomic dedup: exactly one row per (user_id, hour). Concurrent INSERTs
--- collide on this constraint and the second one no-ops via ON CONFLICT.
+-- Atomic dedup: exactly one row per (user_id, UTC hour). Concurrent
+-- INSERTs collide on this constraint and the second one no-ops via
+-- ON CONFLICT. Expressed as a unique expression index (BUG-019). Both
+-- STORED generated columns and unique expression indexes require
+-- IMMUTABLE expressions, so the original two-argument
+-- date_trunc('hour', generated_at) was rejected with SQLSTATE 42P17.
+-- The three-argument form date_trunc('hour', generated_at, 'UTC') IS
+-- IMMUTABLE — the explicit timezone removes the session-GUC dependency.
 CREATE UNIQUE INDEX uniq_user_predictions_user_hour
-    ON public.user_predictions (user_id, generated_hour);
+    ON public.user_predictions (user_id, (date_trunc('hour', generated_at, 'UTC')));
 
 CREATE INDEX idx_user_predictions_user_recent
     ON public.user_predictions (user_id, generated_at DESC);
@@ -162,7 +176,7 @@ BEGIN
         payload->>'insights_version',
         payload_shown
     )
-    ON CONFLICT (user_id, generated_hour) DO NOTHING;
+    ON CONFLICT (user_id, (date_trunc('hour', generated_at, 'UTC'))) DO NOTHING;
 
     GET DIAGNOSTICS inserted_count = ROW_COUNT;
     RETURN inserted_count = 1;
