@@ -216,6 +216,25 @@ def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon
     else:
         preds = raw_tensor  # already [horizon, 7]
 
+    # Anchor the forecast to the user's CURRENT balance so day-0 P50
+    # equals the last observed closing_balance. Without this shift the
+    # forecast carries the model's absolute-level offset (which can
+    # drift from reality if the panel's cumulative-balance baseline
+    # has decoupled from the user's actual account balance — common
+    # when transactions partially populated history). The user reads
+    # "balance forecast" as "where my balance goes from today"; the
+    # raw model prediction is "where the trained-target trajectory
+    # goes from its own t=0". Shifting reconciles the two.
+    try:
+        last_closing = float(history_df["closing_balance"].iloc[-1])
+        _quantiles_for_anchor = list(model.loss.quantiles)
+        if 0.5 in _quantiles_for_anchor:
+            p50_col = _quantiles_for_anchor.index(0.5)
+            shift = last_closing - float(preds[0, p50_col])
+            preds = preds + shift
+    except Exception as _exc:
+        logger.warning(f"forecast_anchor_shift_failed: {_exc}")
+
     # 5. Format results
     results = []
     quantiles = model.loss.quantiles  # [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]

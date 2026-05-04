@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 from packages.forecasting.inference import get_latest_checkpoint_path, predict_with_tft
@@ -78,9 +79,13 @@ def test_predict_with_tft():
         assert "forecast" in result
         forecast = result["forecast"]
         assert len(forecast) == horizon
-        assert forecast[0]["p10"] == 10.0
-        assert forecast[0]["p50"] == 50.0
-        assert forecast[0]["p90"] == 90.0
+        # BUG-031: predict_with_tft now anchors day-0 P50 to the user's
+        # last observed closing_balance and shifts every quantile by the
+        # same delta. Assert the SPREAD (which is shift-invariant) rather
+        # than absolute levels.
+        p10, p50, p90 = forecast[0]["p10"], forecast[0]["p50"], forecast[0]["p90"]
+        assert p50 - p10 == pytest.approx(40.0, abs=0.01)
+        assert p90 - p50 == pytest.approx(40.0, abs=0.01)
 
 
 def test_predict_with_tft_dataset_construction_failure():
