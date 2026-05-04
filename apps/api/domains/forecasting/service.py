@@ -429,15 +429,12 @@ class ForecastService:
     def _safe_get_cached_model(self, user_id: str) -> Any:
         """Resolve the user's TFT model from cache, swallowing all errors.
 
-        ``TFTModelCache.get_or_load`` is async. We always run it on a fresh
-        event loop in a background thread (BUG-023). The previous
-        implementation called ``run_coroutine_threadsafe`` against the
-        FastAPI serving loop and synchronously blocked on the result —
-        that deadlocks the loop against itself, times out at 30s with an
-        empty ``str(TimeoutError())`` and forces every predict to
-        fall back to Chronos-only.
+        Uses the loop-agnostic ``get_or_load_sync`` (BUG-024) wrapped in
+        a daemon thread so a slow checkpoint download cannot block the
+        FastAPI serving loop. The previous async path tied the cache's
+        ``asyncio.Lock`` to the subscriber's loop and broke whenever a
+        fresh-loop thread tried to acquire it.
         """
-        import asyncio
         import threading
 
         result_box: list[Any] = [None]
@@ -445,7 +442,7 @@ class ForecastService:
 
         def _runner() -> None:
             try:
-                result_box[0] = asyncio.run(self.tft_cache.get_or_load(user_id))
+                result_box[0] = self.tft_cache.get_or_load_sync(user_id)
             except BaseException as exc:  # noqa: BLE001
                 err_box[0] = exc
 

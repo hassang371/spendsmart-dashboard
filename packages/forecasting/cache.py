@@ -236,6 +236,22 @@ class TFTModelCache:
     # Async public surface.
     # ------------------------------------------------------------------ #
 
+    def get_or_load_sync(self, user_id: str) -> Optional[CachedModel]:
+        """Loop-agnostic sync variant. Bypasses ``asyncio.Lock``-backed
+        single-flight so callers can run the load in any thread without
+        the lock binding to a specific event loop (BUG-024).
+
+        Trades single-flight for simplicity: at most one duplicate cold
+        download on a same-user race; cache hits on subsequent calls.
+        """
+        cached = self._get(user_id)
+        if cached is not None:
+            return cached
+        result = self._download_and_load(user_id)
+        if result is not None:
+            self._put(user_id, result)
+        return result
+
     async def get_or_load(self, user_id: str) -> Optional[CachedModel]:
         """Single-flight async load. Returns the cached entry on hit,
         triggers exactly one ``_download_and_load`` on miss, and
