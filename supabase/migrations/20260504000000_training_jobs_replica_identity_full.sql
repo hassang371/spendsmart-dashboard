@@ -1,0 +1,11 @@
+-- BUG-030: training_jobs Realtime UPDATE events were silently dropped by
+-- the insights page subscription's `user_id=eq.<uid>` filter because
+-- REPLICA IDENTITY DEFAULT only carries the primary key in the
+-- replicated OLD row. The Realtime server therefore had no user_id to
+-- match against, dropped the event, and the frontend never saw the
+-- "completed" status flip — Hassan had to manually refresh the page.
+--
+-- FULL replicates every column on UPDATE/DELETE so server-side filters
+-- on non-PK columns work. Cost: slightly larger WAL entries on writes
+-- to this table; negligible for a low-volume jobs queue.
+ALTER TABLE public.training_jobs REPLICA IDENTITY FULL;

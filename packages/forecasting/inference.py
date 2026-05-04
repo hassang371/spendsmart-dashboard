@@ -201,12 +201,18 @@ def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon
     pred_dl = pred_ds.to_dataloader(train=False, batch_size=64, num_workers=0)
 
     # Output shape: [n_groups, horizon, n_quantiles]. Panel mode: one
-    # row per (user_id, category_bucket). Sum across buckets to get
-    # the user-level total per day per quantile.
+    # row per (user_id, category_bucket). The training target is
+    # ``closing_balance`` which RFC-005 explicitly DUPLICATES across
+    # all 12 buckets per date (account-wide cumulative balance, not a
+    # per-bucket flow). Each group's prediction is therefore an
+    # estimate of the SAME quantity. We average across groups to
+    # produce a single user-level forecast — summing would inflate the
+    # forecast by ~12× and was the cause of the wildly negative
+    # WORST/LIKELY card numbers Hassan reported.
     raw_predictions = model.predict(pred_dl, mode="quantiles", return_x=False)
     raw_tensor = raw_predictions.detach().cpu().numpy()
     if raw_tensor.ndim == 3:
-        preds = raw_tensor.sum(axis=0)  # shape [horizon, 7]
+        preds = raw_tensor.mean(axis=0)  # shape [horizon, 7]
     else:
         preds = raw_tensor  # already [horizon, 7]
 
@@ -280,19 +286,16 @@ def extract_variable_importance(
         raw_predictions = model.predict(pred_dl, mode="raw", return_x=True)
         # pytorch-forecasting >=1.0 returns a Prediction NamedTuple
         # (output, x, y, decoder_lengths, ...). interpret_output expects
-        # the inner output object — passing the wrapper raises
-        # "tuple indices must be integers". Unwrap defensively across
-        # versions: handle NamedTuple, plain tuple, and bare-tensor
-        # legacy returns.
-        if hasattr(raw_predictions, "output") and hasattr(raw_predictions, "x"):
-            inner = raw_predictions
-        elif isinstance(raw_predictions, tuple) and len(raw_predictions) >= 2:
-            from types import SimpleNamespace
-
-            inner = SimpleNamespace(output=raw_predictions[0], x=raw_predictions[1])
+        # the underlying *dict* (out["decoder_attention"], etc.), not
+        # the NamedTuple wrapper, otherwise it raises
+        # "tuple indices must be integers" trying to subscript by str.
+        if hasattr(raw_predictions, "output"):
+            out_dict = raw_predictions.output
+        elif isinstance(raw_predictions, tuple) and len(raw_predictions) >= 1:
+            out_dict = raw_predictions[0]
         else:
-            inner = raw_predictions
-        interpretation = model.interpret_output(inner, reduction="sum")
+            out_dict = raw_predictions
+        interpretation = model.interpret_output(out_dict, reduction="sum")
         # interpret_output may return either a dict or a NamedTuple
         # depending on version. Handle both.
         if isinstance(interpretation, dict):
