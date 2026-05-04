@@ -148,6 +148,33 @@ describe('Middleware - updateSession', () => {
     expect(res.status).toBe(200);
   });
 
+  it('should redirect to login when accessing /insights without auth', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: 'No user' },
+    });
+
+    const req = createMockRequest('/insights');
+    const res = await updateSession(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/login');
+    expect(location).toContain('next=%2Finsights');
+  });
+
+  it('should allow access to /insights when authenticated', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'user-123', email: 'test@example.com' } },
+      error: null,
+    });
+
+    const req = createMockRequest('/insights');
+    const res = await updateSession(req);
+
+    expect(res.status).toBe(200);
+  });
+
   it('should handle nested dashboard routes', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: null },

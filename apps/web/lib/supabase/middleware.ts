@@ -35,11 +35,14 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isDashboardRoute = pathname.startsWith('/dashboard');
+  // Routes requiring an authenticated Supabase session. Extending this list
+  // also requires an entry in ``apps/web/proxy.ts`` matcher so the middleware
+  // actually fires on those paths.
+  const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/insights');
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const isLandingRoute = pathname === '/';
 
-  if (!user && isDashboardRoute) {
+  if (!user && isProtectedRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set('next', pathname);
