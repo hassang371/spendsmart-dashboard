@@ -11,7 +11,11 @@ celery_app = Celery(
     "scale_training",
     broker=redis_url,
     backend=redis_url,
-    include=["apps.api.tasks.training_tasks", "apps.api.core.tasks.maintenance_tasks"],
+    include=[
+        "apps.api.tasks.training_tasks",
+        "apps.api.core.tasks.maintenance_tasks",
+        "apps.api.core.tasks.evaluate_predictions",
+    ],
 )
 
 # Celery configuration
@@ -32,12 +36,17 @@ celery_app.conf.task_routes = {
     "apps.api.tasks.training_tasks.*": {"queue": "training"},
 }
 
-# Celery Beat schedule for automated cleanup tasks
+# Celery Beat schedule for automated cleanup + evaluation tasks
 celery_app.conf.beat_schedule = {
     "cleanup-stale-training-jobs": {
         "task": "cleanup_stale_jobs",
         "schedule": 3600,  # Every hour
-    }
+    },
+    # RFC-003 §5 — daily evaluation pass over matured predictions.
+    "evaluate-past-predictions": {
+        "task": "evaluate_past_predictions",
+        "schedule": 86400,  # 24h
+    },
 }
 
 if __name__ == "__main__":
