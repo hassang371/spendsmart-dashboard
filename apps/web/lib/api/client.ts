@@ -39,11 +39,26 @@ export interface ForecastPrediction {
   predicted_net: number;
 }
 
-export interface ForecastResponse {
+/**
+ * @deprecated Legacy statistical-MVP forecast shape. New code that consumes
+ * the RFC-003 7-quantile forecast surface MUST import ``ForecastResponse``
+ * from ``./forecast.types`` (typed against the FastAPI Pydantic schemas).
+ *
+ * Will be removed once the legacy ``/forecast/predict`` CSV-upload path is
+ * retired. Tracked under LLD 011 cleanup.
+ */
+export interface LegacyForecastResponse {
   model: string;
   note?: string;
   predictions: ForecastPrediction[];
 }
+
+/**
+ * @deprecated Use ``LegacyForecastResponse`` (or import from
+ * ``./forecast.types`` for the new RFC-003 shape). Aliased for one release
+ * cycle so legacy consumers keep compiling.
+ */
+export type ForecastResponse = LegacyForecastResponse;
 
 export interface HealthResponse {
   services?: {
