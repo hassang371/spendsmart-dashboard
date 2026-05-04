@@ -32,9 +32,12 @@ def test_predict_returns_correct_shape():
     """Predict returns a forecast list of length=horizon, plus metadata."""
     from packages.forecasting.chronos_engine import ChronosEngine
 
-    with patch("packages.forecasting.chronos_engine.ChronosPipeline") as MockPipeline:
-        mock_instance = MagicMock()
-        mock_instance.predict.return_value = torch.randn(1, 100, 30).abs()
+    with patch("packages.forecasting.chronos_engine.BaseChronosPipeline") as MockPipeline:
+        mock_instance = MagicMock(spec=["predict_quantiles"])
+        mock_instance.predict_quantiles.return_value = (
+            torch.randn(1, 30, 7).abs(),
+            torch.randn(1, 30).abs(),
+        )
         MockPipeline.from_pretrained.return_value = mock_instance
 
         engine = ChronosEngine(model_name="mock-model")
@@ -44,15 +47,19 @@ def test_predict_returns_correct_shape():
     assert len(result["forecast"]) == 30
     assert result["model_type"] == "chronos2"
     assert result["horizon"] == 30
+    assert result["model_version"] == "mock-model"
 
 
 def test_predict_emits_all_seven_quantiles():
     """Each forecast point must carry all RFC-003 quantile keys."""
     from packages.forecasting.chronos_engine import ChronosEngine
 
-    with patch("packages.forecasting.chronos_engine.ChronosPipeline") as MockPipeline:
-        mock_instance = MagicMock()
-        mock_instance.predict.return_value = torch.randn(1, 100, 30).abs()
+    with patch("packages.forecasting.chronos_engine.BaseChronosPipeline") as MockPipeline:
+        mock_instance = MagicMock(spec=["predict_quantiles"])
+        mock_instance.predict_quantiles.return_value = (
+            torch.randn(1, 30, 7).abs(),
+            torch.randn(1, 30).abs(),
+        )
         MockPipeline.from_pretrained.return_value = mock_instance
 
         engine = ChronosEngine(model_name="mock-model")
@@ -67,11 +74,11 @@ def test_predict_quantile_ordering():
     """p2 <= p10 <= p25 <= p50 <= p75 <= p90 <= p98 for every point."""
     from packages.forecasting.chronos_engine import ChronosEngine
 
-    with patch("packages.forecasting.chronos_engine.ChronosPipeline") as MockPipeline:
-        mock_instance = MagicMock()
-        # Sort sample dimension so the quantiles end up monotonic.
-        samples = torch.sort(torch.randn(1, 200, 30).abs(), dim=1).values
-        mock_instance.predict.return_value = samples
+    with patch("packages.forecasting.chronos_engine.BaseChronosPipeline") as MockPipeline:
+        # Sort along quantile axis so the per-day quantile vector is monotonic.
+        sorted_q = torch.sort(torch.randn(1, 30, 7).abs(), dim=2).values
+        mock_instance = MagicMock(spec=["predict_quantiles"])
+        mock_instance.predict_quantiles.return_value = (sorted_q, sorted_q[:, :, 3])
         MockPipeline.from_pretrained.return_value = mock_instance
 
         engine = ChronosEngine(model_name="mock-model")
