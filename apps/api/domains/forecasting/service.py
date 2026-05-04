@@ -194,6 +194,15 @@ class ForecastService:
 
             if "error" in tft_result:
                 logger.warning("tft_inference_failed", user_id=user_id, error=tft_result["error"])
+                # BUG-026: stale-checkpoint recovery — invalidate cache and
+                # trigger a fresh full-data retrain. _maybe_enqueue_training
+                # is idempotent (skips if any active job exists) so this is
+                # safe to call on every failure.
+                try:
+                    self.tft_cache.evict(user_id, reason="invalidation")
+                except Exception:
+                    pass
+                self._maybe_enqueue_training(user_id, days_of_data)
                 final_result = chronos_result
             else:
                 try:

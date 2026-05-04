@@ -164,6 +164,34 @@ def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon
         logger.error(f"Failed to reconstruct reference dataset for from_dataset: {e}")
         return {"error": f"Inference dataset construction failed: {e}"}
 
+    # Defense-in-depth (BUG-026): clamp every categorical value in
+    # combined_df to the encoder vocab before from_dataset runs. The
+    # encoders were fitted on history_df, so any value not present in
+    # history (e.g. a future month after a sparse history slice, a
+    # bucket with limited day-of-month coverage) would raise
+    # "Unknown category 'X'" and force fallback to Chronos.
+    saved_encoders = getattr(reference_ds, "_categorical_encoders", {}) or {}
+    for col in categorical_cols:
+        if col not in combined_df.columns or col not in saved_encoders:
+            continue
+        encoder = saved_encoders[col]
+        classes = getattr(encoder, "classes_", None)
+        if not classes:
+            continue
+        vocab = set(classes.keys()) if isinstance(classes, dict) else set(classes)
+        if not vocab:
+            continue
+        series = combined_df[col].astype(str)
+        unknown_mask = ~series.isin(vocab)
+        if unknown_mask.any():
+            fallback = next(iter(vocab))
+            unknown_values = series[unknown_mask].unique().tolist()
+            logger.warning(
+                "tft_inference_clamped_unknown_categoricals",
+                extra={"col": col, "unknown": unknown_values, "fallback": fallback, "n_rows": int(unknown_mask.sum())},
+            )
+            combined_df.loc[unknown_mask, col] = fallback
+
     pred_ds = TimeSeriesDataSet.from_dataset(reference_ds, combined_df, predict=True, stop_randomization=True)
 
     # We predict for the specific group "0" (there is only one anyway)
