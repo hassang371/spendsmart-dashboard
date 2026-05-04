@@ -18,6 +18,7 @@ Refs: docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md §3, §3b
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -175,6 +176,11 @@ class ForecastService:
         cached = None
         if self.tft_cache is not None and days_of_data >= COLD_START_THRESHOLD:
             cached = self._safe_get_cached_model(user_id)
+
+        # Auto-trigger TFT training when user is eligible but no model is
+        # warm. Best-effort + idempotent — duplicate enqueues are skipped.
+        if cached is None:
+            self._maybe_enqueue_training(user_id, days_of_data)
 
         var_importance: list[VariableImportance] | None = None
         final_result: dict[str, Any]
@@ -367,6 +373,54 @@ class ForecastService:
         except Exception as exc:
             logger.warning("fetch_active_intents_failed", user_id=user_id, error=str(exc))
             return []
+
+    def _maybe_enqueue_training(self, user_id: str, days_of_data: int) -> None:
+        """Best-effort: enqueue a TFT training job when user is eligible
+        and no recent active or completed forecasting job blocks it.
+
+        Worker recognises forecasting jobs via the ``logs`` prefix
+        ``forecasting:`` (per ``apps/worker/main.py::process_next_job``;
+        ``training_jobs`` has no ``job_type`` column).
+
+        Failure is non-fatal — the predict path stays on Chronos cold-start.
+        """
+        if days_of_data < COLD_START_THRESHOLD:
+            return
+        try:
+            active = (
+                self.client.table("training_jobs")
+                .select("id, logs")
+                .eq("user_id", user_id)
+                .in_("status", ["pending", "queued", "running", "processing"])
+                .limit(20)
+                .execute()
+            )
+            if any(str(row.get("logs") or "").startswith("forecasting:") for row in (active.data or [])):
+                return  # Forecasting job already in flight.
+
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+            recent_complete = (
+                self.client.table("training_jobs")
+                .select("id, logs")
+                .eq("user_id", user_id)
+                .eq("status", "completed")
+                .gte("created_at", cutoff)
+                .limit(20)
+                .execute()
+            )
+            if any(str(row.get("logs") or "").startswith("forecasting:") for row in (recent_complete.data or [])):
+                return  # Recently retrained — let the model sit for now.
+
+            self.client.table("training_jobs").insert(
+                {
+                    "user_id": user_id,
+                    "status": "pending",
+                    "logs": "forecasting:autoenq",
+                }
+            ).execute()
+            logger.info("training_auto_enqueued", user_id=user_id, days=days_of_data)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("training_auto_enqueue_failed", user_id=user_id, error=str(exc))
 
     def _safe_get_cached_model(self, user_id: str) -> Any:
         """Resolve the user's TFT model from cache, swallowing all errors.
