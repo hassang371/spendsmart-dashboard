@@ -4,11 +4,13 @@ Migrated from routers/forecast.py.
 Fixes BUG-07: Uses parse_file() instead of parse_csv_content() to
 preserve metadata columns.
 
-Stage 1 (LLD 009) refactor: the POST /predict handler is now a thin
-delegation layer over ``ForecastService`` (apps/api/domains/forecasting/
-service.py). The over-the-wire response shape is unchanged — Stage 5
-(RFC-003) is the migration that swaps the response_model to the new
-``ForecastResponse``.
+Stage 5 (RFC-003): the predict endpoints now return the full
+:class:`ForecastResponse` — 7-quantile points + insights +
+``prediction_id``. Both ``GET`` and ``POST`` accept a ``horizon`` query
+param clamped to ``[1, 30]`` (the upper bound is RFC-003 §1, NOT 90).
+The legacy ``GET /forecast/safe-to-spend`` endpoint stays on the
+statistical-MVP path per RFC-003 §"API Changes" pending a separate
+follow-up RFC.
 """
 
 import asyncio
@@ -17,13 +19,13 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 
 from apps.api.core.auth import get_current_user_id, get_user_client
+from apps.api.domains.forecasting.schemas import ForecastResponse
 from apps.api.domains.forecasting.service import ForecastService
 from packages.forecasting.cache import TFTModelCache
 from packages.forecasting.dataset import TransactionLoader
-from packages.forecasting.inference import load_model, predict_with_tft
 from packages.ingestion_engine.import_transactions import parse_file
 from supabase import Client
 
@@ -61,18 +63,68 @@ def _warm_rate_limit(request: Request):
     return dep
 
 
-def _get_service(client: Client = Depends(get_user_client)) -> ForecastService:
-    """Construct a ForecastService scoped to the request's Supabase client."""
-    return ForecastService(client)
+def _get_service(
+    request: Request,
+    client: Client = Depends(get_user_client),
+) -> ForecastService:
+    """Construct a ForecastService scoped to the request's Supabase client.
+
+    The TFT cache is sourced from ``app.state.tft_cache`` (constructed in
+    the FastAPI lifespan); when missing (e.g. early test boot), the
+    service falls back to Chronos-only.
+    """
+    cache = getattr(request.app.state, "tft_cache", None)
+    return ForecastService(client, tft_cache=cache)
 
 
-@router.post("/predict")
-async def forecast_predict(
-    file: UploadFile = File(...),
+def _load_user_transactions(client: Client, user_id: str, lookback_days: int = 365) -> pd.DataFrame:
+    """Fetch the user's recent transactions for the GET /predict path."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
+    resp = (
+        client.table("transactions")
+        .select("transaction_date, amount, status")
+        .eq("user_id", user_id)
+        .gte("transaction_date", cutoff)
+        .order("transaction_date", desc=False)
+        .limit(50_000)
+        .execute()
+    )
+    rows = resp.data or []
+    if not rows:
+        return pd.DataFrame(columns=["date", "amount"])
+    df = pd.DataFrame(rows).rename(columns={"transaction_date": "date"})
+    df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0)
+    return df
+
+
+@router.get("/predict", response_model=ForecastResponse)
+async def forecast_predict_get(
+    horizon: int = Query(30, ge=1, le=30),
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
     service: ForecastService = Depends(_get_service),
-):
+) -> ForecastResponse:
+    """Return a forecast for the authenticated user (RFC-003 §3 contract).
+
+    Pulls the user's transactions from Supabase, runs the tier-routed
+    forecast, and returns the full :class:`ForecastResponse`. The CSV
+    upload + dedup branch lives only on the ``POST`` path.
+    """
+    df = _load_user_transactions(client, user_id)
+    try:
+        return service.predict(df, user_id=user_id, horizon=horizon)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/predict", response_model=ForecastResponse)
+async def forecast_predict(
+    file: UploadFile = File(...),
+    horizon: int = Query(30, ge=1, le=30),
+    user_id: str = Depends(get_current_user_id),
+    client: Client = Depends(get_user_client),
+    service: ForecastService = Depends(_get_service),
+) -> ForecastResponse:
     """Accept a CSV of transactions and return predicted spending.
 
     BUG-07 fix: Uses parse_file() (preserves metadata columns) instead
@@ -81,9 +133,9 @@ async def forecast_predict(
     IMP-05 fix: Auth check and duplicate-file check happen before any
     parsing work, so duplicate uploads fail fast.
 
-    Stage 1: forecast computation now lives in ``ForecastService.predict``;
-    this handler is responsible only for transport concerns (CSV parse,
-    upload-dedup, error mapping).
+    Stage 5 (RFC-003): response shape is now :class:`ForecastResponse`;
+    the dedup-by-file-hash branch on ``uploaded_files`` is preserved on
+    POST only — GET has no upload tracking.
     """
     if file.content_type and "csv" not in file.content_type and "text" not in file.content_type:
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
@@ -119,7 +171,7 @@ async def forecast_predict(
         df = df.rename(columns={"transaction_date": "date"})
 
     try:
-        return service.predict(df, user_id=user_id, horizon=7)
+        return service.predict(df, user_id=user_id, horizon=horizon)
     except ValueError:
         # Roll back the upload marker so the user can retry with a fixed file.
         client.table("uploaded_files").delete().eq("user_id", user_id).eq("file_hash", file_hash).execute()
@@ -130,6 +182,7 @@ async def forecast_predict(
 async def safe_to_spend(
     user_id: str = Depends(get_current_user_id),
     client: Client = Depends(get_user_client),
+    request: Request = None,  # type: ignore[assignment]
 ):
     """Returns predicted safe-to-spend amount for the authenticated user."""
 
@@ -189,10 +242,19 @@ async def safe_to_spend(
     projected_overspend = round(max(0.0, -net), 2)
     forecast_breakdown = []
 
+    # Stage 5: migrate from the deleted ``inference._MODEL_CACHE`` /
+    # ``load_model`` shims to the bounded TFT cache via
+    # ``cache.get_or_load(user_id)`` (RFC-004). When the cache is
+    # unavailable (test boot path that doesn't set ``app.state.tft_cache``)
+    # or the loader returns ``None`` (no trained model yet), this falls
+    # back to the statistical-MVP path above.
     try:
-        tft_model = load_model(client, user_id)
-        if tft_model and len(daily_df) >= 60:
-            pred_data = predict_with_tft(tft_model, df, horizon=horizon)
+        cache = getattr(request.app.state, "tft_cache", None) if request is not None else None
+        cached = await cache.get_or_load(user_id) if cache is not None else None
+        if cached is not None and cached.model is not None and len(daily_df) >= 60:
+            from packages.forecasting.inference import predict_with_tft
+
+            pred_data = predict_with_tft(cached.model, df, horizon=horizon)
             if "forecast" in pred_data:
                 forecast = pred_data["forecast"]
                 total_predicted_spend_p90 = sum(day.get("p90", 0) for day in forecast)

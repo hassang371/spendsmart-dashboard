@@ -122,6 +122,19 @@ forecast_warm_outcome_total: Counter = Counter(
     registry=REGISTRY,
 )
 
+# 12. RFC-003 §3 — log_user_prediction RPC failure counter.
+# Incremented when ForecastService.predict catches a non-fatal RPC
+# failure during the fire-and-forget INSERT into ``user_predictions``.
+forecast_log_insert_failures_total: Counter = Counter(
+    "forecast_log_insert_failures_total",
+    (
+        "Number of times log_user_prediction RPC failed during forecast "
+        "logging. Failure is non-fatal — the user still receives the "
+        "forecast — but accumulating failures indicate a DB / RPC outage."
+    ),
+    registry=REGISTRY,
+)
+
 
 __all__ = [
     "REGISTRY",
@@ -136,4 +149,5 @@ __all__ = [
     "tft_cache_pubsub_publish_failures_total",
     "tft_cache_subscriber_reconnects_total",
     "forecast_warm_outcome_total",
+    "forecast_log_insert_failures_total",
 ]
