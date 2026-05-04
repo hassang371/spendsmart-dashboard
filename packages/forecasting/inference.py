@@ -116,14 +116,21 @@ def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon
 
     future_df = pd.concat(future_blocks, ignore_index=True)
 
-    for col in ("user_id", "category_bucket", "group_id", "day_of_week", "day_of_month", "month", "is_payday"):
+    # Cast both frames' categorical columns to plain strings before
+    # concat. pd.Categorical(values, categories=hist_cats) silently
+    # produces NaN for any value not in hist_cats, and pytorch-forecasting's
+    # NaNLabelEncoder later stringifies that NaN to literal "nan" — which
+    # fails encoding with "Unknown category 'nan'". Strings sidestep both
+    # problems: TimeSeriesDataSet refits its NaNLabelEncoder from the
+    # combined frame's actual values, future values are guaranteed to be
+    # in vocabulary because reference_ds is rebuilt from history_df below.
+    categorical_cols = ("user_id", "category_bucket", "group_id", "day_of_week", "day_of_month", "month", "is_payday")
+    history_df = history_df.copy()
+    for col in categorical_cols:
         if col in history_df.columns:
-            hist_categories = (
-                history_df[col].cat.categories
-                if hasattr(history_df[col], "cat")
-                else pd.Index(history_df[col].astype(str).unique())
-            )
-            future_df[col] = pd.Categorical(future_df[col].astype(str), categories=hist_categories)
+            history_df[col] = history_df[col].astype(str)
+        if col in future_df.columns:
+            future_df[col] = future_df[col].astype(str)
 
     combined_df = pd.concat([history_df, future_df], ignore_index=True)
 

@@ -59,6 +59,12 @@ Rebuild `future_df` to mirror the panel schema. For each `category_bucket` alrea
 
 The `closing_balance` field is `time_varying_unknown` per the dataset config, so its decoder values are unused — but the column must be present for `TimeSeriesDataSet` validation, so we keep it as `0.0`.
 
+## Follow-up: NaN-from-Categorical → "Unknown category 'nan'"
+
+The first cut of the fix used `pd.Categorical(future_df[col].astype(str), categories=hist_categories)` to align dtype. Any future value not present in `hist_categories` silently becomes `NaN`. pytorch-forecasting's `NaNLabelEncoder` later stringifies that `NaN` to the literal string `"nan"` and throws `Unknown category 'nan' encountered. Set add_nan=True to allow unknown categories`.
+
+Final fix: skip the `pd.Categorical` cast entirely. Cast both `history_df` and `future_df` categorical columns to plain Python strings via `astype(str)`. `TimeSeriesDataSet.from_dataset` rebuilds its `NaNLabelEncoder` from `reference_ds` (built off `history_df`); since future values are deterministic functions of dates already present in `history_df`'s value space, encoder vocabulary covers them.
+
 ## Regression prevention
 
 - Add a unit test that calls `predict_with_tft` against a dummy panel-schema model and asserts the response has 30 rows and no `error` key.
