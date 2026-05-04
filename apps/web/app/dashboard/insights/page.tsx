@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ForecastApiError, getForecast, listIntents, upcomingIntents } from '@/lib/api/forecast';
 import type { ForecastResponse, UserIntent } from '@/lib/api/forecast.types';
+import { getBrowserSupabaseClient } from '@/lib/supabase/client';
 import AddPlanModal from '../../insights/components/AddPlanModal';
 import BalanceForecastChart from '../../insights/components/BalanceForecastChart';
 import ColdStartBanner from '../../insights/components/ColdStartBanner';
@@ -59,17 +60,61 @@ export default function InsightsPage() {
     void refetch();
   }, [refetch]);
 
-  // Poll every 60s + refetch when tab regains focus. Lets the page reflect
-  // freshly-trained TFT models without a manual reload — once the worker
-  // completes a training_jobs row + invalidates the cache, the next poll
-  // tick picks up the personalised forecast.
+  // Realtime: push-based refresh. Subscribe to training_jobs UPDATEs for
+  // the current user; when the worker flips status to 'completed' (TFT
+  // training finished + checkpoint uploaded + cache invalidated via
+  // Redis pub-sub) we refetch the forecast immediately. No polling, no
+  // wasted calls.
+  //
+  // Also refetch on window focus — a user returning from another tab
+  // should see the latest forecast without manual reload.
   useEffect(() => {
+    let cancelled = false;
+    let channel: ReturnType<typeof getBrowserSupabaseClient>['channel'] extends (
+      ...args: infer _A
+    ) => infer _R
+      ? _R
+      : never;
+
+    (async () => {
+      const supabase = getBrowserSupabaseClient();
+      const { data: userResp } = await supabase.auth.getUser();
+      const userId = userResp.user?.id;
+      if (cancelled || !userId) return;
+
+      channel = supabase
+        .channel(`training_jobs:user:${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'training_jobs',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload: { new: Record<string, unknown> | null }) => {
+            const next =
+              payload.new && typeof payload.new === 'object'
+                ? (payload.new as { status?: string }).status
+                : undefined;
+            if (next === 'completed') {
+              void refetch();
+            }
+          }
+        )
+        .subscribe();
+    })();
+
     const onFocus = () => void refetch();
     window.addEventListener('focus', onFocus);
-    const interval = window.setInterval(() => void refetch(), 60_000);
+
     return () => {
+      cancelled = true;
       window.removeEventListener('focus', onFocus);
-      window.clearInterval(interval);
+      if (channel) {
+        const supabase = getBrowserSupabaseClient();
+        void supabase.removeChannel(channel);
+      }
     };
   }, [refetch]);
 
