@@ -87,14 +87,20 @@ def _get_service(
 
 
 def _load_user_transactions(client: Client, user_id: str, lookback_days: int = 365) -> pd.DataFrame:
-    """Fetch the user's recent transactions for the GET /predict path."""
+    """Fetch the user's recent transactions for the GET /predict path.
+
+    Orders DESC + caps at 50k so power users (multi-account + UPI =
+    100+ txns/day) get the MOST RECENT 50k, not the oldest. The forecast
+    horizon starts at MAX(transaction_date), so an ASC + LIMIT cap would
+    silently anchor predictions to a stale window.
+    """
     cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
     resp = (
         client.table("transactions")
         .select("transaction_date, amount, status")
         .eq("user_id", user_id)
         .gte("transaction_date", cutoff)
-        .order("transaction_date", desc=False)
+        .order("transaction_date", desc=True)
         .limit(50_000)
         .execute()
     )
@@ -103,6 +109,7 @@ def _load_user_transactions(client: Client, user_id: str, lookback_days: int = 3
         return pd.DataFrame(columns=["date", "amount"])
     df = pd.DataFrame(rows).rename(columns={"transaction_date": "date"})
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0)
+    df = df.sort_values("date", ascending=True).reset_index(drop=True)
     return df
 
 
