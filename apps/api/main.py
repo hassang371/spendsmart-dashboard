@@ -187,13 +187,24 @@ async def lifespan(app: FastAPI):
             app.state.client_event_rate_limiter = rate_limit_dependency(
                 RateLimiter(_redis_client, max_requests=30, window_seconds=60)
             )
+            # LLD 010: intent CRUD 20/min/user; scenario 5/min/user.
+            app.state.intent_crud_rate_limiter = rate_limit_dependency(
+                RateLimiter(_redis_client, max_requests=20, window_seconds=60)
+            )
+            app.state.scenario_rate_limiter = rate_limit_dependency(
+                RateLimiter(_redis_client, max_requests=5, window_seconds=60)
+            )
         except Exception as e:
             logger.warning("warm_rate_limiter_unavailable", error=str(e))
             app.state.warm_rate_limiter = None
             app.state.client_event_rate_limiter = None
+            app.state.intent_crud_rate_limiter = None
+            app.state.scenario_rate_limiter = None
     else:
         app.state.warm_rate_limiter = None
         app.state.client_event_rate_limiter = None
+        app.state.intent_crud_rate_limiter = None
+        app.state.scenario_rate_limiter = None
 
     # Subscribe to cache-invalidation pub-sub. We use redis.asyncio to
     # match the async subscriber loop. Failure to start is non-fatal —

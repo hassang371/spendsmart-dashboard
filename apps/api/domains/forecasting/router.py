@@ -22,7 +22,16 @@ import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 
 from apps.api.core.auth import get_current_user_id, get_user_client
-from apps.api.domains.forecasting.schemas import ForecastResponse
+from apps.api.domains.forecasting.intents_service import IntentsService
+from apps.api.domains.forecasting.schemas import (
+    ForecastResponse,
+    IntentCreateRequest,
+    IntentType,
+    IntentUpdateRequest,
+    ScenarioRequest,
+    ScenarioResponse,
+    UserIntent,
+)
 from apps.api.domains.forecasting.service import ForecastService
 from packages.forecasting.cache import TFTModelCache
 from packages.forecasting.dataset import TransactionLoader
@@ -328,3 +337,141 @@ async def warm_model(
     except Exception as exc:
         logger.warning("tft_warm_failed", user_id=user_id, error=str(exc))
         return {"status": "failed", "user_id": user_id}
+
+
+# ---------------------------------------------------------------------------
+# LLD 010 — User intent CRUD + scenario forecast
+# ---------------------------------------------------------------------------
+#
+# Refs: docs/features/010-user-intents-and-scenario-forecasting.md
+#       §API Changes
+
+
+def _intent_crud_rate_limit(request: Request):
+    return getattr(request.app.state, "intent_crud_rate_limiter", None)
+
+
+def _scenario_rate_limit(request: Request):
+    return getattr(request.app.state, "scenario_rate_limiter", None)
+
+
+async def _apply_rate_limit(request: Request, dep) -> None:
+    if dep is not None:
+        await dep(request)
+
+
+def _get_intents_service(client: Client = Depends(get_user_client)) -> IntentsService:
+    return IntentsService(client)
+
+
+@router.post("/intents", response_model=UserIntent, status_code=201)
+async def create_intent(
+    request: Request,
+    body: IntentCreateRequest,
+    user_id: str = Depends(get_current_user_id),
+    svc: IntentsService = Depends(_get_intents_service),
+) -> UserIntent:
+    """Create a new user intent.
+
+    Rate-limited at 20/min/user. Bridge to scheduled_cashflows is
+    handled inside :class:`IntentsService` via the
+    ``upsert_intent_with_bridge`` RPC.
+    """
+    await _apply_rate_limit(request, _intent_crud_rate_limit(request))
+    try:
+        return svc.create(body, user_id=user_id)
+    except Exception as exc:
+        logger.warning("intent_create_failed", user_id=user_id, error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/intents", response_model=list[UserIntent])
+async def list_intents(
+    request: Request,
+    intent_type: IntentType | None = Query(None),
+    include_inactive: bool = Query(False),
+    user_id: str = Depends(get_current_user_id),
+    svc: IntentsService = Depends(_get_intents_service),
+) -> list[UserIntent]:
+    """List the current user's intents (active by default)."""
+    await _apply_rate_limit(request, _intent_crud_rate_limit(request))
+    return svc.list(
+        user_id=user_id,
+        intent_type=intent_type,
+        include_inactive=include_inactive,
+    )
+
+
+@router.get("/intents/{intent_id}", response_model=UserIntent)
+async def get_intent(
+    request: Request,
+    intent_id: str,
+    user_id: str = Depends(get_current_user_id),
+    svc: IntentsService = Depends(_get_intents_service),
+) -> UserIntent:
+    await _apply_rate_limit(request, _intent_crud_rate_limit(request))
+    intent = svc.get(intent_id, user_id=user_id)
+    if intent is None:
+        raise HTTPException(status_code=404, detail="Intent not found")
+    return intent
+
+
+@router.patch("/intents/{intent_id}", response_model=UserIntent)
+async def patch_intent(
+    request: Request,
+    intent_id: str,
+    body: IntentUpdateRequest,
+    user_id: str = Depends(get_current_user_id),
+    svc: IntentsService = Depends(_get_intents_service),
+) -> UserIntent:
+    await _apply_rate_limit(request, _intent_crud_rate_limit(request))
+    try:
+        return svc.update(intent_id, body, user_id=user_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Intent not found")
+    except Exception as exc:
+        logger.warning("intent_update_failed", intent_id=intent_id, error=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.delete("/intents/{intent_id}", status_code=204)
+async def delete_intent(
+    request: Request,
+    intent_id: str,
+    user_id: str = Depends(get_current_user_id),
+    svc: IntentsService = Depends(_get_intents_service),
+) -> None:
+    """Soft-delete an intent (sets ``is_active=false``; bridge mirrors)."""
+    await _apply_rate_limit(request, _intent_crud_rate_limit(request))
+    try:
+        svc.delete(intent_id, user_id=user_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Intent not found")
+
+
+@router.post("/scenario", response_model=ScenarioResponse)
+async def post_scenario(
+    request: Request,
+    body: ScenarioRequest,
+    user_id: str = Depends(get_current_user_id),
+    client: Client = Depends(get_user_client),
+    service: ForecastService = Depends(_get_service),
+) -> ScenarioResponse:
+    """A/B forecast comparison — see LLD 010 §Scenario Endpoint Design.
+
+    Rate-limited at 5/min/user (heavier than CRUD; runs two forecasts
+    in parallel via ``asyncio.gather``).
+    """
+    await _apply_rate_limit(request, _scenario_rate_limit(request))
+
+    df = _load_user_transactions(client, user_id)
+    try:
+        return await service.scenario_predict(
+            df,
+            user_id=user_id,
+            excludes=body.intent_ids_to_exclude,
+            ephemeral=body.ephemeral_intents,
+            horizon=body.horizon,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
