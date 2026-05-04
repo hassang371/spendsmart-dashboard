@@ -218,8 +218,18 @@ def predict_with_tft(model: TemporalFusionTransformer, df: pd.DataFrame, horizon
     # verification needed on quantile indices. Default QuantileLoss quantiles are:
     # [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]
 
-    q_map = {0.1: "p10", 0.5: "p50", 0.9: "p90"}
-    q_indices = {q: i for i, q in enumerate(quantiles) if q in q_map}
+    # RFC-003 contract: emit all seven quantiles so ensemble_forecasts
+    # can blend each level with chronos. Falls back to nearest available
+    # quantile when training used fewer levels (e.g. legacy 3-quantile
+    # checkpoints).
+    q_map = {0.02: "p2", 0.1: "p10", 0.25: "p25", 0.5: "p50", 0.75: "p75", 0.9: "p90", 0.98: "p98"}
+    quantiles_list = list(quantiles)
+    q_indices = {}
+    for q in q_map:
+        if q in quantiles_list:
+            q_indices[q] = quantiles_list.index(q)
+        elif quantiles_list:
+            q_indices[q] = min(range(len(quantiles_list)), key=lambda i: abs(quantiles_list[i] - q))
 
     actual_length = min(horizon, len(preds))
     for i in range(actual_length):
