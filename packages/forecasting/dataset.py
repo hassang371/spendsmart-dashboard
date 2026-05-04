@@ -214,7 +214,13 @@ def aggregate_daily_panel(
         df.loc[positive_no_cat, "category_bucket"] = "salary"
 
     # --- aggregate per (date, bucket) --------------------------------------
-    df["_date"] = df["date"].dt.normalize()
+    # Strip timezone so downstream merges with scheduled_df (tz-naive,
+    # produced by project_scheduled_cashflows from python `date` objects)
+    # don't crash on dtype mismatch (datetime64[ns, UTC] vs datetime64[ns]).
+    _dates = pd.to_datetime(df["date"])
+    if getattr(_dates.dt, "tz", None) is not None:
+        _dates = _dates.dt.tz_convert("UTC").dt.tz_localize(None)
+    df["_date"] = _dates.dt.normalize()
     grouped = (
         df.groupby(["_date", "category_bucket"])["amount"]
         .sum()
@@ -274,7 +280,10 @@ def _build_dense_panel(
 
     if not per_day_per_bucket.empty:
         per_day_per_bucket = per_day_per_bucket.copy()
-        per_day_per_bucket["date"] = pd.to_datetime(per_day_per_bucket["date"])
+        _d = pd.to_datetime(per_day_per_bucket["date"])
+        if getattr(_d.dt, "tz", None) is not None:
+            _d = _d.dt.tz_convert("UTC").dt.tz_localize(None)
+        per_day_per_bucket["date"] = _d
         panel = panel.merge(per_day_per_bucket, on=["date", "category_bucket"], how="left")
     else:
         panel["bucket_total"] = 0.0
@@ -294,7 +303,10 @@ def _build_dense_panel(
     # scheduled_event_amount join
     if scheduled_df is not None and not scheduled_df.empty:
         sched = scheduled_df.copy()
-        sched["date"] = pd.to_datetime(sched["date"])
+        _sd = pd.to_datetime(sched["date"])
+        if getattr(_sd.dt, "tz", None) is not None:
+            _sd = _sd.dt.tz_convert("UTC").dt.tz_localize(None)
+        sched["date"] = _sd
         sched = (
             sched.groupby(["date", "category_bucket"])["scheduled_amount"]
             .sum()
