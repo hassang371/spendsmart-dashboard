@@ -19,7 +19,35 @@ M5 Monitoring & Observability:
 """
 
 import os
+import warnings
 from contextlib import asynccontextmanager
+
+# Suppress per-batch warning floods triggered by TFT inference inside the
+# FastAPI process. pytorch-forecasting's TimeSeriesDataSet feeds numpy
+# arrays into sklearn StandardScalers fitted on DataFrames; sklearn fires
+# "X does not have valid feature names" on every batch (~one per group),
+# flooding the backend log on every /forecast/predict. Same mitigation as
+# apps/worker/main.py.
+warnings.filterwarnings(
+    "ignore",
+    message="X does not have valid feature names",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="`isinstance\\(treespec, LeafSpec\\)` is deprecated",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="The 'predict_dataloader' does not have many workers",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="Not all dimensions are equal for tensors shapes",
+    category=UserWarning,
+)
 
 import structlog
 from fastapi import FastAPI, Request

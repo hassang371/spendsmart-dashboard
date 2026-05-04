@@ -42,7 +42,14 @@ def fetch_user_transactions(supabase, user_id: str) -> pd.DataFrame:
     # explicit pagination the trainer silently truncates power users to
     # the OLDEST 1000 transactions. Page through with .range() until an
     # empty page returns.
-    page_size = 10_000
+    #
+    # BUG-028: page_size MUST match the server-side `db-max-rows` cap
+    # (Supabase default = 1000). A larger Range header (e.g. 0-9999) is
+    # silently capped server-side and the loop's `len(batch) < page_size`
+    # exit condition fires after the first page, truncating the same way
+    # BUG-021 did. Set page_size to 1000 so we always consume exactly one
+    # cap-worth per request and only exit when the *real* tail is reached.
+    page_size = 1_000
     rows: list[dict] = []
     start = 0
     while True:

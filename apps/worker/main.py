@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import os
 import time
@@ -189,10 +190,17 @@ def train_model(job_id: str, user_id: str):
 
     # 4. Metrics
     best_val_loss = float(trainer.callback_metrics.get("val_loss", 0))
+    distinct_days = int(enriched["date"].nunique())
+    date_min = pd.to_datetime(df["date"]).min().date().isoformat()
+    date_max = pd.to_datetime(df["date"]).max().date().isoformat()
+    # Fingerprint: stable hash of (user, range, count) so duplicate
+    # training runs on identical input data are detectable post-hoc.
+    fingerprint = hashlib.sha256(f"{user_id}|{date_min}|{date_max}|{tx_count}".encode("utf-8")).hexdigest()
     metrics = {
         "val_loss": round(best_val_loss, 6),
         "epochs_trained": trainer.current_epoch + 1,
-        "days_of_data": len(enriched),
+        "days_of_data": distinct_days,
+        "panel_rows": len(enriched),
         "transaction_count": tx_count,
     }
 
@@ -206,6 +214,9 @@ def train_model(job_id: str, user_id: str):
             "checkpoint_path": checkpoint_path,
             "metrics": metrics,
             "transaction_count": tx_count,
+            "date_range_start": date_min,
+            "date_range_end": date_max,
+            "data_fingerprint": fingerprint,
         }
     ).eq("id", job_id).execute()
 
