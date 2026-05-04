@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import time
+import warnings
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -11,6 +12,34 @@ from apps.worker.job_states import InvalidTransitionError, JobStatus, transition
 from supabase import Client, create_client
 
 # Imports
+
+# Silence sklearn StandardScaler "X does not have valid feature names" warning.
+# pytorch-forecasting's TimeSeriesDataSet feeds numpy arrays into scalers
+# fitted on DataFrames; this fires on every batch (~one per training step
+# per group) and floods the worker log with thousands of duplicate lines.
+# The mismatch is benign — scaler still applies the right transform.
+warnings.filterwarnings(
+    "ignore",
+    message="X does not have valid feature names",
+    category=UserWarning,
+)
+# Quiet two more pytorch-forecasting / lightning deprecation noise sources
+# that fire per-batch and add no signal beyond the first occurrence.
+warnings.filterwarnings(
+    "ignore",
+    message="`isinstance\\(treespec, LeafSpec\\)` is deprecated",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="The 'train_dataloader' does not have many workers",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="The 'val_dataloader' does not have many workers",
+    category=UserWarning,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
