@@ -278,10 +278,39 @@ def extract_variable_importance(
         pred_dl = reference_ds.to_dataloader(train=False, batch_size=64, num_workers=0)
 
         raw_predictions = model.predict(pred_dl, mode="raw", return_x=True)
-        interpretation = model.interpret_output(raw_predictions, reduction="sum")
+        # pytorch-forecasting >=1.0 returns a Prediction NamedTuple
+        # (output, x, y, decoder_lengths, ...). interpret_output expects
+        # the inner output object — passing the wrapper raises
+        # "tuple indices must be integers". Unwrap defensively across
+        # versions: handle NamedTuple, plain tuple, and bare-tensor
+        # legacy returns.
+        if hasattr(raw_predictions, "output") and hasattr(raw_predictions, "x"):
+            inner = raw_predictions
+        elif isinstance(raw_predictions, tuple) and len(raw_predictions) >= 2:
+            from types import SimpleNamespace
 
-        weights = interpretation.get("encoder_variables", {})
-        return [{"feature": k, "weight": round(float(v), 4)} for k, v in weights.items()]
+            inner = SimpleNamespace(output=raw_predictions[0], x=raw_predictions[1])
+        else:
+            inner = raw_predictions
+        interpretation = model.interpret_output(inner, reduction="sum")
+        # interpret_output may return either a dict or a NamedTuple
+        # depending on version. Handle both.
+        if isinstance(interpretation, dict):
+            weights_obj = interpretation.get("encoder_variables", {})
+        else:
+            weights_obj = getattr(interpretation, "encoder_variables", {})
+        # encoder_variables can be a dict {feature: weight} OR a torch
+        # tensor indexed by reference_ds.encoder_variables. Normalise.
+        if hasattr(weights_obj, "items"):
+            pairs = list(weights_obj.items())
+        else:
+            try:
+                feature_names = reference_ds.encoder_variables  # list[str]
+                values = weights_obj.detach().cpu().numpy() if hasattr(weights_obj, "detach") else weights_obj
+                pairs = list(zip(feature_names, values, strict=False))
+            except Exception:
+                pairs = []
+        return [{"feature": str(k), "weight": round(float(v), 4)} for k, v in pairs]
     except Exception as e:
         logger.warning(f"Variable importance extraction failed: {e}")
         return None

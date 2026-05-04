@@ -49,12 +49,16 @@ def ensemble_forecasts(
 
     blended: list[dict[str, Any]] = []
     for t, c in zip(tft_fc, chr_fc, strict=True):
+        # Blend each quantile, then sort to guarantee monotonicity.
+        # Two engines blended at different weights can produce crossing
+        # (e.g. TFT noise on p2 lifting it above p10), which would make
+        # the frontend fan chart hide every band as a defensive guard.
+        # QuantileLoss expects monotonic quantiles by construction; we
+        # restore that invariant at the API boundary.
+        values = sorted(tft_weight * float(t[key]) + chronos_weight * float(c[key]) for key in QUANTILE_LABELS)
         point: dict[str, Any] = {"date": t["date"]}
-        for key in QUANTILE_LABELS:
-            point[key] = round(
-                tft_weight * float(t[key]) + chronos_weight * float(c[key]),
-                2,
-            )
+        for key, val in zip(QUANTILE_LABELS, values, strict=True):
+            point[key] = round(val, 2)
         blended.append(point)
 
     return {
