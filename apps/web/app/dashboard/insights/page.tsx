@@ -105,12 +105,8 @@ export default function InsightsPage() {
         .subscribe();
     })();
 
-    const onFocus = () => void refetch();
-    window.addEventListener('focus', onFocus);
-
     return () => {
       cancelled = true;
-      window.removeEventListener('focus', onFocus);
       if (channel) {
         const supabase = getBrowserSupabaseClient();
         void supabase.removeChannel(channel);
