@@ -16,6 +16,7 @@ import {
   Moon,
   AlertTriangle,
   Building2,
+  Upload,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -132,6 +133,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       '/dashboard/transactions',
       '/dashboard/analytics',
       '/dashboard/insights',
+      '/dashboard/train-adapter',
       '/dashboard/settings',
     ].forEach(route => {
       router.prefetch(route);
@@ -254,6 +256,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 label="AI Insights"
                 href="/dashboard/insights"
                 active={pathname === '/dashboard/insights'}
+              />
+              <SidebarItem
+                icon={<Upload size={20} />}
+                label="Manual Import"
+                href="/dashboard/train-adapter"
+                active={pathname === '/dashboard/train-adapter'}
               />
               <SidebarItem
                 icon={<Building2 size={20} />}
