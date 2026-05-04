@@ -28,6 +28,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import pandas as pd
+
 from packages.forecasting.eval.configs import resolve_config
 from packages.forecasting.eval.harness import run_walk_forward
 from packages.forecasting.eval.report import render_diff_markdown
@@ -168,8 +171,61 @@ def _real_train_predict(supabase: Any) -> Any:
 
 
 def _real_fetch_actuals(supabase: Any) -> Any:
-    def _fetch_actuals(user_id, test_start, test_end):  # pragma: no cover — Stage 9
-        raise NotImplementedError("Real fetch_actuals wiring is implemented in Stage 9.")
+    """Return the fetch_actuals callable used in real runs.
+
+    Inputs to the returned callable: ``(user_id, test_start, test_end)``
+    where the dates are ``datetime.date`` instances. Returns a 1-D NumPy
+    array of length ``(test_end - test_start).days`` carrying the actual
+    closing-balance trajectory for each day in ``[test_start, test_end)``.
+
+    Closing balance is derived from the same ``TransactionLoader.aggregate_daily``
+    logic the trainer uses, so train and eval ground-truth are
+    pipeline-consistent (RFC-006 §3).
+    """
+
+    def _fetch_actuals(user_id: str, test_start: Any, test_end: Any) -> np.ndarray:
+        from packages.forecasting.dataset import TransactionLoader
+
+        start_str = str(test_start)
+        end_str = str(test_end)
+
+        response = (
+            supabase.table("transactions")
+            .select("transaction_date, amount")
+            .eq("user_id", user_id)
+            .gte("transaction_date", start_str)
+            .lte("transaction_date", end_str)
+            .order("transaction_date", desc=False)
+            .limit(50_000)
+            .execute()
+        )
+        rows = response.data or []
+        horizon_days = (pd.to_datetime(end_str) - pd.to_datetime(start_str)).days
+
+        if not rows:
+            return np.zeros(horizon_days, dtype=float)
+
+        df = pd.DataFrame(rows)
+        df = df.rename(columns={"transaction_date": "date"})
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0)
+
+        loader = TransactionLoader(df)
+        # aggregate_daily reindexes to [start, end] inclusive; we slice
+        # to [start, end) to align with harness fold semantics where
+        # test_end is exclusive.
+        end_inclusive = pd.to_datetime(end_str) - pd.Timedelta(days=1)
+        daily = loader.aggregate_daily(
+            start_date=pd.to_datetime(start_str),
+            end_date=end_inclusive,
+        )
+        balances = daily["closing_balance"].to_numpy(dtype=float)
+        # Defensive: if reindex yielded a different length, pad/truncate.
+        if balances.shape[0] != horizon_days:
+            out = np.zeros(horizon_days, dtype=float)
+            n = min(balances.shape[0], horizon_days)
+            out[:n] = balances[:n]
+            return out
+        return balances
 
     return _fetch_actuals
 
