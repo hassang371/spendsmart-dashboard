@@ -10,6 +10,7 @@ def create_tft_model(
     dropout=0.1,
     hidden_continuous_size=64,
     lstm_layers=3,
+    weight_decay: float = 0.0,
 ):
     """
     Creates a TemporalFusionTransformer model from the training dataset.
@@ -19,6 +20,10 @@ def create_tft_model(
     ``hidden_continuous_size=64``. The 12-bucket panel produces ~12× more
     rows per user than the v0 single-series schema, justifying the
     capacity bump.
+
+    ``weight_decay`` (RFC-006) defaults to 0.0 (no L2) to preserve the
+    current production codepath. The harness passes 1e-4 for the
+    ``GROKKING`` regime.
     """
     tft = TemporalFusionTransformer.from_dataset(
         training_dataset,
@@ -32,5 +37,6 @@ def create_tft_model(
         log_interval=10,  # log example every 10 batches
         reduce_on_plateau_patience=4,
         lstm_layers=lstm_layers,
+        weight_decay=weight_decay,
     )
     return tft

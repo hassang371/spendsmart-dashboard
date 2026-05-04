@@ -66,9 +66,26 @@ def run_training(
     enriched_df: pd.DataFrame,
     max_epochs: int = 30,
     early_stop_patience: int = 5,
+    weight_decay: float = 0.0,
+    batch_size: int = 64,
+    learning_rate: float = 3e-4,
 ):
     """
     Create datasets, build TFT model, and train with PyTorch Lightning.
+
+    Args:
+        enriched_df:        Panel or single-series DataFrame with the
+            standard time_idx/group_id features (RFC-005).
+        max_epochs:         Lightning ``Trainer.max_epochs``. Default 30.
+        early_stop_patience: ``EarlyStopping`` patience. Default 5.
+        weight_decay:       L2 regularisation passed to the TFT optimiser
+            via ``optimizer_params``. Default 0.0 (preserves production
+            behaviour).
+        batch_size:         DataLoader batch size for both train + val.
+            Default 64 (preserves production behaviour).
+        learning_rate:      TFT learning rate. Default 3e-4 (matches the
+            RFC-006 §4 ``DEFAULT`` preset; previously was 0.01 — see the
+            DEVIATION note in this module's RFC-006 changelog).
 
     Returns ``(trainer, model, training_dataset)``.
     """
@@ -97,11 +114,16 @@ def run_training(
         stop_randomization=True,
     )
 
-    train_dl = training_dataset.to_dataloader(train=True, batch_size=64, num_workers=0)
-    val_dl = validation_dataset.to_dataloader(train=False, batch_size=64, num_workers=0)
+    train_dl = training_dataset.to_dataloader(train=True, batch_size=batch_size, num_workers=0)
+    val_dl = validation_dataset.to_dataloader(train=False, batch_size=batch_size, num_workers=0)
 
-    # Model
-    tft = create_tft_model(training_dataset, learning_rate=0.01)
+    # Model — weight_decay forwarded into the BaseModel ``weight_decay``
+    # field; default 0.0 leaves production behaviour unchanged.
+    tft = create_tft_model(
+        training_dataset,
+        learning_rate=learning_rate,
+        weight_decay=weight_decay,
+    )
 
     # Callbacks
     early_stop = pl.callbacks.EarlyStopping(
