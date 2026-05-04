@@ -351,10 +351,20 @@ def default_supabase_loader(supabase: Any, user_id: str) -> Optional[CachedModel
         return None
 
     try:
+        import tempfile
+
         from pytorch_forecasting import TemporalFusionTransformer  # local import
 
-        with io.BytesIO(buf) as bio:
-            model = TemporalFusionTransformer.load_from_checkpoint(bio, map_location="cpu")
+        # Lightning's `LightningModule.load_from_checkpoint` expects a
+        # filesystem path (str | Path). Earlier versions accepted file-like
+        # objects via internal `torch.load`, but the contract is path-only
+        # in 2.x — passing `io.BytesIO` silently produces a model that
+        # doesn't deserialize properly. Write the downloaded bytes to a
+        # NamedTemporaryFile, load from disk, delete on exit.
+        with tempfile.NamedTemporaryFile(suffix=".ckpt", delete=True) as tmp:
+            tmp.write(buf)
+            tmp.flush()
+            model = TemporalFusionTransformer.load_from_checkpoint(tmp.name, map_location="cpu")
             model.eval()
             model.freeze()
     except Exception as exc:

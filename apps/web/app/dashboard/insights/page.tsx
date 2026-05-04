@@ -59,6 +59,20 @@ export default function InsightsPage() {
     void refetch();
   }, [refetch]);
 
+  // Poll every 60s + refetch when tab regains focus. Lets the page reflect
+  // freshly-trained TFT models without a manual reload — once the worker
+  // completes a training_jobs row + invalidates the cache, the next poll
+  // tick picks up the personalised forecast.
+  useEffect(() => {
+    const onFocus = () => void refetch();
+    window.addEventListener('focus', onFocus);
+    const interval = window.setInterval(() => void refetch(), 60_000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(interval);
+    };
+  }, [refetch]);
+
   if (state.status === 'loading') {
     return (
       <div
