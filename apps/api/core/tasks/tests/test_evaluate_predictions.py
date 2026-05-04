@@ -12,6 +12,9 @@ Refs: docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md §5
 
 from __future__ import annotations
 
+import datetime as dt
+import uuid
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -78,27 +81,201 @@ def test_compute_mape_returns_none_for_zero_truths():
 # ---------------------------------------------------------------------------
 
 
-def _supabase_running() -> bool:
-    import os
+from apps.api.domains.forecasting.tests._supabase_local import (  # noqa: E402
+    cleanup_user,
+    create_test_user,
+    make_service_client,
+    stack_available,
+)
 
-    if os.environ.get("SUPABASE_LOCAL_URL") is None:
-        return False
-    return True
+_db_skip = pytest.mark.skipif(
+    not stack_available(),
+    reason="Requires running local supabase stack (run `supabase start`).",
+)
 
 
-@pytest.mark.skipif(not _supabase_running(), reason="requires running supabase local")
+def _build_forecast(horizon: int) -> list[dict[str, float]]:
+    return [
+        {
+            "date": (dt.date(2026, 1, 1) + dt.timedelta(days=i)).isoformat(),
+            "p2": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0,
+            "p98": 0.0,
+        }
+        for i in range(horizon)
+    ]
+
+
+def _seed_matured_prediction(
+    service,
+    *,
+    user_id: str,
+    horizon_days: int = 7,
+    days_in_past: int = 14,
+    claimed_at: dt.datetime | None = None,
+    lease_expires_at: dt.datetime | None = None,
+) -> str:
+    """Insert a user_predictions row whose horizon_end is in the past.
+
+    Service-role insert bypasses RLS and the log_user_prediction RPC's
+    server-derived ``generated_at`` so we can place the row precisely
+    where the lease/claim filter will match.
+    """
+    pred_id = str(uuid.uuid4())
+    generated_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days_in_past)
+    horizon_end = (generated_at + dt.timedelta(days=horizon_days)).date().isoformat()
+    row: dict = {
+        "prediction_id": pred_id,
+        "user_id": user_id,
+        "generated_at": generated_at.isoformat(),
+        "model_type": "tft_hybrid",
+        "model_version": "v0.0.0-test",
+        "horizon_days": horizon_days,
+        "horizon_end": horizon_end,
+        "forecast": _build_forecast(horizon_days),
+        "insights": {"frozen": True},
+        "insights_version": "v1",
+        "shown_to_user": True,
+    }
+    if claimed_at is not None:
+        row["claimed_at"] = claimed_at.isoformat()
+    if lease_expires_at is not None:
+        row["lease_expires_at"] = lease_expires_at.isoformat()
+    service.table("user_predictions").insert(row).execute()
+    return pred_id
+
+
+@_db_skip
+def test_unclaimed_matured_row_is_evaluated(monkeypatch):
+    """Happy path — a matured, unclaimed row is claimed, evaluated, marked.
+
+    With no ``transactions`` rows for the test user, ``_evaluate_row``
+    takes the no_data sentinel branch and writes ``evaluated_at = now()``.
+    The atomic-claim fallback path (no SECURITY DEFINER helper) is
+    exercised because ``claim_predictions_for_evaluation`` is not
+    installed locally.
+    """
+    from apps.api.core.tasks import evaluate_predictions as ep
+
+    user = create_test_user(prefix="lease-happy")
+    service = make_service_client()
+    monkeypatch.setattr(ep, "get_service_client", make_service_client)
+    try:
+        pred_id = _seed_matured_prediction(service, user_id=user.user_id)
+
+        result = ep.evaluate_past_predictions()
+
+        assert result["claimed"] >= 1, result
+        assert result["succeeded"] >= 1, result
+
+        row = (
+            service.table("user_predictions")
+            .select("evaluated_at, claimed_at, lease_expires_at, actual_outcomes")
+            .eq("prediction_id", pred_id)
+            .single()
+            .execute()
+        )
+        assert row.data["evaluated_at"] is not None, row.data
+        # After eval, the lease columns are cleared.
+        assert row.data["claimed_at"] is None, row.data
+        assert row.data["lease_expires_at"] is None, row.data
+        assert row.data["actual_outcomes"] == {"note": "no_data"}, row.data
+    finally:
+        cleanup_user(user.user_id)
+
+
+@_db_skip
+def test_crashed_worker_row_is_reclaimable(monkeypatch):
+    """A row with a stale lease (lease_expires_at < now()) is re-claimed.
+
+    Simulates a crashed worker by seeding a row whose ``claimed_at`` is
+    set but whose ``lease_expires_at`` is already in the past. The next
+    evaluate pass must claim it again and complete the evaluation.
+    """
+    from apps.api.core.tasks import evaluate_predictions as ep
+
+    user = create_test_user(prefix="lease-stale")
+    service = make_service_client()
+    monkeypatch.setattr(ep, "get_service_client", make_service_client)
+    try:
+        now = dt.datetime.now(dt.timezone.utc)
+        pred_id = _seed_matured_prediction(
+            service,
+            user_id=user.user_id,
+            claimed_at=now - dt.timedelta(hours=1),
+            lease_expires_at=now - dt.timedelta(minutes=30),
+        )
+
+        result = ep.evaluate_past_predictions()
+        assert result["claimed"] >= 1, result
+
+        row = (
+            service.table("user_predictions")
+            .select("evaluated_at, claimed_at, lease_expires_at")
+            .eq("prediction_id", pred_id)
+            .single()
+            .execute()
+        )
+        assert row.data["evaluated_at"] is not None, row.data
+        assert row.data["claimed_at"] is None, row.data
+    finally:
+        cleanup_user(user.user_id)
+
+
+@_db_skip
+def test_active_lease_row_is_skipped(monkeypatch):
+    """A row whose lease is still valid is NOT claimed by another pass.
+
+    This proves the OR-clause in the claim filter:
+        (claimed_at IS NULL OR lease_expires_at < now())
+    correctly skips rows whose lease is in the future.
+    """
+    from apps.api.core.tasks import evaluate_predictions as ep
+
+    user = create_test_user(prefix="lease-active")
+    service = make_service_client()
+    monkeypatch.setattr(ep, "get_service_client", make_service_client)
+    try:
+        now = dt.datetime.now(dt.timezone.utc)
+        pred_id = _seed_matured_prediction(
+            service,
+            user_id=user.user_id,
+            claimed_at=now,
+            lease_expires_at=now + dt.timedelta(minutes=30),
+        )
+
+        # The function should NOT touch this row — its lease is fresh.
+        ep.evaluate_past_predictions()
+
+        row = (
+            service.table("user_predictions")
+            .select("evaluated_at, claimed_at, lease_expires_at")
+            .eq("prediction_id", pred_id)
+            .single()
+            .execute()
+        )
+        # evaluated_at remains NULL because the row was skipped.
+        assert row.data["evaluated_at"] is None, row.data
+        # claimed_at unchanged.
+        assert row.data["claimed_at"] is not None, row.data
+    finally:
+        cleanup_user(user.user_id)
+
+
+@_db_skip
+@pytest.mark.skip(
+    reason=(
+        "True FOR UPDATE SKIP LOCKED concurrency requires two real Postgres "
+        "sessions racing. The supabase-py client serialises requests on a "
+        "single connection; emulating it from one process is not "
+        "deterministic without spinning up a second worker process. "
+        "Covered manually via psql."
+    )
+)
 def test_atomic_claim_skips_locked():
     """Two concurrent claim runs return disjoint claim sets (FOR UPDATE SKIP LOCKED)."""
-    pytest.skip("DB-backed test runs in Stage 10 verification")
-
-
-@pytest.mark.skipif(not _supabase_running(), reason="requires running supabase local")
-def test_evaluated_at_set_only_after_metrics_computed():
-    """If metrics computation throws, ``evaluated_at`` stays NULL (lease expires)."""
-    pytest.skip("DB-backed test runs in Stage 10 verification")
-
-
-@pytest.mark.skipif(not _supabase_running(), reason="requires running supabase local")
-def test_crashed_worker_row_is_reclaimable():
-    """A row with stale ``lease_expires_at`` is re-claimable (RFC-003 §5 lease test)."""
-    pytest.skip("DB-backed test runs in Stage 10 verification")
+    raise AssertionError("see skip reason")
