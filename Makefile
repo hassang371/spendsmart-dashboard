@@ -6,11 +6,12 @@ dev:
 	@if [ ! -d ".venv" ]; then echo "Error: .venv not found. Run 'make install'."; exit 1; fi
 	@.venv/bin/python3 -m uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload > .backend.log 2>&1 & echo $$! > .backend.pid
 	@(cd apps/web && npm run dev) > .frontend.log 2>&1 & echo $$! > .frontend.pid
+	@PYTHONPATH=. .venv/bin/python3 apps/worker/main.py > .worker.log 2>&1 & echo $$! > .worker.pid
 	@echo ""
 	@echo "  Frontend: http://localhost:3000"
 	@echo "  Backend:  http://localhost:8000"
+	@echo "  Worker:   PID $$(cat .worker.pid) — picks up training_jobs"
 	@echo ""
-	@echo "  make worker     — start background job worker"
 	@echo "  make logs       — stream all logs"
 	@echo "  make stop       — shut down everything"
 
