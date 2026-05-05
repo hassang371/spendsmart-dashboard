@@ -41,28 +41,33 @@ Rules are **auto-loaded by Claude Code on every session**. They enforce the non-
 
 | File | Purpose |
 |---|---|
-| `superpowers.md` | Master workflow routing table. Defines the Discovery Gate (defect found → bug report before discussing solutions), the Brainstorming Gate (brainstorm before any non-trivial code change), and the full skill table mapping situations to the correct tool or workflow. |
-| `documentation-gate.md` | The five documentation gates: Discovery Gate, Design Gate, Spec Review Gate, Commit Gate, and Implementation Sync Gate. Defines exactly when to create docs, when to run spec review, and when commits are allowed. |
-| `commit-strategy.md` | Conventional commit prefixes, when to commit, and the mandatory `Refs:` line rule — every `fix:` commit must reference a `docs/bugs/BUG-NNN` file, every `feat:` commit must reference a `docs/features/NNN` file. |
-| `task-tracking.md` | Protocol for using `TaskCreate`, `TaskUpdate`, and `TaskList` for all multi-step work. Defines that project docs live in `docs/` and that `task.md` files are never created. |
+| `documentation-gate.md` | The five documentation gates: Discovery Gate, Design Gate, Spec Review Gate, Commit Gate, and Implementation Sync Gate. Defines exactly when to create docs, when to run spec review, and when commits are allowed. Includes investigation→BUG promotion rule and bug-iteration override. |
+| `skills-routing.md` | Resolution rules: how a workflow situation (e.g. "spec review") resolves to a concrete skill via `skills-registry.md`. Fallback procedure when bound skill isn't loaded. Override rules. |
+| `commit-strategy.md` | Conventional commit prefixes, mandatory `Refs:` line rule, bug-iteration `wip:` rule (no `fix:` until user confirms resolved). |
+| `task-tracking.md` | Protocol for using `TaskCreate`, `TaskUpdate`, and `TaskList` for all multi-step work. Defines doc taxonomy (Feature LLD / Bug / ADR / Design Doc / Plan). |
 | `frontend/nextjs.md` | Next.js-specific rules auto-loaded when working on `apps/web/`. |
 | `backend/fastapi.md` | FastAPI-specific rules auto-loaded when working on `apps/api/`. |
 
-### .claude/workflows/
+### .claude/workflow.md
 
-Workflow files are **not auto-loaded**. Claude Code reads them explicitly when the relevant workflow is needed. They contain the detailed step-by-step procedures.
+Master workflow for SCALE. Auto-referenced from `CLAUDE.md` startup protocol. Pure situation
+language — does not name skills directly. The 8-step pipeline: Phase 0 Investigate → Brainstorm →
+Document → Plan → Execute (TDD vertical slicing) → Doc Sync → Self review → Adversarial (optional) →
+Verify → Commit. Bug iteration loop with user-confirm gate is encoded as Step 6 override.
 
-| File | Purpose |
-|---|---|
-| `docs-driven-dev.md` | The master development workflow for SCALE. Covers every step from idea to verified commit: brainstorm → LLD → spec review → user approval → TDD → implementation → deviation log → verification → commit with `Refs:`. |
+### .claude/skills-registry.md
+
+The ONLY place skill names live. Maps each workflow situation (e.g. "spec review", "TDD execution",
+"adversarial review") to the concrete skill that handles it. When plugins change, update this file —
+the workflow stays stable.
 
 ### .claude/skills/
 
-Local project skills — not the same as the global plugin skills from `.claude/plugins/`.
+Local project skills — not the same as the plugin skills from installed marketplaces.
 
 | File | Purpose |
 |---|---|
-| `design-docs/SKILL.md` | Progressive skill for writing design docs (Feature LLDs, Bug Reports, RFCs, HLDs). Tells Claude Code which reference files to load and when, based on the doc type being written. |
+| `design-docs/SKILL.md` | Progressive skill for writing design docs (Feature LLDs, Bug Reports, ADRs, Design Doc updates). Tells Claude Code which reference files to load and when, based on the doc type being written. |
 | `website-cloner/SKILL.md` | Skill for cloning a website's visual design into the codebase. |
 
 ### .claude/settings.json
@@ -72,73 +77,6 @@ Claude Code project settings — configures which hooks run on which events (e.g
 ### .claude/settings.local.json
 
 Local overrides to settings (gitignored). Developer-specific configuration that should not be shared.
-
----
-
-## .agents/ — Shared Agent Skills
-
-Skills and workflows that are shared across multiple agent types (Claude Code, Gemini, others). These mirror the Claude-specific `.claude/` directory but are not tied to any single AI assistant.
-
-### .agents/skills/
-
-Each subdirectory is a named skill with a `SKILL.md` entry point.
-
-| Skill | Purpose |
-|---|---|
-| `design-docs/` | Writing design docs (same goal as `.claude/skills/design-docs/`, shared version). |
-| `tdd/` | Test-driven development — red → green → refactor cycle. |
-| `systematic-debugging/` | Structured debugging process: reproduce → isolate → hypothesise → verify → fix. |
-| `subagent-driven-dev/` | Pattern for breaking work into parallel subagent tasks. |
-| `request-code-review/` | How to dispatch and frame a code review request. |
-| `fullstack-guardian/` | Full-stack feature development skill. |
-| `secure-code-guardian/` | Security-focused code review and implementation. |
-| `typescript-pro/` | TypeScript best practices for this codebase. |
-| `nextjs-developer/` | Next.js App Router patterns and SCALE conventions. |
-| `python-pro/` | Python best practices and SCALE API patterns. |
-| `react-expert/` | React component patterns. |
-| `feature-forge/` | Structured requirements gathering for new features. |
-| `skill-creator/` | Skill for creating new skills. |
-| `webapp-testing/` | Web app testing strategies. |
-| `mcp-builder/` | Building MCP (Model Context Protocol) servers. |
-| `monitoring-expert/` | Setting up monitoring and observability. |
-| `sre-engineer/` | SRE practices, SLO definition. |
-| `devops-engineer/` | Docker, CI/CD, infra configuration. |
-| `evaluation/` | Evaluating ML model quality. |
-| `test-master/` | Writing and structuring test suites. |
-| `microservices-architect/` | Architecture patterns (informational for future reference). |
-| `database-optimizer/` | Database query and schema optimisation. |
-| `context-*` | Context management skills for long AI sessions (compression, fundamentals, optimisation). |
-
-### .agents/workflows/
-
-Cross-agent workflow reference files — the same procedures as `.claude/workflows/` but in a format readable by any agent.
-
-| File | Purpose |
-|---|---|
-| `docs-driven-dev.md` | Master development workflow (cross-agent version). |
-| `brainstorm.md` | Brainstorming procedure. |
-| `tdd.md` | TDD procedure. |
-| `systematic-debugging.md` | Debugging procedure. |
-| `commit-strategy.md` | Commit conventions. |
-| `spec-review.md` | Spec review procedure. |
-| `subagent-driven-dev.md` | Parallel subagent pattern. |
-| `verify.md` | Verification before claiming done. |
-| `write-plan.md` | Writing an implementation plan. |
-| `execute-plan.md` | Executing an existing plan. |
-| `finish-branch.md` | Branch completion checklist. |
-| `git-worktrees.md` | Using git worktrees for branch isolation. |
-| `dispatch-parallel-agents.md` | Dispatching parallel agent tasks. |
-| `request-code-review.md` | Requesting a code review. |
-| `receive-code-review.md` | Handling incoming code review feedback. |
-| `documentation-gates.md` | Documentation gate rules. |
-| `context-checkpoint.md` | Saving context at session boundaries. |
-| `skills-guide.md` | How to discover and use skills. |
-| `using-superpowers.md` | Superpowers plugin introduction. |
-| `writing-skills.md` | Creating new skills. |
-| `global-rule.md` | Global rules applied to all workflows. |
-| `ci-cd.md` | CI/CD workflow reference. |
-| `k8s-troubleshooter.md` | Kubernetes troubleshooting (future reference). |
-| `monitoring-expert.md` | Monitoring setup reference. |
 
 ---
 
@@ -207,7 +145,7 @@ When working with Claude Code on SCALE, every non-trivial task follows this sequ
 6. **Verification** — `make check` (lint + tsc + pytest) runs and passes. Output is read, not assumed.
 7. **Commit** — `feat:` or `fix:` commit with a `Refs:` line pointing to the design doc.
 
-Full details: `.claude/CLAUDE.md` and `.claude/workflows/docs-driven-dev.md`.
+Full details: `.claude/CLAUDE.md`, `.claude/workflow.md`, and `.claude/skills-registry.md`.
 
 ---
 

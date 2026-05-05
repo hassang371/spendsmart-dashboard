@@ -23,14 +23,25 @@ When you are investigating, researching, or analysing code and you find:
 **You must:**
 1. STOP — do not discuss solutions, do not continue analysis, do not propose improvements
 2. Create `docs/bugs/BUG-NNN-name.md` immediately (design-docs skill)
-3. Run spec review on it (`superpowers:code-reviewer`)
+3. Run spec review on it (situation: spec review — see `.claude/skills-registry.md`)
 4. Commit the bug report: `git commit -m "docs: add BUG-NNN — <name>"`
 5. Only then return to investigation or proceed to brainstorm the fix
 
 **This gate fires even if no code is about to be written.**
 
+### Investigation → BUG promotion path
+
 Unconfirmed observations go to `docs/investigations/<scratch-note>.md` (lightweight, unreviewed,
-never committed as formal docs). Once confirmed, they graduate to proper Bug Reports.
+never committed as formal docs).
+
+**Promotion rule:** When an investigation note confirms a defect → graduate it to BUG-NNN
+immediately. The investigation file is then either:
+- Deleted (preferred — content moved into BUG-NNN doc), OR
+- Archived to `docs/archive/investigations/` if it has historical value
+
+Investigation notes that confirm a defect must NOT remain as scratch — they hide real defects
+from the gate system. Discovery Gate fires the moment defect is confirmed, regardless of where
+the observation started.
 
 ---
 
@@ -38,7 +49,7 @@ never committed as formal docs). Once confirmed, they graduate to proper Bug Rep
 
 Before writing any code for a feature or bug fix:
 
-1. Is there a committed design doc (`docs/features/NNN`, `docs/bugs/BUG-NNN`, or `docs/rfcs/RFC-NNN`)?
+1. Is there a committed design doc (`docs/features/NNN`, `docs/bugs/BUG-NNN`, or `docs/adr/ADR-NNN`)?
 2. Has spec review been run and passed on that doc?
 3. Has the user approved the doc?
 
@@ -48,14 +59,14 @@ If any answer is NO → do not write code. Go back and satisfy the missing gate.
 
 ## Gate 3: Spec Review Gate (fires after writing or updating any doc)
 
-After creating or updating ANY doc (Feature LLD, Bug Report, RFC, HLD, Policy):
+After creating or updating ANY doc (Feature LLD, Bug Report, ADR, Design Doc, Policy):
 
-1. Dispatch `superpowers:code-reviewer` with the doc content + type + review focus
+1. Run spec review on the doc (situation: spec review — see `.claude/skills-registry.md`)
 2. Fix all issues found
-3. Re-dispatch until no issues remain (max 3 iterations; surface to user if still failing)
+3. Re-review until no issues remain (max 3 iterations; surface to user if still failing)
 4. Only commit the doc after spec review passes
 
-**No exceptions for "small" updates.** Adding a changelog entry to an HLD still requires
+**No exceptions for "small" updates.** Adding a changelog entry to a Design Doc still requires
 a review pass. The review for a minor update is fast — the discipline is the point.
 
 ---
@@ -63,10 +74,18 @@ a review pass. The review for a minor update is fast — the discipline is the p
 ## Gate 4: Commit Gate (fires before every fix: or feat: commit)
 
 Every `fix:` commit must have: `Refs: docs/bugs/BUG-NNN-name.md`
-Every `feat:` commit must have: `Refs: docs/features/NNN-name.md` (or RFC)
+Every `feat:` commit must have: `Refs: docs/features/NNN-name.md` (or `docs/adr/ADR-NNN-name.md`)
 
 A commit without a `Refs:` line for these prefixes is an **orphan commit** and is not allowed.
 If no doc exists, stop and create it first.
+
+### Bug iteration override
+
+For bug-iteration loops:
+- During iteration: WIP commits OK (`wip:` prefix), no `fix:` until user confirms
+- Append iteration entries to BUG-NNN changelog rather than fragment into multiple `fix:` commits
+- One BUG-NNN doc lifetime spans all iterations
+- `fix:` commit only after explicit user confirmation that the bug is resolved
 
 ---
 
@@ -89,6 +108,9 @@ Investigation finds defect
   → Gate 1: Create BUG-NNN + spec review + commit
   → THEN brainstorm the fix
 
+Investigation note confirms defect
+  → Gate 1 promotion: graduate scratch → BUG-NNN, delete or archive scratch
+
 About to write code
   → Gate 2: Design doc exists + spec review passed + user approved?
 
@@ -96,10 +118,10 @@ Writing/updating a doc
   → Gate 3: Run spec review before committing
 
 About to commit fix:/feat:
-  → Gate 4: Refs: line present and pointing to a real file?
+  → Gate 4: Refs: line present and pointing to a real file? (For bugs: user confirmed resolved?)
 
 About to run verification
-  → Gate 5: LLD re-read + deviations recorded?
+  → Gate 5: design doc re-read + deviations recorded?
 ```
 
 ---
@@ -113,3 +135,29 @@ Gates 1–3 may be bypassed ONLY for changes that are ALL of:
 - Single file
 
 If you are asking whether it qualifies, it does not.
+
+---
+
+## Pitfall rules (industry-research-derived)
+
+### ADR is RECORDED, not deliberated
+
+ADRs capture decisions already made. If your draft has a long "Options Considered" section
+weighing alternatives without a chosen direction, you wrote an RFC, not an ADR. SCALE does not
+use RFC vocabulary. Two paths:
+- Decide first (use grill / brainstorm skills), then record as ADR
+- If you genuinely cannot decide alone, surface to user — not to a doc
+
+### LLD vs Plan no-overlap
+
+Feature LLD describes WHAT to build (design, contracts, edge cases).
+Plan describes HOW and IN WHAT ORDER to build it (steps, dependencies, sequencing).
+
+A Plan that re-states the LLD's design content is doing the wrong thing. A Plan that
+introduces design decisions not in the LLD means the LLD is incomplete — go back and fix it.
+
+### Design Doc decay
+
+Design Docs at `docs/design/<component>.md` are LIVING. After every feature that affects
+that component, Gate 5 fires — either deviation entry or status confirmation. Stale Design
+Docs lie to future-you and to AI agents. Sync them before the feature commit, never after.

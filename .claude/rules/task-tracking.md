@@ -23,13 +23,18 @@ Design docs live in `docs/` and are shared by all agents and humans:
 | What | Where |
 |---|---|
 | Feature LLD | `docs/features/NNN-name.md` |
-| Bug reports | `docs/bugs/BUG-NNN-name.md` |
-| RFCs / decisions | `docs/rfcs/RFC-NNN-name.md` |
-| HLD (living docs) | `docs/design/*.md` |
+| Bug Report | `docs/bugs/BUG-NNN-name.md` |
+| ADR (architectural decision) | `docs/adr/ADR-NNN-name.md` |
+| Design Doc (living component) | `docs/design/*.md` |
 | Policies | `docs/policies/*.md` |
 | Implementation plans | `docs/plans/YYYY-MM-DD-name.md` |
 | Session state / notes | auto memory (`MEMORY.md`) — local to Claude only |
 
-**Implementation plans override:** When superpowers or any plugin says to save plans to `docs/superpowers/plans/`, save to `docs/plans/` instead. Do NOT create `docs/superpowers/` — plugin artifacts do not belong in project docs.
+**Implementation plans override:** When superpowers or any plugin says to save plans to `docs/superpowers/plans/` or `docs/superpowers/specs/`, save to `docs/plans/` instead. Do NOT create `docs/superpowers/` — plugin artifacts do not belong in project docs.
 
 **Doc format standard:** See `docs/STANDARDS.md` for required metadata, sections, naming, and status lifecycle.
+
+## Vocabulary notes
+
+- **Design Doc** is the canonical term for living component-level architecture (path stays `docs/design/`). "HLD" is deprecated wording — Design Doc replaces it.
+- **ADR** records an architectural decision that has been made. It is RECORDED, not deliberated. RFC vocabulary is not used in this project (solo decision-maker — re-evaluate if 2+ senior engineers).

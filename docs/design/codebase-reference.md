@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document is the authoritative reference for every file and directory in the SCALE repository. Read it top-down for a full orientation, or jump to a section by layer. For AI development tooling (`.claude/`, `.agents/`, `.gemini/`, `.github/`), see [`ai-tooling-guide.md`](ai-tooling-guide.md).
+This document is the authoritative reference for every file and directory in the SCALE repository. Read it top-down for a full orientation, or jump to a section by layer. For AI development tooling (`.claude/`, `.gemini/`, `.github/`), see [`ai-tooling-guide.md`](ai-tooling-guide.md).
 
 ---
 
@@ -413,8 +413,8 @@ Domain-specific unit tests live **co-located** with the domain code (e.g. `apps/
 | `docs/design/` | Living HLD documents — system architecture, API design, database design, codebase reference, AI tooling guide. Never archived; kept current. |
 | `docs/features/` | Feature LLDs (auto-numbered 001, 002…). One per feature, from conception to verified. |
 | `docs/bugs/` | Bug reports (BUG-NNN). Created before any fix is written. |
-| `docs/rfcs/` | RFCs for significant decisions (RFC-NNN). |
-| `docs/plans/` | Implementation plans (YYYY-MM-DD-name.md). Created from LLDs/RFCs before work begins. |
+| `docs/adr/` | ADRs — recorded architectural decisions (ADR-NNN). |
+| `docs/plans/` | Implementation plans (YYYY-MM-DD-name.md). Created from LLDs/ADRs before work begins. |
 | `docs/policies/` | Standing policies — migration policy, secrets policy, etc. |
 | `docs/investigations/` | Scratch notes for unconfirmed observations. Not formal docs; not committed as Bug Reports until confirmed. |
 | `docs/archive/` | Superseded docs. Read-only. |
@@ -486,7 +486,6 @@ These directories contain AI assistant configuration, CI/CD, and development too
 | Directory | Purpose | Details |
 |---|---|---|
 | `.claude/` | Claude Code configuration — rules, workflows, skills, settings | See [`ai-tooling-guide.md`](ai-tooling-guide.md) |
-| `.agents/` | Shared agent skills and workflows (cross-agent) | See [`ai-tooling-guide.md`](ai-tooling-guide.md) |
 | `.gemini/` | Gemini CLI context, rules, and knowledge files | See [`ai-tooling-guide.md`](ai-tooling-guide.md) |
 | `.github/` | GitHub Actions CI/CD workflows and Dependabot config | See [`ai-tooling-guide.md`](ai-tooling-guide.md) |
 | `.git/` | Git object store — managed by Git, never edit manually | — |
