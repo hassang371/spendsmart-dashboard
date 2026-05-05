@@ -72,7 +72,7 @@ optional. Load ONLY the guide you need:
 
 After any Feature LLD or Bug Report, check if a living Design Doc needs updating:
 
-1. Read `references/hld-sync-protocol.md` (file name kept legacy; content is the Design Doc sync rule)
+1. Read `references/design-doc-sync-protocol.md`
 2. Identify affected Design Doc files in `docs/design/`
 3. Update affected sections + add changelog entry at bottom
 
@@ -143,7 +143,7 @@ use `templates/adr.md`.
 |---|---|
 | `docs/STANDARDS.md` | Before writing any doc — canonical required fields and sections |
 | `references/doc-standards.md` | Need implementation notes specific to Claude (scripts, auto-numbering) |
-| `references/hld-sync-protocol.md` | After writing any LLD (Design Doc sync rule, despite legacy filename) |
+| `references/design-doc-sync-protocol.md` | After writing any LLD — Design Doc sync rule |
 | `references/resilient-workflow.md` | Generating or validating diagrams |
 | `references/troubleshooting.md` | Diagram fails to render |
 | `references/mermaid/activity-diagrams.md` | Need workflow/process diagram |

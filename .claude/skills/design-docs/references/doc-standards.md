@@ -38,7 +38,7 @@ Before committing any doc, verify ALL of:
 - [ ] All required sections filled — no placeholders, no TODOs
 - [ ] At least one Mermaid diagram (Feature LLD + Bug Report mandatory; ADR optional; ADR-short optional)
 - [ ] Changelog section present with at least one entry
-- [ ] Design Doc sync check done (`references/hld-sync-protocol.md`)
+- [ ] Design Doc sync check done (`references/design-doc-sync-protocol.md`)
 - [ ] **Spec review passed** — invoke the spec-review situation skill from `.claude/skills-registry.md`, fix issues, re-review clean
 - [ ] For Bug Report: Iteration Log section present (one entry per attempt, even if only one)
 - [ ] File committed before any code touches the repo
