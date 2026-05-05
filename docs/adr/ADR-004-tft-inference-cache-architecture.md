@@ -1,6 +1,6 @@
-# RFC-004: TFT Inference Cache Architecture (Pre-warm + Bounded LRU + Redis Pub-Sub Invalidation)
+# ADR-004: TFT Inference Cache Architecture (Pre-warm + Bounded LRU + Redis Pub-Sub Invalidation)
 
-> **Doc ID:** RFC-004-tft-inference-cache-architecture
+> **Doc ID:** ADR-004-tft-inference-cache-architecture
 > **Date:** 2026-04-17
 > **DRI:** Mohammed Hassan Mohiddin
 > **Status:** Implemented
@@ -15,7 +15,7 @@
 3. **No invalidation hook** — `invalidate_cache()` is defined but has zero callers. After `apps/worker/main.py` writes a new `checkpoint_path` to `training_jobs`, API workers keep serving the old in-memory model indefinitely.
 4. **No metrics** — no Prometheus counters, no cache-hit rate, no cold-load latency histogram. The 500 ms SLO in LLD 009 is unmeasurable in production.
 
-Additionally, BUG-018 §"Observed Behavior" shows the cold-path latency breakdown: checkpoint download (500–2000 ms) plus model load (200–500 ms) plus inference (100–300 ms) plus Chronos-2 inference (150–400 ms) = **1,000–3,200 ms end-to-end on a cold miss**. Warm-path p95 is ~650 ms which *already* exceeds the SLO once Chronos-2 is added to every request. This RFC addresses the cold path; the warm-path headroom issue is noted as a follow-on.
+Additionally, BUG-018 §"Observed Behavior" shows the cold-path latency breakdown: checkpoint download (500–2000 ms) plus model load (200–500 ms) plus inference (100–300 ms) plus Chronos-2 inference (150–400 ms) = **1,000–3,200 ms end-to-end on a cold miss**. Warm-path p95 is ~650 ms which *already* exceeds the SLO once Chronos-2 is added to every request. This ADR addresses the cold path; the warm-path headroom issue is noted as a follow-on.
 
 If this is not solved now, LLD 009 cannot ship. Every first-request-per-user-per-worker blows the 500 ms SLO; every deploy resets the fleet to cold; retrained models are silently not used. The feature is inoperable in its current form.
 
@@ -27,7 +27,7 @@ Replace `_MODEL_CACHE` with a bounded LRU cache class (`TFTModelCache` in a new 
 
 1. **Pre-warm on app-open** — a new `POST /forecast/warm` endpoint that fires a fire-and-forget background task loading the user's TFT into the serving worker's cache. The Next.js frontend calls it on app-open and on the AI Insights route navigation, so by the time `/forecast/predict` lands, the cache is hot.
 2. **Redis pub-sub invalidation** — `apps/worker/main.py` publishes `(user_id, checkpoint_updated_at)` to a `scale:model-cache:invalidate` Redis channel immediately after transitioning `training_jobs.status → 'completed'`. Every API worker runs a daemon subscriber thread that evicts the cached entry on receipt. Reuses the Redis instance already deployed as Celery broker — zero new infra.
-3. **TTL fallback** — each cached entry expires after 1 h (configurable), so even if a pub-sub message is lost the stale window is bounded. Server-side bulk pre-warm (e.g., top-100-active-users beat task) is deliberately **out of scope for v1**: the Celery worker process has its own separate Python runtime without the API's `TFTModelCache` singleton, so no server-initiated load can touch API-worker caches. Server-initiated pre-warm is tracked as a follow-on RFC.
+3. **TTL fallback** — each cached entry expires after 1 h (configurable), so even if a pub-sub message is lost the stale window is bounded. Server-side bulk pre-warm (e.g., top-100-active-users beat task) is deliberately **out of scope for v1**: the Celery worker process has its own separate Python runtime without the API's `TFTModelCache` singleton, so no server-initiated load can touch API-worker caches. Server-initiated pre-warm is tracked as a follow-on ADR.
 
 Async contract: the blocking `TemporalFusionTransformer.load_from_checkpoint(...)` call is wrapped in `asyncio.to_thread(...)` so it runs in a threadpool and does not starve the FastAPI event loop. Concurrent cold misses for the same user are single-flight locked per `user_id` — the first request loads, the rest await the same result.
 
@@ -70,7 +70,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Proposed["🚀 Proposed Architecture — RFC-004"]
+    subgraph Proposed["🚀 Proposed Architecture — ADR-004"]
         FE["🌐 Next.js"]
         W1["⚙️ Worker 1<br/>TFTModelCache + subscriber thread"]
         W2["⚙️ Worker 2<br/>TFTModelCache + subscriber thread"]
@@ -555,7 +555,7 @@ limiter that gates `/api/import/*` at `apps/api/main.py:136–138`.
 
 The obvious-looking design of "daily Celery beat task that pre-warms the top-N most-active
 users into the cache" does not work with the current process topology and is therefore
-**deferred to a follow-on RFC**. Two constraints make it non-trivial:
+**deferred to a follow-on ADR**. Two constraints make it non-trivial:
 
 1. **Process-boundary isolation.** `TFTModelCache` lives in the API (uvicorn) process memory.
    A Celery worker is a separate Python process with its own memory space and its own
@@ -566,7 +566,7 @@ users into the cache" does not work with the current process topology and is the
    reach every uvicorn worker to populate every cache copy. Load-balancer round-robin
    does not guarantee coverage in a bounded number of internal calls.
 
-Candidate server-initiated designs for the follow-on RFC:
+Candidate server-initiated designs for the follow-on ADR:
 
 - A new Redis pub-sub channel `scale:model-cache:prewarm` where publishing a user_id
   causes every API-worker subscriber to trigger `get_or_load` on its local cache.
@@ -599,21 +599,21 @@ tft_model = cached.model if cached is not None else None
 > **New subsystem.** Grep for `prometheus_client`, `Counter(`, `Histogram(` across the
 > repo returns zero hits — the project does not yet have Prometheus wiring. The existing
 > `/metrics` route at `apps/api/domains/categorization/router.py:161` returns custom JSON,
-> not Prometheus exposition format. This RFC stands up the Prometheus subsystem as part
+> not Prometheus exposition format. This ADR stands up the Prometheus subsystem as part
 > of its own scope. Specifically:
 >
 > - Add `prometheus-client>=0.20,<1.0` to `apps/api/requirements.txt`.
 > - Create `apps/api/core/metrics.py` exposing a single module-level
 >   `CollectorRegistry` (`REGISTRY`) plus factory functions `counter(name, doc, labels=())`,
 >   `histogram(name, doc, labels=(), buckets=None)`, `gauge(name, doc, labels=())` that
->   wrap `prometheus_client` constructors and register into `REGISTRY`. All RFC-004
+>   wrap `prometheus_client` constructors and register into `REGISTRY`. All ADR-004
 >   metrics are defined here as module-level singletons.
 > - Register a FastAPI route at `/metrics/prom` (note: not `/metrics` — avoids collision
 >   with the categorization JSON route). Returns `Response(content=generate_latest(REGISTRY),
 >   media_type=CONTENT_TYPE_LATEST)`. Unauthenticated — Prometheus scrapers are behind
 >   the internal VPC / ingress allowlist per the ops runbook.
 > - Rename the categorization JSON route from `/metrics` to `/categorization/metrics` in
->   a separate follow-up (flagged in §Impact Assessment; out of scope for this RFC if it
+>   a separate follow-up (flagged in §Impact Assessment; out of scope for this ADR if it
 >   would otherwise block).
 >
 > The eleven metrics below are emitted via `TFTModelCache.stats()` refresh on every
@@ -635,15 +635,15 @@ tft_model = cached.model if cached is not None else None
 | `forecast_warm_outcome_total{result="ok\|429\|timeout\|error"}` | Counter (labelled) | Per Codex Fix #4 — closes the loop on FE-initiated `POST /forecast/warm` outcomes. Fed by the client via a new `POST /api/v1/metrics/client-event` route (JWT-authenticated, rate-limited 30/min). Lets ops detect a high `result="timeout"` rate (warm endpoint is slow) or `result="error"` rate (auth or network breakage) without inferring from cache hit/miss alone. |
 
 All histograms use seconds per Prometheus convention; no separate `_ms` metric.
-Grafana dashboard `dashboards/forecast-cache.json` out of scope for this RFC but tracked as a follow-up.
+Grafana dashboard `dashboards/forecast-cache.json` out of scope for this ADR but tracked as a follow-up.
 
 ### Data Model Changes
 
-**None.** Server-initiated bulk pre-warm is out of scope for this RFC (§6), so no
-`top_active_users` RPC is created here. The follow-on RFC that implements bulk pre-warm
+**None.** Server-initiated bulk pre-warm is out of scope for this ADR (§6), so no
+`top_active_users` RPC is created here. The follow-on ADR that implements bulk pre-warm
 will own that migration.
 
-`public.user_predictions` exists (from RFC-003). `training_jobs` unchanged.
+`public.user_predictions` exists (from ADR-003). `training_jobs` unchanged.
 
 ### API Changes
 
@@ -651,9 +651,9 @@ will own that migration.
 |---|---|---|
 | POST | `/api/v1/metrics/client-event` | **New per Codex Fix #4.** Accepts `{event: "forecast_warm_outcome", result: "ok\|429\|timeout\|error"}`. Increments `forecast_warm_outcome_total{result=...}`. JWT-authenticated, rate-limited 30/min/user via `RateLimiter + rate_limit_dependency`. Body validated by Pydantic; unknown event names rejected 400. |
 | POST | `/forecast/warm` | **New.** Fire-and-forget TFT warm. Returns 202. JWT-authenticated. Rate-limited to 1 per 5 min per user. |
-| GET | `/metrics/prom` | Prometheus exposition endpoint stood up by this RFC's §8. Carries all eleven new metric series listed above. |
+| GET | `/metrics/prom` | Prometheus exposition endpoint stood up by this ADR's §8. Carries all eleven new metric series listed above. |
 
-No other endpoints change. `/forecast/predict` now consumes `get_tft_cache()` internally but the contract is unchanged from RFC-003.
+No other endpoints change. `/forecast/predict` now consumes `get_tft_cache()` internally but the contract is unchanged from ADR-003.
 
 ## Alternatives Considered
 
@@ -696,7 +696,7 @@ No other endpoints change. `/forecast/predict` now consumes `get_tft_cache()` in
   - `packages/forecasting/cache_invalidation.py` — `publish_invalidation`, `start_subscriber`, `CHANNEL`
   - `packages/forecasting/tests/test_cache.py`
   - `packages/forecasting/tests/test_cache_invalidation.py`
-  - `apps/api/core/metrics.py` — module-level `CollectorRegistry` + counter/histogram/gauge factories + all eleven RFC-004 metric singletons
+  - `apps/api/core/metrics.py` — module-level `CollectorRegistry` + counter/histogram/gauge factories + all eleven ADR-004 metric singletons
   - `apps/api/domains/forecasting/tests/test_warm_endpoint.py`
   - `apps/worker/tests/test_train_publishes_invalidation.py`
 - **Backend — modified files:**
@@ -710,10 +710,10 @@ No other endpoints change. `/forecast/predict` now consumes `get_tft_cache()` in
   - `apps/api/requirements.txt` — add `prometheus-client>=0.20,<1.0`.
 - **Config:**
   - New env vars: `TFT_CACHE_MAX_ENTRIES`, `TFT_CACHE_MAX_BYTES`, `TFT_CACHE_TTL_SECONDS`. Defaults in code; override via `.env`.
-- **Out of scope (tracked for follow-on RFC):**
+- **Out of scope (tracked for follow-on ADR):**
   - Celery-beat server-initiated bulk pre-warm (`warm_hot_models` task, `top_active_users` RPC, beat-schedule entry). §Detailed Design #6 explains why this cannot be done safely in v1 without additional cross-process plumbing.
 - **Docs:**
-  - `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` changelog — append "Fix architecture chosen: see RFC-004" entry. Status `Root Cause Found → Fix Applied` once code lands.
+  - `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` changelog — append "Fix architecture chosen: see ADR-004" entry. Status `Root Cause Found → Fix Applied` once code lands.
   - `docs/features/009-prediction-engine.md` changelog — append DEVIATION entry noting that LLD 009's implicit "singleton pattern for Chronos-2" (line 289–291) now applies to both tiers via `TFTModelCache` for TFT + the existing singleton for Chronos-2.
   - `docs/design/system-architecture.md` — add cache + pub-sub lane to the forecast sequence diagram.
 
@@ -758,13 +758,13 @@ Zero downtime. No user-visible changes until the frontend wires `/forecast/warm`
 
 | Phase | Duration | Deliverable |
 |---|---|---|
-| Phase 1 | 0.5 day | RFC-004 spec review + user approval + merge |
+| Phase 1 | 0.5 day | ADR-004 spec review + user approval + merge |
 | Phase 2 | 1 day | `packages/forecasting/cache.py` + tests (TDD) including `asyncio.Future` single-flight |
 | Phase 3 | 0.5 day | `cache_invalidation.py` + tests (fakeredis + reconnect loop) |
 | Phase 4 | 0.5 day | `apps/api/main.py` lifespan + `get_tft_cache` + `app.state.warm_rate_limiter` |
 | Phase 5 | 0.5 day | Worker `publish_invalidation` wiring + test (polling worker, NOT Celery) |
 | Phase 6 | 0.5 day | `POST /forecast/warm` endpoint + test via existing `RateLimiter + rate_limit_dependency` (no slowapi) |
-| Phase 7 | 1 day | Prometheus subsystem: add `prometheus-client` dependency, create `apps/api/core/metrics.py` (`CollectorRegistry` + factories + eleven RFC-004 metrics), register `/metrics/prom` route, update ops-runbook note on the existing `/metrics` JSON route naming collision |
+| Phase 7 | 1 day | Prometheus subsystem: add `prometheus-client` dependency, create `apps/api/core/metrics.py` (`CollectorRegistry` + factories + eleven ADR-004 metrics), register `/metrics/prom` route, update ops-runbook note on the existing `/metrics` JSON route naming collision |
 | Phase 8 | 0.5 day | `inference.py` deletion + service-layer migration + integration tests |
 | Phase 9 | 1 day | End-to-end load test, latency benchmark, append observed p50/p95 per metric as a new Research doc `docs/research/NNN-rfc-004-load-test.md` |
 
@@ -774,15 +774,15 @@ Total: ~6 engineering-days. Parallelisable to ~4 days (cache module + invalidati
 
 > **Decision:** Proposed — pending user review
 > **Date:** 2026-04-17
-> **Rationale:** Hybrid approach (pre-warm + bounded LRU + Redis pub-sub + TTL fallback) addresses all four BUG-018 defects simultaneously: OOM-safe via LRU, cross-worker consistent via pub-sub, retrain-aware via invalidation, measurable via Prometheus. Zero new infrastructure (Redis already runs for Celery); Prometheus subsystem is introduced here as an explicitly-scoped side-effect of making the SLO measurable. Graceful degradation on every partial failure: publish fails → TTL catches within 1 h; subscriber dies → reconnect loop; load fails → service-layer Chronos-only fallback (inherited from RFC-003 service routing, not defined here). Server-initiated bulk pre-warm is deliberately scoped out to a follow-on RFC because pre-warming into the Celery worker's address space cannot populate API-worker caches. The remaining warm-path headroom issue (Chronos-2 inference brings p95 near the SLO ceiling) is a separate concern tracked for a follow-on.
+> **Rationale:** Hybrid approach (pre-warm + bounded LRU + Redis pub-sub + TTL fallback) addresses all four BUG-018 defects simultaneously: OOM-safe via LRU, cross-worker consistent via pub-sub, retrain-aware via invalidation, measurable via Prometheus. Zero new infrastructure (Redis already runs for Celery); Prometheus subsystem is introduced here as an explicitly-scoped side-effect of making the SLO measurable. Graceful degradation on every partial failure: publish fails → TTL catches within 1 h; subscriber dies → reconnect loop; load fails → service-layer Chronos-only fallback (inherited from ADR-003 service routing, not defined here). Server-initiated bulk pre-warm is deliberately scoped out to a follow-on ADR because pre-warming into the Celery worker's address space cannot populate API-worker caches. The remaining warm-path headroom issue (Chronos-2 inference brings p95 near the SLO ceiling) is a separate concern tracked for a follow-on.
 
 ## Related Documents
 
-- Bug: `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` — defect this RFC resolves
-- Feature LLD: `docs/features/009-prediction-engine.md` — the < 500 ms SLO; this RFC is a precondition for the `Verified` status
-- Related RFC: `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` — established the `user_predictions` table and the forecast-API contract this RFC caches models for
+- Bug: `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` — defect this ADR resolves
+- Feature LLD: `docs/features/009-prediction-engine.md` — the < 500 ms SLO; this ADR is a precondition for the `Verified` status
+- Related ADR: `docs/adr/ADR-003-forecast-api-schema-and-prediction-logging.md` — established the `user_predictions` table and the forecast-API contract this ADR caches models for
 - HLD to update after implementation: `docs/design/system-architecture.md` — add cache + pub-sub lane to the prediction-engine sequence diagram
-- Follow-on RFC (not yet authored): server-initiated bulk pre-warm (`warm_hot_models` + `top_active_users` RPC) — scoped out of this RFC per §6
+- Follow-on ADR (not yet authored): server-initiated bulk pre-warm (`warm_hot_models` + `top_active_users` RPC) — scoped out of this ADR per §6
 - Existing code references: `packages/forecasting/inference.py:24` (`_MODEL_CACHE` — being deleted), `apps/worker/main.py:37` (`train_model` — gaining `publish_invalidation` call after the DB commit)
 
 ## Changelog
@@ -790,6 +790,6 @@ Total: ~6 engineering-days. Parallelisable to ~4 days (cache module + invalidati
 | Date | Entry |
 |---|---|
 | 2026-04-17 | Initial draft. Architecture chosen after brainstorming BUG-018's four candidate options (pre-warm, mmap, consistent-hash, hybrid): hybrid prevails because it is the only option that addresses all four structural defects enumerated in BUG-018. Redis pub-sub selected over Supabase Realtime for the invalidation channel because Redis is already deployed as the Celery broker and has lower latency for the single-producer / few-consumer traffic pattern. Status: Proposed. |
-| 2026-04-17 | Spec review pass 1 fixes. C1: removed slowapi (doesn't exist in repo) — rewrote `/forecast/warm` endpoint to use the existing `RateLimiter + rate_limit_dependency` pattern from `apps/api/main.py`. C2: dropped the false "existing `prometheus_client` wiring" claim; the RFC now explicitly stands up the Prometheus subsystem (`prometheus-client` dependency, new `apps/api/core/metrics.py`, new `/metrics/prom` route, named-collision note vs the existing `/metrics` JSON route in categorization). C3: removed the server-initiated `warm_hot_models` Celery beat task because pre-warming into the Celery worker's memory cannot populate API-worker caches — deferred to a follow-on RFC; v1 relies on FE-initiated `POST /forecast/warm`. C4: replaced the `threading.Lock`-inside-`asyncio.to_thread` single-flight pattern (threadpool head-of-line blocking risk) with an `asyncio.Future`-based leader/follower pattern under a single `asyncio.Lock`, with cleanup on completion. H1: dropped the `top_active_users` RPC (no longer needed after C3). H4: `publish_invalidation` payload slimmed to `(user_id, checkpoint_updated_at)`; subscriber uses timestamp as stale-guard to skip out-of-order messages. H5: documented per-worker subscriber fan-out intent. Dropped `forecast_cold_load_latency_ms` (unit collision with `_seconds`); SLO watchdog fires off histogram bucket. Removed `from __future__ import annotations` imports (redundant on 3.14). |
+| 2026-04-17 | Spec review pass 1 fixes. C1: removed slowapi (doesn't exist in repo) — rewrote `/forecast/warm` endpoint to use the existing `RateLimiter + rate_limit_dependency` pattern from `apps/api/main.py`. C2: dropped the false "existing `prometheus_client` wiring" claim; the ADR now explicitly stands up the Prometheus subsystem (`prometheus-client` dependency, new `apps/api/core/metrics.py`, new `/metrics/prom` route, named-collision note vs the existing `/metrics` JSON route in categorization). C3: removed the server-initiated `warm_hot_models` Celery beat task because pre-warming into the Celery worker's memory cannot populate API-worker caches — deferred to a follow-on ADR; v1 relies on FE-initiated `POST /forecast/warm`. C4: replaced the `threading.Lock`-inside-`asyncio.to_thread` single-flight pattern (threadpool head-of-line blocking risk) with an `asyncio.Future`-based leader/follower pattern under a single `asyncio.Lock`, with cleanup on completion. H1: dropped the `top_active_users` RPC (no longer needed after C3). H4: `publish_invalidation` payload slimmed to `(user_id, checkpoint_updated_at)`; subscriber uses timestamp as stale-guard to skip out-of-order messages. H5: documented per-worker subscriber fan-out intent. Dropped `forecast_cold_load_latency_ms` (unit collision with `_seconds`); SLO watchdog fires off histogram bucket. Removed `from __future__ import annotations` imports (redundant on 3.14). |
 | 2026-04-17 | **Codex Fix #4** (medium) — paired with LLD-011 update. Warm path was fire-and-forget with no observability and no first-request latency contract. Added counter `forecast_warm_outcome_total{result="ok\|429\|timeout\|error"}` (eleventh metric) and new `POST /api/v1/metrics/client-event` route (JWT + rate-limited 30/min) so client warm outcomes are server-side measurable. LLD 011 takes the bounded-wait + race-with-predict pattern. |
-| 2026-05-04 | Status flipped Proposed → Implemented. `packages/forecasting/cache.py` (TFTModelCache + LRU + byte-cap + TTL + single-flight) + `cache_invalidation.py` (Redis pub-sub publish/subscribe + stale-guard + reconnect) + `apps/api/core/metrics.py` (eleven Prometheus metrics on a private `CollectorRegistry`) + lifespan wiring + `POST /forecast/warm` + `GET /metrics/prom` + `POST /api/v1/metrics/client-event` landed in master-plan Stage 3; lifespan loader `default_supabase_loader` wired in Stage 5; legacy `_MODEL_CACHE`/`load_model`/`invalidate_cache` shims deleted from `inference.py` in Stage 5. DEVIATION: pub-sub channel name set to `tft_cache_invalidation` in code; this RFC's prose said `scale:model-cache:invalidate` — code is canonical. BUG-018 status: Fix Applied (real-Redis runtime check still pending production deploy). |
+| 2026-05-04 | Status flipped Proposed → Implemented. `packages/forecasting/cache.py` (TFTModelCache + LRU + byte-cap + TTL + single-flight) + `cache_invalidation.py` (Redis pub-sub publish/subscribe + stale-guard + reconnect) + `apps/api/core/metrics.py` (eleven Prometheus metrics on a private `CollectorRegistry`) + lifespan wiring + `POST /forecast/warm` + `GET /metrics/prom` + `POST /api/v1/metrics/client-event` landed in master-plan Stage 3; lifespan loader `default_supabase_loader` wired in Stage 5; legacy `_MODEL_CACHE`/`load_model`/`invalidate_cache` shims deleted from `inference.py` in Stage 5. DEVIATION: pub-sub channel name set to `tft_cache_invalidation` in code; this ADR's prose said `scale:model-cache:invalidate` — code is canonical. BUG-018 status: Fix Applied (real-Redis runtime check still pending production deploy). |

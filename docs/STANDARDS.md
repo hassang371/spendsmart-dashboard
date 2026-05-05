@@ -2,7 +2,7 @@
 
 > **Canonical source of truth for all agents (Claude, Gemini) and humans.**
 > When any agent's internal doc-standards file conflicts with this file, this file wins.
-> Last Updated: 2026-04-07
+> Last Updated: 2026-05-05
 
 ---
 
@@ -12,17 +12,26 @@
 |---|---|---|---|
 | Feature LLD | `docs/features/` | `NNN-kebab-name.md` | Yes (001, 002…) |
 | Bug Report | `docs/bugs/` | `BUG-NNN-kebab-name.md` | Yes (BUG-001…) |
-| RFC (full) | `docs/rfcs/` | `RFC-NNN-kebab-name.md` | Yes (RFC-001…) |
-| RFC (short) | `docs/rfcs/` | `RFC-NNN-kebab-name.md` | Yes (RFC-001…) |
-| HLD (living) | `docs/design/` | `kebab-name.md` | No |
+| ADR | `docs/adr/` | `ADR-NNN-kebab-name.md` | Yes (ADR-001…) |
+| Design Doc (living) | `docs/design/` | `kebab-name.md` | No |
 | Policies | `docs/policies/` | `kebab-name.md` | No |
 | Implementation Plan | `docs/plans/` | `YYYY-MM-DD-kebab-name.md` | No (date-prefixed) |
 | Research | `docs/research/` | `NNN-kebab-name.md` | Yes (001, 002…) |
-| Investigation | `docs/investigations/` | `kebab-name.md` | No |
+| Investigation | `docs/investigations/` | `kebab-name.md` | No (scratch) |
 
-**`docs/adr/` is deprecated.** All decisions (large or small) go in `docs/rfcs/`. Use full RFC for significant changes, short-form RFC for small decisions.
+**Vocabulary notes:**
+- **Design Doc** is the canonical term for living component-level architecture — replaces
+  the deprecated "HLD" wording. Path stays `docs/design/`.
+- **ADR** records an architectural decision that has been MADE. RFC vocabulary is not used
+  — SCALE has a single decision-maker. Re-evaluate if 2+ senior engineers join.
+- The previous `docs/rfcs/` directory was migrated to `docs/adr/` on 2026-05-05.
 
-**`docs/archive/`** holds superseded or outdated docs. Move docs here instead of deleting them. No naming convention enforced — keep the original filename.
+**`docs/archive/`** holds superseded or outdated docs. Move docs here instead of deleting them.
+No naming convention enforced — keep the original filename.
+
+**Deferred (not yet created):**
+- `docs/postmortems/` — add when first user-facing incident occurs (until then, Bug Reports cover)
+- `docs/runbooks/` — add when on-call obligations begin
 
 ---
 
@@ -43,8 +52,8 @@ Additional fields by doc type:
 |---|---|
 | Feature LLD | `Type: Feature LLD` |
 | Bug Report | `Severity: Critical \| High \| Medium \| Low` |
-| RFC (full) | `OKR Alignment: [which objective this serves]` |
-| HLD | `Last Updated: YYYY-MM-DD`, `Version: 1.x` |
+| ADR | `OKR Alignment: [which objective this serves]` |
+| Design Doc | `Last Updated: YYYY-MM-DD`, `Version: 1.x` |
 | Implementation Plan | `LLD: [path to Feature LLD or Bug Report this implements]` |
 | Research | `Scope: [what was researched]`, `Researchers: [who/what conducted the research]` |
 
@@ -60,11 +69,20 @@ Additional fields by doc type:
 
 `Investigating` → `Root Cause Found` → `In Progress` → `Fix Applied` → `Verified`
 
-### RFC
+**Bug iteration loop:** A Bug Report's lifecycle may iterate inside `In Progress` → `Fix
+Applied`. If the user reports the bug still persists, the doc remains the same — append a
+new iteration entry to the changelog and loop. Only advance to `Verified` after the user
+explicitly confirms resolution.
 
-`Draft` → `Proposed` → `Approved` → `In Progress` → `Implemented` → `Verified` | `Rejected` | `Superseded`
+### ADR
 
-### HLD
+`Draft` → `Proposed` → `Approved` → `Implemented` | `Superseded` | `Rejected`
+
+ADRs are RECORDED decisions. If your draft has a long "Options Considered" section weighing
+alternatives without a chosen direction, you wrote an RFC, not an ADR. Decide first (using
+brainstorm/grilling skills), then record as ADR.
+
+### Design Doc
 
 `Current` | `Outdated` | `Deprecated`
 
@@ -73,7 +91,7 @@ Additional fields by doc type:
 | Code state | Doc status to set |
 |---|---|
 | Implementation committed | `Implemented` |
-| Verification passed (tests green, evidence confirmed) | `Verified` |
+| Verification passed (tests green, evidence confirmed, user confirmed for bugs) | `Verified` |
 
 ---
 
@@ -90,7 +108,7 @@ Additional fields by doc type:
 7. Edge Cases & Error Handling
 8. Security Considerations
 9. Testing Strategy
-10. Related Documents (HLD links, RFC links)
+10. Related Documents (Design Doc links, ADR links)
 11. Changelog (append-only — add an entry when the doc is created and whenever reality diverges from the original design)
 
 ### Bug Report (all required)
@@ -101,37 +119,31 @@ Additional fields by doc type:
 4. Environment (branch, component, trigger)
 5. Root Cause Analysis (with Mermaid diagram showing bug path)
 6. Fix Description (files changed + why it works)
-7. Regression Prevention (test added, guard added)
-8. Related Documents
-9. Changelog (append-only — add an entry at creation; add entries as status transitions)
-
-### RFC — Full (all required)
-
-1. Problem Statement
-2. Proposed Solution (with before/after Mermaid diagrams)
-3. Detailed Design
-4. Alternatives Considered (≥2, with rejection rationale)
-5. Impact Assessment (what changes, what breaks, migration strategy)
-6. Success Metrics
-7. Timeline
-8. Decision (approved/rejected/deferred + rationale)
+7. Iteration Log (one entry per attempt — hypothesis, change, observed result, user verification result)
+8. Regression Prevention (test added, guard added)
 9. Related Documents
-10. Changelog (append-only — add entries as decision status changes)
+10. Changelog (append-only — add an entry at creation; add entries as status transitions)
 
-### RFC — Short (for small decisions, all required)
+The Iteration Log is what prevents the multi-doc-spam bug pattern: one BUG-NNN doc covers all attempts.
 
-1. Problem Statement (1–3 sentences)
-2. Decision (what was chosen and why)
-3. Alternatives Considered (1–2, brief)
-4. Impact (what changes as a result)
-5. Changelog (append-only — add entries as decision status changes)
+### ADR (all required)
 
-### HLD — Living Document (all required)
+1. Context (the situation that forced a decision)
+2. Decision (what was chosen — direct, no hedging)
+3. Status (Draft / Proposed / Approved / Implemented / Superseded / Rejected)
+4. Consequences (what becomes easier, what becomes harder, what it commits to)
+5. Related Documents
+6. Changelog (append-only — add entries as status changes)
+
+ADRs record decisions. They are immutable in spirit — if the decision changes, write a new
+ADR that supersedes the old one (status `Superseded`).
+
+### Design Doc — Living Document (all required)
 
 1. Overview
 2. Architecture/ER/Deployment Diagrams (≥3)
 3. Domain/Module/Endpoint Details
-4. Key Decisions
+4. Key Decisions (links to ADRs)
 5. Changelog (append-only, newest at top)
 
 ### Policy (all required)
@@ -145,8 +157,11 @@ Additional fields by doc type:
 
 1. Header (goal, architecture, tech stack, LLD reference)
 2. File Structure (which files will be created or modified)
-3. Tasks (bite-sized, TDD: failing test -> implement -> pass -> commit)
-4. Each task must have: Files list, exact code, exact commands, commit message
+3. Tasks (bite-sized, TDD vertical slicing: one failing test → one implementation → repeat)
+4. Each task must have: Files list, sequencing/dependencies, commit message
+
+**Pitfall — LLD vs Plan no-overlap:** Plans describe HOW and IN WHAT ORDER. LLDs describe
+WHAT to build. A plan that re-states the LLD's design content is doing the wrong thing.
 
 ### Research (all required)
 
@@ -158,7 +173,9 @@ Additional fields by doc type:
 
 ### Investigation (lightweight — no formal sections required)
 
-Scratch notes for unconfirmed observations. Once confirmed, graduate to a formal Bug Report or Feature LLD. Keep brief — these are working notes, not published docs.
+Scratch notes for unconfirmed observations. Once confirmed, graduate to a formal Bug Report or
+Feature LLD per `documentation-gate.md` Gate 1 promotion rule. Keep brief — these are working
+notes, not published docs.
 
 ---
 
@@ -168,9 +185,8 @@ Scratch notes for unconfirmed observations. Once confirmed, graduate to a formal
 |---|---|---|
 | Feature LLD | 1 | Sequence (API flows) or Activity (business logic) |
 | Bug Report | 1 | Sequence showing the bug's data path |
-| RFC (full) | 2 | Current state architecture + proposed state |
-| RFC (short) | 0 | Optional |
-| HLD | 3+ | Architecture + data flow + deployment |
+| ADR | 0–2 | Optional — current state vs proposed state if helpful |
+| Design Doc | 3+ | Architecture + data flow + deployment |
 | Implementation Plan | 0 | Optional (code blocks serve as the primary visual) |
 | Research | 0 | Optional (tables and comparison matrices serve as the primary visual) |
 | Investigation | 0 | Optional |
@@ -189,8 +205,8 @@ Scratch notes for unconfirmed observations. Once confirmed, graduate to a formal
 |---|---|---|
 | Feature LLD | `NNN-kebab.md` (3-digit zero-padded) | `003-transaction-search.md` |
 | Bug Report | `BUG-NNN-kebab.md` | `BUG-002-duplicate-ingestion.md` |
-| RFC | `RFC-NNN-kebab.md` | `RFC-002-multi-currency.md` |
-| HLD | `system-component.md` | `api-design.md` |
+| ADR | `ADR-NNN-kebab.md` | `ADR-002-multi-currency.md` |
+| Design Doc | `system-component.md` | `api-design.md` |
 | Policy | `topic-policy.md` | `migration-policy.md` |
 | Implementation Plan | `YYYY-MM-DD-kebab.md` | `2026-04-06-prediction-engine.md` |
 | Research | `NNN-kebab.md` (3-digit zero-padded) | `001-prediction-engine-model-selection.md` |
@@ -209,30 +225,32 @@ Scratch notes for unconfirmed observations. Once confirmed, graduate to a formal
 
 ---
 
-## HLD Sync Rule
+## Design Doc Sync Rule
 
-After writing any Feature LLD or Bug Report, always check if an HLD needs updating:
+After writing any Feature LLD or Bug Report, always check if a Design Doc needs updating:
 
-| Change type | HLD to update |
+| Change type | Design Doc to update |
 |---|---|
 | New or modified API endpoints | `docs/design/api-design.md` |
 | Schema / DB changes | `docs/design/database-design.md` |
 | Architecture / service topology | `docs/design/system-architecture.md` |
 
-Add a changelog entry at the bottom of any HLD you update.
+Add a changelog entry at the bottom of any Design Doc you update.
 
 ---
 
 ## Spec Review Rule
 
-After writing or updating ANY doc, run a spec review before committing:
+After writing or updating ANY doc, run a spec review before committing. The skill bound to
+the spec-review situation lives in `.claude/skills-registry.md` — workflow files do not name
+the skill directly so plugin changes don't break this rule.
 
-1. Dispatch `superpowers:code-reviewer` with the doc content + type + review focus
+1. Run spec review (registry: spec-review situation)
 2. Fix all issues found
 3. Re-run until clean (max 3 iterations)
 4. Commit only after spec review passes
 
-This applies to all doc types: Feature LLDs, Bug Reports, RFCs, HLDs, Policies.
+This applies to all doc types: Feature LLDs, Bug Reports, ADRs, Design Docs, Policies.
 
 ---
 

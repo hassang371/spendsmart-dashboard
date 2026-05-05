@@ -1,11 +1,11 @@
 #!/bin/bash
 # next_doc_number.sh — Get the next auto-incremented doc number
 # Usage: ./next_doc_number.sh <type>
-#   type: features | bugs | rfcs
+#   type: features | bugs | adr
 
 set -e
 
-TYPE="${1:?Usage: next_doc_number.sh <features|bugs|rfcs>}"
+TYPE="${1:?Usage: next_doc_number.sh <features|bugs|adr>}"
 DOCS_DIR="$(git rev-parse --show-toplevel)/docs"
 
 case "$TYPE" in
@@ -17,12 +17,12 @@ case "$TYPE" in
     DIR="$DOCS_DIR/bugs"
     PREFIX="BUG-"
     ;;
-  rfcs)
-    DIR="$DOCS_DIR/rfcs"
-    PREFIX="RFC-"
+  adr)
+    DIR="$DOCS_DIR/adr"
+    PREFIX="ADR-"
     ;;
   *)
-    echo "Error: Unknown type '$TYPE'. Use: features, bugs, or rfcs" >&2
+    echo "Error: Unknown type '$TYPE'. Use: features, bugs, or adr" >&2
     exit 1
     ;;
 esac

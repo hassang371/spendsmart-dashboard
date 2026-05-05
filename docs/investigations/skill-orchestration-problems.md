@@ -130,7 +130,7 @@ Hassan's project uses a specific doc taxonomy:
 |---|---|---|
 | Feature LLD | `docs/features/NNN-*.md` | Low-level design for a feature |
 | Bug Report | `docs/bugs/BUG-NNN-*.md` | Bug investigation + fix design |
-| RFC (full/short) | `docs/rfcs/RFC-NNN-*.md` | Architectural decisions |
+| RFC (full/short) | `docs/adr/RFC-NNN-*.md` | Architectural decisions |
 | HLD | `docs/design/*.md` | Living system architecture docs |
 | Implementation Plan | `docs/plans/` | Step-by-step execution plan |
 
@@ -145,7 +145,7 @@ Matt pocock's plugin skills use a different vocabulary:
 
 When matt pocock skills run (e.g., `to-prd`, `to-issues`, `improve-codebase-architecture`), they reference their vocabulary. When SCALE's design-docs skill runs, it references SCALE's vocabulary. There is no mapping between them.
 
-Concrete example: `docs/agents/domain.md` (set up in this session) instructs skills to read `docs/adr/` for architectural decisions. But `docs/STANDARDS.md` explicitly states `docs/adr/` is deprecated — all decisions go in `docs/rfcs/`. The `docs/adr/` directory was created in this session by the matt pocock setup skill, contradicting the project standard. This conflict was not caught because no mapping exists.
+Concrete example: `docs/agents/domain.md` (set up in this session) instructs skills to read `docs/adr/` for architectural decisions. But `docs/STANDARDS.md` explicitly states `docs/adr/` is deprecated — all decisions go in `docs/adr/`. The `docs/adr/` directory was created in this session by the matt pocock setup skill, contradicting the project standard. This conflict was not caught because no mapping exists.
 
 ---
 

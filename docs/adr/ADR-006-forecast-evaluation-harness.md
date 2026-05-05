@@ -1,24 +1,24 @@
-# RFC-006: Forecast Evaluation Harness (Walk-Forward + Grokking A/B)
+# ADR-006: Forecast Evaluation Harness (Walk-Forward + Grokking A/B)
 
-> **Doc ID:** RFC-006-forecast-evaluation-harness
+> **Doc ID:** ADR-006-forecast-evaluation-harness
 > **Date:** 2026-04-17
 > **DRI:** Mohammed Hassan Mohiddin
 > **Status:** Implemented (code-complete; first walk-forward run deferred per Stage 9)
-> **OKR Alignment:** Q2 2026 — "Forecast accuracy lifts user action." Provides the offline measurement system that validates LLD 009's SLOs (RFC-005 accuracy targets, RFC-003 calibration targets) before any model config lands on production. Also runs the first grokking-vs-default A/B experiment surfaced in the Cowork brainstorming session.
+> **OKR Alignment:** Q2 2026 — "Forecast accuracy lifts user action." Provides the offline measurement system that validates LLD 009's SLOs (ADR-005 accuracy targets, ADR-003 calibration targets) before any model config lands on production. Also runs the first grokking-vs-default A/B experiment surfaced in the Cowork brainstorming session.
 
 ## Problem Statement
 
-LLD 009 claims a 500 ms latency SLO and ≤15–25 % MAPE accuracy target. RFC-005 tightens the accuracy target to ≤10 % MAPE via the three-tier data pipeline. RFC-003 claims ≥0.80 P10–P90 interval coverage. **None of these claims are measurable today.** The current evaluation in `packages/forecasting/trainer.py` does a single `training_cutoff = max_time_idx - 30` split and reports val_loss — one data point per user, no historical backtesting, no calibration assessment, no way to compare model configurations without shipping them.
+LLD 009 claims a 500 ms latency SLO and ≤15–25 % MAPE accuracy target. ADR-005 tightens the accuracy target to ≤10 % MAPE via the three-tier data pipeline. ADR-003 claims ≥0.80 P10–P90 interval coverage. **None of these claims are measurable today.** The current evaluation in `packages/forecasting/trainer.py` does a single `training_cutoff = max_time_idx - 30` split and reports val_loss — one data point per user, no historical backtesting, no calibration assessment, no way to compare model configurations without shipping them.
 
 Three concrete consequences follow:
 
-1. **Ship-blind risk.** Every model-config change (RFC-005's hyperparameter bump, the Chronos-2 integration from LLD 009, the grokking training regime proposed in the Cowork synthesis) lands in production without a controlled accuracy comparison. Users are the A/B harness.
+1. **Ship-blind risk.** Every model-config change (ADR-005's hyperparameter bump, the Chronos-2 integration from LLD 009, the grokking training regime proposed in the Cowork synthesis) lands in production without a controlled accuracy comparison. Users are the A/B harness.
 2. **Grokking experiment is structurally impossible.** The Cowork synthesis argues that extending `max_epochs` 30→150, `patience` 5→50, and adding `weight_decay=1e-4` may unlock a generalisation regime for per-user TFT. That hypothesis can only be validated on held-out historical folds because live data is confounded by prediction-induced behaviour change. Without a walk-forward harness, "try grokking config" is a coin flip deployed to real users.
-3. **Honest uncertainty cannot be claimed.** The 7-quantile ForecastPoint (RFC-003) only pays off if quantile calibration is measured — does P10 actually contain 10 % of outcomes, does P90 contain 90 %? Pinball loss + interval coverage + calibration error are the tests; without a harness running them, the outer quantiles are decorative.
+3. **Honest uncertainty cannot be claimed.** The 7-quantile ForecastPoint (ADR-003) only pays off if quantile calibration is measured — does P10 actually contain 10 % of outcomes, does P90 contain 90 %? Pinball loss + interval coverage + calibration error are the tests; without a harness running them, the outer quantiles are decorative.
 
 Relatedly, Hassan's walk-forward insight from the Cowork session is genuinely correct: historical transaction data from before SCALE existed is a **clean counterfactual baseline**. Every user with ≥2 years of data gives us ~22 train→predict→compare folds whose test windows predate SCALE's existence entirely — no prediction-induced feedback, no intervention effect. This is a gift that the current trainer throws away by doing a single split.
 
-If this is not built now, RFC-005 cannot be safely validated, RFC-003's calibration claims cannot be tested, and the grokking experiment stays theoretical.
+If this is not built now, ADR-005 cannot be safely validated, ADR-003's calibration claims cannot be tested, and the grokking experiment stays theoretical.
 
 ## Proposed Solution
 
@@ -31,7 +31,7 @@ Build an offline walk-forward evaluation harness as a standalone Python CLI and 
 3. Runs both **expanding** (grow training set each fold) and **rolling** (fixed 365-day window) protocols.
 4. Computes MAPE on P50, pinball loss on each of the 7 quantiles, P10–P90 interval coverage, and per-quantile calibration error.
 5. Supports swappable training configs — `default` (current LLD 009 hyperparameters) and `grokking` (extended epochs + weight decay + smaller batch) — so the first use of the harness is the grokking A/B.
-6. Emits a diff report against absolute thresholds (RFC-003/005 success metrics) and relative regression guards (new config must not regress > 5 % from baseline on any fold).
+6. Emits a diff report against absolute thresholds (ADR-003/005 success metrics) and relative regression guards (new config must not regress > 5 % from baseline on any fold).
 
 No production code runs the harness. No frontend integration. No data written to `user_predictions` or `training_jobs`. The harness is pure read-side over historical transactions: fetch, slice, train in isolation, predict, score, discard checkpoint. Results write to `docs/research/` as formal research artifacts.
 
@@ -187,7 +187,7 @@ For each fold:
 
 1. Fetch user transactions via `packages.forecasting.trainer.fetch_user_transactions` (existing helper; no schema change).
 2. Slice to train window by `transaction_date`.
-3. Call `packages.forecasting.dataset.aggregate_daily_panel` (per RFC-005) on the slice.
+3. Call `packages.forecasting.dataset.aggregate_daily_panel` (per ADR-005) on the slice.
 4. Call `packages.forecasting.scheduler.detect_recurring_cashflows` + `project_scheduled_cashflows` to assemble known-future covariates for the 30-day test horizon.
 5. Train a fresh TFT via `trainer.run_training(panel, **chosen_config)` — checkpoint stays in-memory, never touches Supabase Storage.
 6. Predict the 30-day horizon; collect the full 7-quantile matrix.
@@ -243,11 +243,11 @@ def run_training(
 ):
 ```
 
-RFC-006 expands this to:
+ADR-006 expands this to:
 
 ```python
 def run_training(
-    enriched_df: pd.DataFrame,                       # name preserved; RFC-005 implementation
+    enriched_df: pd.DataFrame,                       # name preserved; ADR-005 implementation
                                                      # will migrate this argument to a panel
                                                      # DataFrame — coordinated there, not renamed here
     max_epochs: int = 30,
@@ -260,7 +260,7 @@ def run_training(
 ```
 
 Param names preserved to avoid any breaking change:
-- `enriched_df` (not `panel_df`) — matches the current code. RFC-005's panel migration changes the *shape* of the data passed in, not the parameter name; a follow-up rename can land as a cosmetic PR after RFC-005 lands.
+- `enriched_df` (not `panel_df`) — matches the current code. ADR-005's panel migration changes the *shape* of the data passed in, not the parameter name; a follow-up rename can land as a cosmetic PR after ADR-005 lands.
 - `early_stop_patience` (not `patience`) — matches the current code. The harness maps `TrainingConfig.patience → run_training(early_stop_patience=...)`. Do not add `*` to force keyword-only; existing positional callers (e.g., `apps/worker/main.py::train_model` line 67: `run_training(enriched, max_epochs=30)`) keep working.
 
 Defaults preserve current production behaviour exactly. The four new kwargs (`weight_decay`, `batch_size`, `learning_rate`, plus the already-existing `early_stop_patience`) take current implicit pytorch-forecasting defaults so an unchanged callsite produces unchanged results. The harness passes them explicitly from the chosen `TrainingConfig`. Zero breaking changes.
@@ -274,10 +274,10 @@ Custom configs supported via `--config custom:path/to/config.yaml` (YAML loaded,
 ```python
 import numpy as np
 
-# Source of truth: RFC-003 §1 ForecastPoint schema + RFC-003 §4
+# Source of truth: ADR-003 §1 ForecastPoint schema + ADR-003 §4
 # user_predictions.pinball_loss jsonb keys {p2, p10, p25, p50, p75, p90, p98}.
-# Any future change to the quantile set must land in RFC-003 first; this
-# module mirrors the RFC-003 contract.
+# Any future change to the quantile set must land in ADR-003 first; this
+# module mirrors the ADR-003 contract.
 QUANTILE_LEVELS = (0.02, 0.10, 0.25, 0.50, 0.75, 0.90, 0.98)
 
 
@@ -316,7 +316,7 @@ def calibration_error(
         {"observed": {tau: fraction}, "deviation": {tau: |fraction - tau|},
          "mean_abs_deviation": float}
     Mean |observed - tau| across quantile levels is the headline calibration
-    error. Perfect calibration → 0. RFC-006 threshold: ≤ 0.05."""
+    error. Perfect calibration → 0. ADR-006 threshold: ≤ 0.05."""
 ```
 
 All functions are pure. All unit-tested with golden values computed by hand or via `sklearn.metrics.mean_pinball_loss` cross-reference.
@@ -338,7 +338,7 @@ def stratified_sample(
        last 365 days, at least 2 years total history.
     2. Low-frequency spenders: bottom 40% by transaction count, ≥ 2 years.
     3. Recent life-event users: last-90-days coefficient-of-variation on
-       daily total spend > 1.5 (matches RFC-005 widener threshold).
+       daily total spend > 1.5 (matches ADR-005 widener threshold).
     4. Salary-only users: transactions classify to {'salary', 'rent',
        'groceries', 'utilities', 'transfer'} ≥ 80% — stable salaried life.
     5. Multi-account users: bank_accounts rows where provider_account_id
@@ -358,7 +358,7 @@ Reproducibility: the seed is logged in the run JSON + rendered research doc so a
 `packages/forecasting/eval/report.py`:
 
 ```python
-# Thresholds (per RFC-003/RFC-005 success metrics)
+# Thresholds (per ADR-003/ADR-005 success metrics)
 ABS_MAPE_THRESHOLD = 0.10                     # ≤ 10%
 ABS_COVERAGE_MIN = 0.80                       # ≥ 80% actuals inside P10-P90
 ABS_CALIBRATION_ERROR_MAX = 0.05              # ≤ 5% mean absolute deviation
@@ -424,14 +424,14 @@ Per-stratum MAPE (config B):
 
 Recommendation: adopt grokking config (strictly better across all metrics);
 MAPE absolute gate not yet met - retune learning rate or expand model
-capacity in RFC-005 follow-up.
+capacity in ADR-005 follow-up.
 ```
 
 Everything above is generated automatically. The research doc at `docs/research/002-walk-forward-baseline.md` wraps this in the research-doc metadata block per `docs/STANDARDS.md`.
 
 #### 8. Execution model
 
-Runs are manual, not scheduled, not CI-gated in v1. Expected cadence: ~monthly while iterating on RFC-005 hyperparameters and post-RFC-006 eval methodology refinement. Not tied to any PR workflow.
+Runs are manual, not scheduled, not CI-gated in v1. Expected cadence: ~monthly while iterating on ADR-005 hyperparameters and post-ADR-006 eval methodology refinement. Not tied to any PR workflow.
 
 Compute budget on developer hardware:
 
@@ -443,7 +443,7 @@ Compute budget on developer hardware:
 | 50 users × 22 folds × grokking × `--parallel 8` | ~36 h |
 | Full A/B (both configs, both window protocols, `--parallel 8`) | ~72 h |
 
-Modal serverless T4 would cut the full A/B to ~6 h at ~$44 cost per RFC-004's cost model. Not integrated in v1; documented as v1.5 optimisation.
+Modal serverless T4 would cut the full A/B to ~6 h at ~$44 cost per ADR-004's cost model. Not integrated in v1; documented as v1.5 optimisation.
 
 ### Data Model Changes
 
@@ -463,11 +463,11 @@ None. No new endpoints, no schema changes to existing endpoints.
 - **Cons:** One fold per user means no learning curve, no seasonal coverage, no calibration assessment (a single point cannot estimate whether P10 contains 10 % of outcomes). Confounds "more training data" with "better config" because the test month is fixed. Hassan's own correction from the Cowork synthesis applies: historical data is already enough for 22 folds per user; using only one is malpractice.
 - **Why rejected:** The whole point of the harness is to extract the cheap folds that sit inside every user's existing data. Falling back to single-split would be equivalent to keeping the current evaluator.
 
-### Alternative 2: Shadow mode as primary evaluation (RFC-003 `user_predictions` already collects)
+### Alternative 2: Shadow mode as primary evaluation (ADR-003 `user_predictions` already collects)
 
-- **Pros:** No offline harness needed. Predictions land in `user_predictions`; the evaluation job (RFC-003 §5) fills `actual_outcomes` + `mape` + `pinball_loss` automatically.
+- **Pros:** No offline harness needed. Predictions land in `user_predictions`; the evaluation job (ADR-003 §5) fills `actual_outcomes` + `mape` + `pinball_loss` automatically.
 - **Cons:** Shadow data accrues prospectively; it takes at least one 30-day horizon to produce even one evaluation-completed row per user. The grokking A/B cannot wait 30+ days before a decision. Pre-SCALE counterfactual data (the users' historical transactions from 2022–2024) is discarded by this approach. Also, shadow mode is confounded by macro shifts between now and the prediction date; walk-forward on pre-SCALE data is immune.
-- **Why rejected:** Shadow mode is valuable production drift monitoring — it answers "is the deployed model still accurate *right now*" — but cannot be the primary accuracy benchmark. Walk-forward + shadow are sequential, not alternatives. RFC-006 ships walk-forward; shadow mode rollout is v1.5.
+- **Why rejected:** Shadow mode is valuable production drift monitoring — it answers "is the deployed model still accurate *right now*" — but cannot be the primary accuracy benchmark. Walk-forward + shadow are sequential, not alternatives. ADR-006 ships walk-forward; shadow mode rollout is v1.5.
 
 ### Alternative 3: CI-gated walk-forward on every PR
 
@@ -478,14 +478,14 @@ None. No new endpoints, no schema changes to existing endpoints.
 ### Alternative 4: Custom harness per metric (MAPE only now, pinball + coverage later)
 
 - **Pros:** Smaller v1 delivery. Ship MAPE quickly; add calibration metrics after first insight.
-- **Cons:** The 7-quantile ForecastPoint in RFC-003 exists specifically to be evaluated via pinball + coverage + calibration error. Shipping MAPE-only would mean RFC-003's outer quantiles (P2, P25, P75, P98) remain decorative because the harness cannot test their calibration. The metric modules are low-cost to ship together — `pinball_loss` is 15 lines; `calibration_error` is 25.
-- **Why rejected:** The honest uncertainty claim from RFC-003 requires the calibration suite. Dropping it is a false economy.
+- **Cons:** The 7-quantile ForecastPoint in ADR-003 exists specifically to be evaluated via pinball + coverage + calibration error. Shipping MAPE-only would mean ADR-003's outer quantiles (P2, P25, P75, P98) remain decorative because the harness cannot test their calibration. The metric modules are low-cost to ship together — `pinball_loss` is 15 lines; `calibration_error` is 25.
+- **Why rejected:** The honest uncertainty claim from ADR-003 requires the calibration suite. Dropping it is a false economy.
 
-### Alternative 5: Wait until RFC-005 lands before building the harness
+### Alternative 5: Wait until ADR-005 lands before building the harness
 
-- **Pros:** Harness can validate RFC-005's actual output without any plumbing drift.
-- **Cons:** RFC-005 implementation is ~5.5 days; RFC-006 is ~5 days. Building them sequentially is ~10 days before the first accuracy measurement exists. Building them in parallel is still ~5.5 days end-to-end because the harness code is independent of the aggregation change — the harness calls `aggregate_daily_panel` which RFC-005 provides. Parallel build means the moment RFC-005 lands, the harness runs on it.
-- **Why rejected:** False sequence — the two RFCs are naturally parallel. And Phase 7 of RFC-006 (first run + research doc) waits for RFC-005 anyway, so parallel building is risk-free.
+- **Pros:** Harness can validate ADR-005's actual output without any plumbing drift.
+- **Cons:** ADR-005 implementation is ~5.5 days; ADR-006 is ~5 days. Building them sequentially is ~10 days before the first accuracy measurement exists. Building them in parallel is still ~5.5 days end-to-end because the harness code is independent of the aggregation change — the harness calls `aggregate_daily_panel` which ADR-005 provides. Parallel build means the moment ADR-005 lands, the harness runs on it.
+- **Why rejected:** False sequence — the two ADRs are naturally parallel. And Phase 7 of ADR-006 (first run + research doc) waits for ADR-005 anyway, so parallel building is risk-free.
 
 ## Impact Assessment
 
@@ -520,7 +520,7 @@ None. No new endpoints, no schema changes to existing endpoints.
 | Harness runtime exceeds developer patience (~72 h full A/B) | **Medium.** 3 days of wall-clock is a lot. Running on CI is not feasible; running on Modal requires a budget decision. | `--parallel 8` on an M2 brings it to ~36 h. `--dry-run` first to confirm scope. Phase 7 scheduled across 1–2 calendar days with the harness running overnight. Future: Modal integration once the budget case is made. |
 | Stratified sample has < 10 users per stratum for a young product | **High confidence, medium impact.** SCALE's current user base may not have 10 multi-account users or 10 ≥2-year users yet. | `stratified_sample` falls back to random supplementation with priority order. Report includes actual composition + fallback log. If fewer than 50 users exist overall, harness runs on what's available and notes the smaller N. |
 | Historical data quality uneven — ingestion gaps, mislabelled txns | **Medium.** Users with broken ingestion in, e.g., April 2023 produce garbage folds that year. | Per-fold `actual_outcomes` shape validated against `np.isnan`; folds with >10 % missing days skipped with log line. Research doc reports skip rate per stratum. |
-| `aggregate_daily_panel` not yet implemented when RFC-006 lands | **High confidence, handled by ordering.** RFC-005 is in flight; the harness depends on it. | Phase 7 of RFC-006 (first run) is explicitly blocked on RFC-005 implementation. Phases 1–6 build the harness code + test against synthetic data; no actual TFT training happens until RFC-005's `aggregate_daily_panel` is in the tree. |
+| `aggregate_daily_panel` not yet implemented when ADR-006 lands | **High confidence, handled by ordering.** ADR-005 is in flight; the harness depends on it. | Phase 7 of ADR-006 (first run) is explicitly blocked on ADR-005 implementation. Phases 1–6 build the harness code + test against synthetic data; no actual TFT training happens until ADR-005's `aggregate_daily_panel` is in the tree. |
 | Old-schema checkpoints leak into harness if `load_model` is called | **Not applicable.** Harness trains fresh per fold; never calls `load_model`. Every fold produces a new in-memory TFT that is discarded after prediction. No Supabase Storage interaction. | N/A |
 | Grokking config training time blows up to hours per fold | **Medium.** max_epochs=150 at batch_size=16 on a sub-1000-row panel could take 20–30 min per fold on CPU. | Documented in the timeline estimates. `--parallel 8` absorbs some of the cost. If observed worse than the estimate, introduce an `--early-exit-on-convergence` flag in v1.5 (currently `patience=50` from the grokking config enforces a floor, so grossly-slow grokking runs are bounded). |
 | Run JSON artifacts bloat git history | **Low.** ~15 MB per run × monthly = ~180 MB/year. | `.gitignore` excludes `docs/research/runs/*.json` by default; only `*.summary.json` (under 50 KB) is committed. Full raw data reproducible from the same seed + user population. |
@@ -534,9 +534,9 @@ No migration. Harness is additive — new sub-package, new CLI, zero changes to 
 **Rollout:**
 
 1. Merge Phases 1–6 (harness code + tests).
-2. Wait for RFC-005 implementation to land.
+2. Wait for ADR-005 implementation to land.
 3. Run Phase 7 (first execution). Write `docs/research/002-walk-forward-baseline.md`.
-4. Use the results to decide whether to adopt grokking config in `apps/worker/main.py::train_model` (either via LLD 009 DEVIATION changelog + plan update, or via a separate tightly-scoped RFC if the decision is non-trivial).
+4. Use the results to decide whether to adopt grokking config in `apps/worker/main.py::train_model` (either via LLD 009 DEVIATION changelog + plan update, or via a separate tightly-scoped ADR if the decision is non-trivial).
 
 **Rollback:** revert the merge. No data state to restore.
 
@@ -544,7 +544,7 @@ No migration. Harness is additive — new sub-package, new CLI, zero changes to 
 
 | Metric | Target |
 |---|---|
-| First walk-forward run committed to `docs/research/002-walk-forward-baseline.md` | within 1 week of RFC-005 implementation landing |
+| First walk-forward run committed to `docs/research/002-walk-forward-baseline.md` | within 1 week of ADR-005 implementation landing |
 | Grokking vs default A/B decision recorded in same research doc | same window |
 | Eval harness unit test coverage for `packages/forecasting/eval/` | ≥ 85 % line coverage |
 | Harness runtime for 50 users × 22 folds × 1 config × `--parallel 4` | ≤ 24 h wall-clock on an M2 MacBook |
@@ -555,15 +555,15 @@ No migration. Harness is additive — new sub-package, new CLI, zero changes to 
 
 | Phase | Duration | Deliverable |
 |---|---|---|
-| Phase 1 | 0.5 day | RFC-006 spec review + commit |
+| Phase 1 | 0.5 day | ADR-006 spec review + commit |
 | Phase 2 | 1 day | `metrics.py` + tests (pinball, coverage, calibration; golden values vs sklearn) |
 | Phase 3 | 1 day | `harness.py` fold-loop + tests (expanding + rolling; synthetic user) |
 | Phase 4 | 0.5 day | `sampling.py` + tests (stratification + fallback logic) |
 | Phase 5 | 0.5 day | `configs.py` + trainer kwarg patch + unit test that defaults unchanged |
 | Phase 6 | 0.5 day | `report.py` + CLI `scripts/walk_forward_eval.py` + end-to-end smoke test on a tiny synthetic user |
-| Phase 7 | 1–2 days wall-clock (parallel with overnight runs) | First full run once RFC-005 lands; write `docs/research/002-walk-forward-baseline.md`; record grokking A/B decision |
+| Phase 7 | 1–2 days wall-clock (parallel with overnight runs) | First full run once ADR-005 lands; write `docs/research/002-walk-forward-baseline.md`; record grokking A/B decision |
 
-Total: ~4–5 engineering-days across Phases 1–6 + 1–2 days wall-clock in Phase 7. Phases 2–6 can run in parallel with RFC-005 implementation.
+Total: ~4–5 engineering-days across Phases 1–6 + 1–2 days wall-clock in Phase 7. Phases 2–6 can run in parallel with ADR-005 implementation.
 
 ## Decision
 
@@ -575,9 +575,9 @@ Total: ~4–5 engineering-days across Phases 1–6 + 1–2 days wall-clock in Ph
 
 - Feature LLD: `docs/features/009-prediction-engine.md` — Success Criteria gain walk-forward checkboxes; trainer kwarg expansion is non-breaking
 - Implementation plan: `docs/plans/2026-04-06-prediction-engine.md` — new Task 11.5 runs the harness after production verification
-- Related RFC: `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` — calibration targets (pinball, coverage) validated here; `user_predictions` table is the future shadow-mode artifact but is not touched by this harness
-- Related RFC: `docs/rfcs/RFC-004-tft-inference-cache-architecture.md` — harness trains fresh models each fold; no interaction with the cache
-- Related RFC: `docs/rfcs/RFC-005-aggregation-strategy-three-tier-data-separation.md` — harness consumes `aggregate_daily_panel` + `detect_recurring_cashflows`; Phase 7 blocks on RFC-005 implementation
+- Related ADR: `docs/adr/ADR-003-forecast-api-schema-and-prediction-logging.md` — calibration targets (pinball, coverage) validated here; `user_predictions` table is the future shadow-mode artifact but is not touched by this harness
+- Related ADR: `docs/adr/ADR-004-tft-inference-cache-architecture.md` — harness trains fresh models each fold; no interaction with the cache
+- Related ADR: `docs/adr/ADR-005-aggregation-strategy-three-tier-data-separation.md` — harness consumes `aggregate_daily_panel` + `detect_recurring_cashflows`; Phase 7 blocks on ADR-005 implementation
 - Research: `docs/research/001-prediction-engine-model-selection.md` §8.5 Early Stopping Criteria, §7 LR schedules — grokking-regime literature that the A/B tests empirically
 - Future research (to be authored): `docs/research/002-walk-forward-baseline.md` — the artifact produced by Phase 7
 
@@ -585,6 +585,6 @@ Total: ~4–5 engineering-days across Phases 1–6 + 1–2 days wall-clock in Ph
 
 | Date | Entry |
 |---|---|
-| 2026-04-17 | Initial draft. Walk-forward validation scoped as the v1 primary evaluation method per the Cowork synthesis's pre-SCALE counterfactual insight. Stratified 50-user sampling (high-frequency, low-frequency, life-event, salary-only, multi-account). Default + grokking training configs A/B tested on the first run. Shadow mode (via RFC-003 `user_predictions` table) and CI-gated evaluation deferred to Track C roadmap. Pass/fail thresholds combine absolute gates (MAPE ≤ 10 %, coverage ≥ 80 %, calibration error ≤ 5 %) with relative regression guards (≤ 5 pp worse than baseline). Status: Proposed. |
-| 2026-04-17 | Spec review fixes: C1 — corrected the trainer signature to match the real `packages/forecasting/trainer.py:129` (`enriched_df` not `panel_df`; `early_stop_patience` not `patience`; no `*` keyword-only separator) so the existing `apps/worker/main.py::train_model` positional caller keeps working; harness maps `TrainingConfig.patience` → `run_training(early_stop_patience=...)`. H1 — corrected the multi-account stratum to reference the real `bank_accounts` table and filter on `provider_account_id IS NOT NULL` to exclude the single manual row per user. H2 — corrected the `scikit-learn` provenance (lives in `packages/forecasting/requirements.txt`, not `packages/categorization/`). M3 — added RFC-003 cross-reference on `QUANTILE_LEVELS`. |
+| 2026-04-17 | Initial draft. Walk-forward validation scoped as the v1 primary evaluation method per the Cowork synthesis's pre-SCALE counterfactual insight. Stratified 50-user sampling (high-frequency, low-frequency, life-event, salary-only, multi-account). Default + grokking training configs A/B tested on the first run. Shadow mode (via ADR-003 `user_predictions` table) and CI-gated evaluation deferred to Track C roadmap. Pass/fail thresholds combine absolute gates (MAPE ≤ 10 %, coverage ≥ 80 %, calibration error ≤ 5 %) with relative regression guards (≤ 5 pp worse than baseline). Status: Proposed. |
+| 2026-04-17 | Spec review fixes: C1 — corrected the trainer signature to match the real `packages/forecasting/trainer.py:129` (`enriched_df` not `panel_df`; `early_stop_patience` not `patience`; no `*` keyword-only separator) so the existing `apps/worker/main.py::train_model` positional caller keeps working; harness maps `TrainingConfig.patience` → `run_training(early_stop_patience=...)`. H1 — corrected the multi-account stratum to reference the real `bank_accounts` table and filter on `provider_account_id IS NOT NULL` to exclude the single manual row per user. H2 — corrected the `scikit-learn` provenance (lives in `packages/forecasting/requirements.txt`, not `packages/categorization/`). M3 — added ADR-003 cross-reference on `QUANTILE_LEVELS`. |
 | 2026-05-04 | Status flipped Proposed → Implemented (code-complete; first walk-forward run deferred). `packages/forecasting/eval/` subpackage shipped: `metrics.py` (pinball-loss golden-tested against sklearn) + `configs.py` (DEFAULT + GROKKING `TrainingConfig` presets) + `harness.py` (fold loop with dependency-injected `fetch_history` / `train_predict` / `fetch_actuals` callables) + `sampling.py` (stratified user selection) + `report.py` (threshold evaluator + markdown renderer) + `scripts/walk_forward_eval.py` CLI (run + diff). `trainer.run_training` kwargs expanded with `weight_decay`, `batch_size`, `learning_rate` (preserve existing positional caller). DEVIATION: harness `train_predict`/`fetch_actuals` are stubs in Stage 7 — Stage 9 implements real wrappers (`aggregate_daily_panel` → trained TFT → 7-quantile matrix; transactions → daily closing-balance trajectory). Stage 9 also adds `--parallel` `ProcessPoolExecutor`. First walk-forward run on 50 stratified users + research doc `docs/research/002-walk-forward-baseline.md` are gated on populated supabase + Stage 9 dispatch — separate session. |

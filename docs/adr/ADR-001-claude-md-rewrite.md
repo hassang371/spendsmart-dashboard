@@ -1,6 +1,6 @@
-# RFC-001: CLAUDE.md Rewrite + Design-Docs Skill Update
+# ADR-001: CLAUDE.md Rewrite + Design-Docs Skill Update
 
-> **Doc ID:** RFC-001-claude-md-rewrite
+> **Doc ID:** ADR-001-claude-md-rewrite
 > **Date:** 2026-03-07
 > **Status:** Implemented
 > **DRI:** Hassan
@@ -19,7 +19,7 @@ The current `.claude/CLAUDE.md` was ported from `GEMINI.md` and has fundamental 
 
 ## Before State
 
-The configuration before this RFC — monolithic CLAUDE.md with Gemini artifacts:
+The configuration before this ADR — monolithic CLAUDE.md with Gemini artifacts:
 
 ```mermaid
 graph TB
@@ -115,7 +115,7 @@ graph TB
 | Task tracking | `TaskCreate` / `TaskUpdate` / `TaskList` |
 | Feature LLD | `docs/features/NNN-name.md` |
 | Bug reports | `docs/bugs/BUG-NNN-name.md` |
-| RFCs | `docs/rfcs/RFC-NNN-name.md` |
+| ADRs | `docs/adr/ADR-NNN-name.md` |
 | HLD (living docs) | `docs/design/*.md` |
 | Session state | auto memory (`MEMORY.md`) |
 | **NEVER create** | `task.md`, `implementation_plan.md`, `walkthrough.md`, `docs/plans/` |
@@ -128,7 +128,7 @@ graph TB
 
 ```
 Step 1: Brainstorm → superpowers:brainstorming (IS step 1, not separate)
-Step 2: Document  → Read .claude/skills/design-docs/ (LLD/HLD/bug/RFC)
+Step 2: Document  → Read .claude/skills/design-docs/ (LLD/HLD/bug/ADR)
 Step 3: Plan      → superpowers:writing-plans (saves to docs/ subdir)
 Step 4: Execute   → superpowers:test-driven-development + executing-plans
 Step 5: Verify    → superpowers:verification-before-completion
@@ -183,7 +183,7 @@ Level 3: skills/design-docs/references/ (loaded per decision tree)
 - **`.claude/rules/`**: New directory with 6 rule files.
 - **`.claude/workflows/`**: New directory with 1 workflow file.
 - **`.claude/skills/design-docs/`**: SKILL.md rewritten, 4 files restored from original repo.
-- **No code changes**: This RFC only affects agent configuration, not application code.
+- **No code changes**: This ADR only affects agent configuration, not application code.
 
 ## Success Metrics
 
@@ -200,8 +200,8 @@ Level 3: skills/design-docs/references/ (loaded per decision tree)
 
 | Phase | Date | Deliverable |
 |---|---|---|
-| Brainstorm + design | 2026-03-07 | RFC-001 written, approach approved |
-| Implementation | 2026-03-07 → 2026-03-08 | All 8 tasks executed (see RFC-001-implementation-plan.md) |
+| Brainstorm + design | 2026-03-07 | ADR-001 written, approach approved |
+| Implementation | 2026-03-07 → 2026-03-08 | All 8 tasks executed (see ADR-001-implementation-plan.md) |
 | Verification + commit | 2026-03-08 | Committed as `cd63a8e` — 29 files, 8107 insertions |
 
 ## Decision

@@ -1,6 +1,6 @@
-# RFC-003: Forecast API Schema Expansion + Prediction Logging
+# ADR-003: Forecast API Schema Expansion + Prediction Logging
 
-> **Doc ID:** RFC-003-forecast-api-schema-and-prediction-logging
+> **Doc ID:** ADR-003-forecast-api-schema-and-prediction-logging
 > **Date:** 2026-04-17
 > **DRI:** Mohammed Hassan Mohiddin
 > **Status:** Implemented
@@ -58,7 +58,7 @@ service, database, and HTTP layers.
 **Worker-pattern clarification:** LLD 009's spec review (changelog C1, line 378) rejected
 using Celery `.delay()` to enqueue per-user **training jobs** — those remain owned by the
 hand-rolled polling worker `apps/worker/main.py` because it already owns the
-`training_jobs` state machine. **This RFC does not revisit that decision.** The
+`training_jobs` state machine. **This ADR does not revisit that decision.** The
 evaluation task is a periodic batch scan, not a per-user queued job, and matches the
 existing `cleanup-stale-training-jobs` beat pattern at
 `apps/api/core/tasks/maintenance_tasks.py`. Two distinct patterns coexist in the repo
@@ -98,7 +98,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Proposed["🚀 Proposed Architecture — RFC-003"]
+    subgraph Proposed["🚀 Proposed Architecture — ADR-003"]
         FE["🌐 Next.js"]
         ROUTER["⚙️ forecast router"]
         SVC["📊 ForecastService"]
@@ -200,7 +200,7 @@ class TrainStatusResponse(BaseModel):
 
 **Chronos-path quantile expansion (C2 fix):** LLD 009 §"Chronos-2 Integration" draft
 (line 266) configured `ChronosEngine.predict` with `torch.tensor([0.1, 0.5, 0.9])` — 3
-quantiles only. That line is superseded by this RFC. The fix is a one-line change on the
+quantiles only. That line is superseded by this ADR. The fix is a one-line change on the
 quantile list used inside the engine:
 
 ```python
@@ -342,8 +342,8 @@ INSIGHTS_VERSION: str = "v1"
 `ForecastService._log_prediction` reads this constant and passes it to the INSERT. Any
 pull request that changes `compute_insights` logic in a way that could alter field
 values (new formula, changed quantile mapping, different floor derivation) **must** bump
-`INSIGHTS_VERSION` (`v1` → `v2`) and add an entry to the changelog of this RFC (or a new
-RFC if the change is substantial) describing the behavioural delta. The evaluation task
+`INSIGHTS_VERSION` (`v1` → `v2`) and add an entry to the changelog of this ADR (or a new
+ADR if the change is substantial) describing the behavioural delta. The evaluation task
 records but does not interpret `insights_version` — old rows preserve their historical
 values for walk-forward analysis; new rows reflect current logic.
 
@@ -734,7 +734,7 @@ worker can complete the fill-in.
 | User was deleted | `ON DELETE CASCADE` already removed the row; job never sees it |
 | Exception during evaluation of one row | Log with `prediction_id`; continue batch. The row keeps `evaluated_at IS NULL` because only the successful fill-in update sets it. Its lease expires after 15 min, after which the next beat fire re-claims it. No data loss; max one-cycle delay (24 h). |
 | Worker crashes after claim, before fill-in (process killed, OOM, network drop) | `claimed_at` non-null but `lease_expires_at < now()` once 15 min elapse. Next beat fire's claim query picks it up via the `claimed_at IS NULL OR lease_expires_at < now()` predicate. Recovery is automatic. |
-| Beat worker not running | Rows accumulate in partial index. First restart processes up to 500. Operational alert on `idx_user_predictions_unevaluated` size > N (set in monitoring, not this RFC). |
+| Beat worker not running | Rows accumulate in partial index. First restart processes up to 500. Operational alert on `idx_user_predictions_unevaluated` size > N (set in monitoring, not this ADR). |
 
 #### 6. Data-flow sequence
 
@@ -775,7 +775,7 @@ sequenceDiagram
 
 Single new table `user_predictions` (full DDL above). No column changes to existing
 tables. No drops. No renames. Supabase migration file
-`supabase/migrations/20260418000000_user_predictions.sql` checked in alongside the RFC
+`supabase/migrations/20260418000000_user_predictions.sql` checked in alongside the ADR
 implementation plan.
 
 ### API Changes
@@ -784,7 +784,7 @@ implementation plan.
 |---|---|
 | `POST /forecast/predict` (existing) | Response type → `ForecastResponse` with 7-quantile `ForecastPoint` + `insights` + `prediction_id` |
 | `GET /forecast/predict` (new per LLD 009, now shipping with expanded contract) | Same expanded `ForecastResponse` |
-| `GET /forecast/safe-to-spend` (existing) | No contract change in this RFC; remains on the legacy statistical path per LLD 009 §"Component Changes". Separate follow-up RFC migrates it onto `ForecastService`. |
+| `GET /forecast/safe-to-spend` (existing) | No contract change in this ADR; remains on the legacy statistical path per LLD 009 §"Component Changes". Separate follow-up ADR migrates it onto `ForecastService`. |
 
 No endpoint removed. No path renamed. Existing mobile/web clients consuming only `p10`,
 `p50`, `p90` continue to work because those fields remain in `ForecastPoint`. The schema
@@ -840,7 +840,7 @@ running.
   prediction-outcome pairs collected over time. Every month without logging is a month
   of missing future training data. The v2 counterfactual model needs 12–18 months of
   logs before training.
-- **Why rejected:** Logging is the lowest-cost piece of the whole RFC (one table, one
+- **Why rejected:** Logging is the lowest-cost piece of the whole ADR (one table, one
   fire-and-forget insert, one daily batch job). Deferring it saves maybe a day of
   engineering work and costs a year of future data. Straightforwardly wrong trade.
 
@@ -884,7 +884,7 @@ Add `forecast`, `actual_outcomes`, `mape` columns to `training_jobs` and use a s
 - **Database — new migration:**
   - `supabase/migrations/20260418000000_user_predictions.sql` (DDL above)
 - **Docs — updated:**
-  - `docs/features/009-prediction-engine.md` (add §"Prediction Logging", update §"Response Schema", add DEVIATION changelog entry pointing at this RFC)
+  - `docs/features/009-prediction-engine.md` (add §"Prediction Logging", update §"Response Schema", add DEVIATION changelog entry pointing at this ADR)
   - `docs/plans/2026-04-06-prediction-engine.md` (expand task 6 schemas, task 7 service, add new tasks T6.5 compute_insights and T10.5 prediction logging + eval job)
   - `docs/design/system-architecture.md` or equivalent HLD (add prediction-logging flow diagram)
 
@@ -907,8 +907,8 @@ Deploy in one commit sequence, no feature flag:
 1. Migration runs first (creates `user_predictions` table and indexes; no data to backfill).
 2. Deploy backend containing the expanded schemas, new insights module, updated service,
    and Celery beat registration.
-3. No frontend changes required in this RFC — the AI Insights page work is a separate
-   feature LLD that depends on this RFC's response shape.
+3. No frontend changes required in this ADR — the AI Insights page work is a separate
+   feature LLD that depends on this ADR's response shape.
 4. Evaluation job first fires 24 h after first prediction is logged; no urgency.
 
 Zero downtime. No user-visible change until the AI Insights page consumes the new fields
@@ -935,8 +935,8 @@ No `pyproject.toml` testpaths change is required.
 | Derived fields computed server-side | 0 | 10 (listed in `ForecastInsights`) |
 | Predictions persisted to `user_predictions` | 0 | 100% of successful forecast responses |
 | Predictions with `evaluated_at` set at horizon + 1 day | n/a | ≥ 95% (allows for a retried run next day) |
-| P50 MAPE on evaluated predictions (walk-forward baseline, to be measured and reported) | unknown | baseline established on first 30 days of evaluations; threshold TBD in the future accuracy-SLO RFC |
-| Pinball loss, averaged per-quantile across evaluated predictions | unknown | baseline established on first 30 days of evaluations; threshold TBD in the future accuracy-SLO RFC |
+| P50 MAPE on evaluated predictions (walk-forward baseline, to be measured and reported) | unknown | baseline established on first 30 days of evaluations; threshold TBD in the future accuracy-SLO ADR |
+| Pinball loss, averaged per-quantile across evaluated predictions | unknown | baseline established on first 30 days of evaluations; threshold TBD in the future accuracy-SLO ADR |
 | P10–P90 interval coverage (fraction of actuals inside the 80% band) | unknown | ≥ 0.80 (honest bands should at least meet their nominal coverage) |
 | Logging INSERT failure rate | n/a | < 0.1% |
 
@@ -944,7 +944,7 @@ No `pyproject.toml` testpaths change is required.
 
 | Phase | Duration | Deliverable |
 |---|---|---|
-| Phase 1 | 1 day | RFC spec review + user approval; merge RFC |
+| Phase 1 | 1 day | ADR spec review + user approval; merge ADR |
 | Phase 2 | 1 day | Migration file + `supabase/migrations/` commit |
 | Phase 3 | 2 days | `compute_insights` module + tests (TDD) |
 | Phase 4 | 1 day | Schema expansion + service logging + tests |
@@ -963,23 +963,23 @@ development on insights module vs logging pipeline.
 > (1) expose all 7 quantiles already computed by the model, (2) push derived financial
 > math to server-side, (3) log every prediction from day 1 so future accuracy work has
 > data, (4) defer UI-facing features (scenarios, user floor override, shadow mode) to
-> dedicated follow-up RFCs. Scope chosen to be additive and non-breaking.
+> dedicated follow-up ADRs. Scope chosen to be additive and non-breaking.
 
 ## Related Documents
 
-- Feature LLD to update: `docs/features/009-prediction-engine.md` — this RFC modifies its
+- Feature LLD to update: `docs/features/009-prediction-engine.md` — this ADR modifies its
   §"Response Schema" and adds a §"Prediction Logging" section
 - Implementation plan to update: `docs/plans/2026-04-06-prediction-engine.md` — tasks 6
   and 7 expand; new tasks T6.5 (compute_insights) and T10.5 (prediction logging +
   evaluation job) added
 - Related bug: `docs/bugs/BUG-018-tft-inference-cold-load-no-bounded-cache.md` —
   independent; no overlap in scope but both feed into the deployability of LLD 009
-- Future RFCs blocked on this one:
-  - `RFC-NNN-forecast-scenario-comparison` (scenario endpoint + intents_override) — needs
+- Future ADRs blocked on this one:
+  - `ADR-NNN-forecast-scenario-comparison` (scenario endpoint + intents_override) — needs
     `ForecastInsights` shape as input
-  - `RFC-NNN-forecast-shadow-mode-rollout` — needs `shown_to_user` flag wiring already in
-    place (lands via this RFC)
-  - `RFC-NNN-user-intent-schema` (Track A remainder from brainstorming) — independent but
+  - `ADR-NNN-forecast-shadow-mode-rollout` — needs `shown_to_user` flag wiring already in
+    place (lands via this ADR)
+  - `ADR-NNN-user-intent-schema` (Track A remainder from brainstorming) — independent but
     UI components built on top will reference the same `ForecastInsights` extension
     points
 - HLD to update: `docs/design/system-architecture.md` — add the prediction-logging box
@@ -989,7 +989,7 @@ development on insights module vs logging pipeline.
 
 | Date | Entry |
 |---|---|
-| 2026-04-17 | Initial draft. Produced from the Cowork brainstorming session synthesis covering quantile exposure, derived insights, prediction logging, walk-forward evaluation, and shadow-mode groundwork. Scope: expansion-only changes that unblock the AI Insights page and the future counterfactual-aware model. Explicitly defers scenario comparison, user floor override, shadow-mode holdout rollout, and intervention detection to follow-up RFCs. |
+| 2026-04-17 | Initial draft. Produced from the Cowork brainstorming session synthesis covering quantile exposure, derived insights, prediction logging, walk-forward evaluation, and shadow-mode groundwork. Scope: expansion-only changes that unblock the AI Insights page and the future counterfactual-aware model. Explicitly defers scenario comparison, user floor override, shadow-mode holdout rollout, and intervention detection to follow-up ADRs. |
 | 2026-04-17 | Spec review pass 1. Fixed C1 (evaluation task moved from a fictional `apps/worker/evaluate_predictions.py` Celery-beat path to the **existing** Celery beat at `apps/api/celery_app.py`, with the task module sibling to `maintenance_tasks.py`; LLD 009's polling-worker precedent retained for queued training jobs), C2 (Chronos engine upgraded to emit all 7 quantiles — module-level `QUANTILES` constant — so `ForecastPoint` contract is non-nullable for both tiers; supersedes LLD 009 line 266), C3 (removed duplicate `DriverWeight` Pydantic class; `primary_drivers` now typed as `list[VariableImportance]`). Fixed H1 (`prediction_id: UUID` typed; generated via `uuid4()` in `ForecastService` before INSERT), H2 (added `users insert own predictions` RLS policy so the user-scoped client can write; documented service-role use for evaluation UPDATE), H3 (rewrote claim-and-fetch as atomic `UPDATE … FROM claimable … RETURNING` with `FOR UPDATE SKIP LOCKED`), H4 (added "Insights versioning protocol" subsection; `insights_version` column has no DEFAULT so service must supply), H5 (replaced ambiguous "pinball calibration" metric with separate pinball-loss and P10–P90 coverage rows), H6 (corrected Alt-4 CHECK-constraint argument). Picked up M1 (`public.` prefix on DDL), M2 (corrected JSONB storage math + introduced v1 hour-bucket logging dedup), M3 (added `horizon_days` CHECK + Pydantic `Annotated[int, Field(ge=1, le=30)]`), M4 (test-discovery note), M5 (rollback paragraph). Status promoted `Draft → Proposed`. |
 | 2026-04-17 | Codex adversarial review pass. **Codex Fix #1** (high) — hourly logging dedup was a SELECT-then-INSERT race. Fixed via `generated_hour timestamptz GENERATED ALWAYS AS date_trunc('hour', generated_at) STORED` + `UNIQUE (user_id, generated_hour)` + new `log_user_prediction(payload jsonb)` SECURITY DEFINER RPC implementing `INSERT … ON CONFLICT DO NOTHING`. Service no longer reads-then-writes; one round trip. Concurrency test added to required test list. **Codex Fix #2** (high) — evaluation claim semantics could permanently lose metrics if a worker crashed between `evaluated_at = now()` and the metric-fill UPDATE. Replaced single `evaluated_at` claim flag with a lease pair (`claimed_at` + `lease_expires_at`); `evaluated_at` is set ONLY by the successful fill-in UPDATE. Lease default 15 min; re-claimable via `claimed_at IS NULL OR lease_expires_at < now()`. Failure-modes table updated. New invariant test `test_crashed_worker_row_is_reclaimable`. |
 | 2026-04-17 | Codex pass-2 fixes. **Codex Fix #5** (high) — RPC param name mismatch (`row` vs `payload`). Canonicalised to `payload` everywhere; updated service call site `{"payload": row}`. Added "canonical name" implementation note. **Codex Fix #6** (high) — `SECURITY DEFINER` RPC granted to `authenticated` let users forge synthetic rows by supplying `generated_at` / `horizon_end` / `model_type`. Hardened: `generated_at = now()` server-derived; `horizon_end = now()::date + horizon_days` server-derived; `horizon_days` validated 1..30; `model_type` validated against allowed set; `prediction_id` / `insights_version` / `forecast` / `insights` validated NOT NULL. Required test `test_log_user_prediction_rpc_hardening` exercises each guard. |

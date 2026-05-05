@@ -1,6 +1,6 @@
-# RFC-005: Aggregation Strategy + Three-Tier Data Separation
+# ADR-005: Aggregation Strategy + Three-Tier Data Separation
 
-> **Doc ID:** RFC-005-aggregation-strategy-three-tier-data-separation
+> **Doc ID:** ADR-005-aggregation-strategy-three-tier-data-separation
 > **Date:** 2026-04-17
 > **DRI:** Mohammed Hassan Mohiddin
 > **Status:** Implemented
@@ -16,7 +16,7 @@ Three concrete consequences follow:
 2. **Three qualitatively different kinds of cash flows conflated.** Deterministic obligations (EMI, SIP, rent, insurance premium) have near-100 % predictability and should be scheduled arithmetic, not ML output. Semi-predictable behavioural patterns (groceries, dining, transport) are what the TFT is designed for. Stochastic one-off events (medical, travel, appliance failure) are unpredictable regardless of model capacity — the correct response is to widen prediction intervals, not try to sharpen the P50. The current pipeline treats all three identically, producing over-confident forecasts that break around known obligations and break again around life events.
 3. **Data scale wasted.** Per the Cowork synthesis, a typical SCALE user has 6,000–75,000 raw transactions across 2–7 years and multiple accounts — enough data to justify a hidden_size 128–256 TFT. Aggregating to daily totals produces ~365–2,555 rows per user, constraining model sizing far below what the raw data supports.
 
-If this is not fixed, LLD 009's accuracy targets are unachievable. Every downstream feature (AI Insights page, scenario comparison, walk-forward evaluation in RFC-006) inherits the accuracy ceiling set by `aggregate_daily()`. This RFC replaces the aggregation with a three-tier pipeline that preserves category-level signal, pre-resolves deterministic cash flows as scheduled arithmetic, and widens uncertainty for stochastic events.
+If this is not fixed, LLD 009's accuracy targets are unachievable. Every downstream feature (AI Insights page, scenario comparison, walk-forward evaluation in ADR-006) inherits the accuracy ceiling set by `aggregate_daily()`. This ADR replaces the aggregation with a three-tier pipeline that preserves category-level signal, pre-resolves deterministic cash flows as scheduled arithmetic, and widens uncertainty for stochastic events.
 
 ## Proposed Solution
 
@@ -26,7 +26,7 @@ Replace the single-path `aggregate_daily()` with a four-layer pipeline:
 
 - **Layer 1 — Deterministic scheduler (no ML).** A heuristic recurrence detector scans historical transactions for patterns (merchant + amount ±5 % + day-of-month ±2d × ≥3 months) and writes them to a new `public.scheduled_cashflows` table. The scheduler projects known rules forward over the forecast horizon as concrete (date, category, signed_amount) rows, fed into the TFT as known-future covariates. This alone accounts for 30–50 % of predictable monthly cash flows with near-100 % accuracy — no ML error on obligations.
 - **Layer 2 — Category-level daily panel.** `aggregate_daily_panel()` replaces `aggregate_daily()` and emits one row per (date, category_bucket) pair. A fixed 12-bucket taxonomy (`salary`, `rent`, `groceries`, `dining`, `transport`, `utilities`, `entertainment`, `health`, `emi_loan`, `investment`, `transfer`, `other`) decouples the ML pipeline from the MiniLM classifier's fine-grained label set. The TFT trains on this panel with `group_ids=[user_id, category_bucket]` and expanded capacity (hidden_size=128, attention_heads=8, lstm_layers=3).
-- **Layer 3 — Chronos-2 ensemble.** Unchanged from LLD 009 + RFC-003 (still a 7-quantile univariate forecast over `closing_balance`), blended 70/30 with the TFT output.
+- **Layer 3 — Chronos-2 ensemble.** Unchanged from LLD 009 + ADR-003 (still a 7-quantile univariate forecast over `closing_balance`), blended 70/30 with the TFT output.
 - **Layer 4 — Stochastic widener (rule-based).** A per-bucket volatility measure (coefficient of variation over last 90 days) inflates the P10/P90 spread of the ensemble forecast when any bucket's CV exceeds a threshold or when an active LIFE_EVENT intent is flagged. Pure math, no ML.
 
 Transaction-level modeling with Mamba/Jamba is explicitly deferred to a v2 roadmap; the three-tier separation captures ~80 % of the accuracy win without abandoning the pytorch-forecasting TFT stack that LLD 009 ships against.
@@ -57,7 +57,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Proposed["🚀 Proposed Architecture — RFC-005 four layers"]
+    subgraph Proposed["🚀 Proposed Architecture — ADR-005 four layers"]
         RAW2["💳 Raw transactions<br/>+ classifier output"]
 
         L1["🗓️ Layer 1 — scheduler<br/>heuristic recurrence detector<br/>→ scheduled_cashflows"]
@@ -314,17 +314,17 @@ Per-user training: each user's `train_model` invocation constructs the panel ove
 
 LLD 009 §"TFT-Hybrid Model Upgrades" specifies target hyperparameters:
 
-| Setting | LLD 009 target | RFC-005 target | Reason |
+| Setting | LLD 009 target | ADR-005 target | Reason |
 |---|---|---|---|
 | `hidden_size` | 64 | **128** | 12× more data rows per user justifies higher capacity |
 | `attention_head_size` | 4 | **8** | Each head specialises on a subset of the 12 buckets |
 | `lstm_layers` | 2 | **3** | Deeper LSTM for multi-scale seasonality across buckets |
 | `hidden_continuous_size` | 32 | **64** | Matches the bump in hidden_size |
-| `dropout` | 0.1 (base), 0.3 (fine-tune) | unchanged | Grokking experiment in RFC-006 may adjust |
+| `dropout` | 0.1 (base), 0.3 (fine-tune) | unchanged | Grokking experiment in ADR-006 may adjust |
 | `learning_rate` | 3e-4 | unchanged | |
 | `gradient_clip_val` | 1.0 | unchanged | |
 
-This supersedes the LLD 009 upgrade table for the panel-training path. A DEVIATION entry in LLD 009's changelog will reference this RFC.
+This supersedes the LLD 009 upgrade table for the panel-training path. A DEVIATION entry in LLD 009's changelog will reference this ADR.
 
 #### 5. Layer 4 — Stochastic widener
 
@@ -332,7 +332,7 @@ This supersedes the LLD 009 upgrade table for the panel-training path. A DEVIATI
 
 ```python
 """Rule-based P10/P90 interval widening driven by per-bucket volatility and
-active user intents. No ML. Runs inside compute_insights (RFC-003) after
+active user intents. No ML. Runs inside compute_insights (ADR-003) after
 ensemble blending and before ForecastInsights assembly."""
 
 import numpy as np
@@ -366,7 +366,7 @@ def widen_intervals(
     """
 ```
 
-Called from `compute_insights` in RFC-003 §3 (pure function boundary preserved):
+Called from `compute_insights` in ADR-003 §3 (pure function boundary preserved):
 
 ```python
 def compute_insights(forecast_matrix, future_dates, history_df, ...):
@@ -378,7 +378,7 @@ def compute_insights(forecast_matrix, future_dates, history_df, ...):
     # ... rest of compute_insights unchanged
 ```
 
-`confidence_band_width` in `ForecastInsights` (RFC-003 §1) then reflects the widened spread — the UI surfaces this as honestly-wider intervals, not a hidden adjustment.
+`confidence_band_width` in `ForecastInsights` (ADR-003 §1) then reflects the widened spread — the UI surfaces this as honestly-wider intervals, not a hidden adjustment.
 
 ### Data Model Changes
 
@@ -445,7 +445,7 @@ CREATE UNIQUE INDEX uniq_scheduled_cashflows_rule
 --   GROUP BY 1,2,3,4,5,6,7,8
 --   HAVING count(*) > 1;
 --
--- v1 ships against an empty table (RFC-005 is a green-field migration), so the
+-- v1 ships against an empty table (ADR-005 is a green-field migration), so the
 -- audit is precautionary only.
 
 ALTER TABLE public.scheduled_cashflows ENABLE ROW LEVEL SECURITY;
@@ -466,30 +466,30 @@ CREATE POLICY "users update own scheduled cashflows"
 -- task handled by apps/api/core/tasks/maintenance_tasks.py (or a follow-up task).
 ```
 
-No other table changes. `public.user_predictions` (RFC-003) and `training_jobs` unchanged.
+No other table changes. `public.user_predictions` (ADR-003) and `training_jobs` unchanged.
 
 ### API Changes
 
-No new endpoints. `GET /forecast/predict` behaviour changes internally (richer input; same response shape per RFC-003). No breaking changes to any schema.
+No new endpoints. `GET /forecast/predict` behaviour changes internally (richer input; same response shape per ADR-003). No breaking changes to any schema.
 
 ## Alternatives Considered
 
 ### Alternative 1: Daily total only (current) — do nothing
 
 - **Pros:** Zero work.
-- **Cons:** Accuracy ceiling ~15–25 % MAPE per the Cowork synthesis. AI Insights page has no category-level insight to show. Scenario endpoints cannot differentiate "cut dining" from "cut transport". Walk-forward validation (RFC-006) will measure a ceiling the user will not forgive.
+- **Cons:** Accuracy ceiling ~15–25 % MAPE per the Cowork synthesis. AI Insights page has no category-level insight to show. Scenario endpoints cannot differentiate "cut dining" from "cut transport". Walk-forward validation (ADR-006) will measure a ceiling the user will not forgive.
 - **Why rejected:** Identified as the #1 accuracy bottleneck; not shipping this change means shipping a product that doesn't meet its own brief.
 
 ### Alternative 2: Transaction-level modeling with Mamba/Jamba
 
 - **Pros:** Preserves full temporal microstructure. Scales to 75k-event sequences. Opens path to Neural RDE and TDA feature engineering per the Cowork research.
-- **Cons:** Architectural rewrite. Abandons pytorch-forecasting. No pre-trained checkpoints. Interpretability (VSN, known-future covariates, calibrated quantiles) do not translate cleanly to Mamba without custom implementation. Engineering budget is 2–4× this RFC's budget.
-- **Why rejected:** Right direction, wrong time. v2 roadmap (per `docs/design/prediction-engine-roadmap.md` once the roadmap HLD lands). This RFC captures ~80 % of the accuracy win with the TFT stack we already have.
+- **Cons:** Architectural rewrite. Abandons pytorch-forecasting. No pre-trained checkpoints. Interpretability (VSN, known-future covariates, calibrated quantiles) do not translate cleanly to Mamba without custom implementation. Engineering budget is 2–4× this ADR's budget.
+- **Why rejected:** Right direction, wrong time. v2 roadmap (per `docs/design/prediction-engine-roadmap.md` once the roadmap HLD lands). This ADR captures ~80 % of the accuracy win with the TFT stack we already have.
 
 ### Alternative 3: Per-category separate TFT models (one model per bucket, global across users)
 
 - **Pros:** Each bucket model specialises on its own pattern (rent is highly regular; groceries are bursty). Simpler per-model debugging.
-- **Cons:** 12 models to train, version, invalidate, and cache. Cross-bucket interactions (grocery spend correlates with payday which correlates with salary credit) are not captured because no model sees the joint distribution. Inference cost per request is 12× not 1×. The cache RFC-004 would need 12× the memory.
+- **Cons:** 12 models to train, version, invalidate, and cache. Cross-bucket interactions (grocery spend correlates with payday which correlates with salary credit) are not captured because no model sees the joint distribution. Inference cost per request is 12× not 1×. The cache ADR-004 would need 12× the memory.
 - **Why rejected:** Panel TFT with `group_ids=[user_id, category_bucket]` captures the same specialisation via the Variable Selection Network while keeping one model + one cache entry per user. The pytorch-forecasting library is designed for this exact case.
 
 ### Alternative 4: Use the existing MiniLM classifier's fine-grained labels directly (no bucket layer)
@@ -498,10 +498,10 @@ No new endpoints. `GET /forecast/predict` behaviour changes internally (richer i
 - **Cons:** Classifier emits 20–50+ fine labels; most are sparse per user (one "pet_store" txn every 3 months). TFT panel with 50 groups × 2500 days = 125k rows per user, half of which are zero-activity. Training instability on near-empty series. Classifier evolution (re-labelling, adding a new label) silently changes the model's input schema. Every classifier deploy would require a model retrain.
 - **Why rejected:** Coupling ML model to classifier internals creates a brittle pipeline. The 12-bucket fixed taxonomy is the stable contract; the classifier is allowed to evolve behind the `map_classifier_label_to_bucket` boundary. UI-facing bucket names also tend to be coarser than classifier labels anyway.
 
-### Alternative 5: Defer the deterministic scheduler to a follow-on RFC
+### Alternative 5: Defer the deterministic scheduler to a follow-on ADR
 
-- **Pros:** Smaller v1. Keeps RFC-005 to the panel rewrite.
-- **Cons:** The scheduler is where the biggest single accuracy gain sits (obligations are 30–50 % of cash flow at near-100 % accuracy). Deferring means the v1 accuracy metric (RFC-006 walk-forward) shows worse numbers than achievable, which invites premature re-architecture work. Also leaves `scheduled_cashflows` table unbuilt, blocking LLD 010 (user intents).
+- **Pros:** Smaller v1. Keeps ADR-005 to the panel rewrite.
+- **Cons:** The scheduler is where the biggest single accuracy gain sits (obligations are 30–50 % of cash flow at near-100 % accuracy). Deferring means the v1 accuracy metric (ADR-006 walk-forward) shows worse numbers than achievable, which invites premature re-architecture work. Also leaves `scheduled_cashflows` table unbuilt, blocking LLD 010 (user intents).
 - **Why rejected:** The scheduler is algorithmically simple (heuristic matching + arithmetic projection). The cost of including it here is ~1.5 days; the accuracy lift it provides is disproportionate.
 
 ## Impact Assessment
@@ -521,7 +521,7 @@ No new endpoints. `GET /forecast/predict` behaviour changes internally (richer i
   - `packages/forecasting/dataset.py` — `aggregate_daily()` → `aggregate_daily_panel()`; `create_timeseries_dataset` updated for panel group_ids
   - `packages/forecasting/tft_model.py` — hyperparameters bumped to hidden=128, heads=8, lstm=3, hidden_continuous=64
   - `packages/forecasting/trainer.py` — panel-aware training; invokes `detect_recurring_cashflows` before training
-  - `packages/forecasting/inference.py` — panel-aware prediction path; consumes `scheduled_cashflows` as known-future covariates (via cache layer from RFC-004)
+  - `packages/forecasting/inference.py` — panel-aware prediction path; consumes `scheduled_cashflows` as known-future covariates (via cache layer from ADR-004)
   - `apps/api/domains/forecasting/service.py` — fetches `scheduled_cashflows` rows and wires them into the inference path; calls `widen_intervals` through `compute_insights`
   - `apps/worker/main.py::train_model` — adds scheduler detection + upsert step before the training call
 - **Migration:**
@@ -529,14 +529,14 @@ No new endpoints. `GET /forecast/predict` behaviour changes internally (richer i
 - **Docs:**
   - `docs/features/009-prediction-engine.md` — DEVIATION changelog entry: hyperparameters bumped, aggregation path switched, new deterministic layer
   - `docs/plans/2026-04-06-prediction-engine.md` — update Task 2 (hyperparameter numbers), Task 1/1.5 (prepare_training_data becomes panel-aware), add new tasks for scheduler + stochastic widener
-  - `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` — cross-reference entry in §Related Documents (no code change; `compute_insights` now invokes widener)
+  - `docs/adr/ADR-003-forecast-api-schema-and-prediction-logging.md` — cross-reference entry in §Related Documents (no code change; `compute_insights` now invokes widener)
   - `docs/design/system-architecture.md` — add the four-layer diagram to the prediction-engine component view
 
 ### What Could Break
 
 | Risk | Assessment | Mitigation |
 |---|---|---|
-| Existing TFT checkpoints trained on `aggregate_daily` are incompatible with the new panel schema | **High confidence, medium impact.** `load_from_checkpoint` raises on state_dict shape/key mismatch (three independent invalidating changes: `hidden_size` bump 64→128, `group_ids` list gains `category_bucket`, `scheduled_event_amount` added to `time_varying_known_reals`). RFC-004's `_download_and_load` catches the exception in its `try/except`, returns None; service falls back to Chronos-only; `ForecastService` triggers fresh training. | Acceptable degraded state for 1 deploy + per-user retraining cycle. For the top-100 active users, admin script enqueues immediate retraining on deploy. All other users absorb the cold window over their first post-deploy forecast request. |
+| Existing TFT checkpoints trained on `aggregate_daily` are incompatible with the new panel schema | **High confidence, medium impact.** `load_from_checkpoint` raises on state_dict shape/key mismatch (three independent invalidating changes: `hidden_size` bump 64→128, `group_ids` list gains `category_bucket`, `scheduled_event_amount` added to `time_varying_known_reals`). ADR-004's `_download_and_load` catches the exception in its `try/except`, returns None; service falls back to Chronos-only; `ForecastService` triggers fresh training. | Acceptable degraded state for 1 deploy + per-user retraining cycle. For the top-100 active users, admin script enqueues immediate retraining on deploy. All other users absorb the cold window over their first post-deploy forecast request. |
 | Fixed 12-bucket taxonomy too coarse for power users | **Low impact in v1.** A user with 6 subscriptions all landing in `entertainment` loses the per-subscription signal. | v1.5 adds per-user custom buckets. v1 ships with the fixed set; dashboards + UI reflect the same coarsening. |
 | MiniLM emits a label not in `CLASSIFIER_LABEL_TO_BUCKET` → falls into `'other'` | **Medium.** `'other'` becomes a catchall that absorbs signal the model could have used. | Mapping-validator test runs as part of `make test`, asserts every label emitted by the classifier in the last 30 days maps explicitly. CI fails when the classifier gains a new label that isn't mapped. |
 | Heuristic recurrence detector misses irregular-but-real patterns (e.g., quarterly insurance premium) | **Medium.** A ₹15,000 insurance payment every 3 months won't match the monthly pattern. | v1 supports `rrule_freq='quarterly'` explicitly. Annual patterns (tax, subscription renewals) also supported. User-override path (LLD 010) backfills edge cases the heuristic misses. |
@@ -551,11 +551,11 @@ No new endpoints. `GET /forecast/predict` behaviour changes internally (richer i
 Deploy in this order, non-blocking:
 
 1. Apply migration `20260418200000_scheduled_cashflows.sql` — creates the new table + RLS.
-2. Deploy backend containing `scheduler.py`, `category_mapping.py`, `stochastic_widener.py`, and the `dataset.py` panel rewrite. Old TFT checkpoints become dead (their `dataset_parameters` does not match the new panel schema); the RFC-004 cache returns None; service falls back to Chronos-only for existing users until retraining completes.
-3. Admin script `scripts/retrain_top_users.py` (new, out of RFC scope — one-off operational script) enqueues retraining jobs for the top-100 most-active users so the worst of the cold window is compressed.
+2. Deploy backend containing `scheduler.py`, `category_mapping.py`, `stochastic_widener.py`, and the `dataset.py` panel rewrite. Old TFT checkpoints become dead (their `dataset_parameters` does not match the new panel schema); the ADR-004 cache returns None; service falls back to Chronos-only for existing users until retraining completes.
+3. Admin script `scripts/retrain_top_users.py` (new, out of ADR scope — one-off operational script) enqueues retraining jobs for the top-100 most-active users so the worst of the cold window is compressed.
 4. LLD 009's existing test suite runs against the new pipeline; any test that seeded `aggregate_daily` output is updated (or replaced) as part of Phase 4.
 
-Zero downtime. No frontend changes required. AI Insights page (LLD 011) can begin consuming per-bucket drivers from `ForecastInsights.primary_drivers` once this RFC ships.
+Zero downtime. No frontend changes required. AI Insights page (LLD 011) can begin consuming per-bucket drivers from `ForecastInsights.primary_drivers` once this ADR ships.
 
 **Rollback:** Revert the backend deploy. Drop the new table in a follow-up migration if the rollback is permanent. Old checkpoints are still in Supabase Storage and will load under the reverted code. No data loss.
 
@@ -563,8 +563,8 @@ Zero downtime. No frontend changes required. AI Insights page (LLD 011) can begi
 
 | Metric | Current (baseline to measure) | Target (30 days post-launch) |
 |---|---|---|
-| Forecast P50 MAPE on walk-forward evaluation (per RFC-006) | ~15–25 % estimated | ≤ 10 % for established users |
-| Pinball loss, averaged across 7 quantiles | unknown | baseline established; threshold set in the accuracy-SLO RFC |
+| Forecast P50 MAPE on walk-forward evaluation (per ADR-006) | ~15–25 % estimated | ≤ 10 % for established users |
+| Pinball loss, averaged across 7 quantiles | unknown | baseline established; threshold set in the accuracy-SLO ADR |
 | P10–P90 interval coverage | unknown | ≥ 0.80 (honest bands) |
 | Deterministic-layer contribution to next-30-day cash flow | 0 % (no scheduler) | 30–50 % of predictable cash flow captured as `scheduled_cashflows` rows |
 | `scheduled_cashflows.is_active=true` rules per established user (median) | 0 | 3–8 |
@@ -575,7 +575,7 @@ Zero downtime. No frontend changes required. AI Insights page (LLD 011) can begi
 
 | Phase | Duration | Deliverable |
 |---|---|---|
-| Phase 1 | 0.5 day | RFC-005 spec review + merge |
+| Phase 1 | 0.5 day | ADR-005 spec review + merge |
 | Phase 2 | 1 day | `scheduled_cashflows` migration + `scheduler.py` + tests |
 | Phase 3 | 0.5 day | `category_mapping.py` + tests |
 | Phase 4 | 1.5 day | `dataset.py` panel rewrite + `test_dataset_panel.py` + updated `test_trainer.py` / `test_model.py` |
@@ -593,11 +593,11 @@ Total: ~5.5 engineering-days. Parallelisable to ~4 days (Phase 2 + Phase 3 + Pha
 
 ## Related Documents
 
-- Feature LLD: `docs/features/009-prediction-engine.md` — TFT upgrade target table superseded by this RFC's panel sizing
-- Implementation plan: `docs/plans/2026-04-06-prediction-engine.md` — Task 1/1.5 (prepare_training_data) and Task 2 (TFT hyperparameters) need updates once this RFC is approved
-- Related RFC: `docs/rfcs/RFC-003-forecast-api-schema-and-prediction-logging.md` — `compute_insights` gains a call to `widen_intervals` from this RFC's Layer 4
-- Related RFC: `docs/rfcs/RFC-004-tft-inference-cache-architecture.md` — cache and invalidation contract unchanged; the new panel-shaped checkpoints flow through the same cache
-- Future RFC: evaluation harness RFC-006 — walk-forward validation measures this RFC's accuracy target
+- Feature LLD: `docs/features/009-prediction-engine.md` — TFT upgrade target table superseded by this ADR's panel sizing
+- Implementation plan: `docs/plans/2026-04-06-prediction-engine.md` — Task 1/1.5 (prepare_training_data) and Task 2 (TFT hyperparameters) need updates once this ADR is approved
+- Related ADR: `docs/adr/ADR-003-forecast-api-schema-and-prediction-logging.md` — `compute_insights` gains a call to `widen_intervals` from this ADR's Layer 4
+- Related ADR: `docs/adr/ADR-004-tft-inference-cache-architecture.md` — cache and invalidation contract unchanged; the new panel-shaped checkpoints flow through the same cache
+- Future ADR: evaluation harness ADR-006 — walk-forward validation measures this ADR's accuracy target
 - Future LLD: user intents LLD-010 — writes `source='intent'` rows into the same `scheduled_cashflows` table
 - Research: `docs/research/001-prediction-engine-model-selection.md` — §2 and §8 background on panel training + data augmentation; the panel approach here aligns with the patching/panel patterns surveyed
 - HLD to update: `docs/design/system-architecture.md` — add the four-layer pipeline diagram
@@ -607,7 +607,7 @@ Total: ~5.5 engineering-days. Parallelisable to ~4 days (Phase 2 + Phase 3 + Pha
 | Date | Entry |
 |---|---|
 | 2026-04-17 | Initial draft. Derived from the Cowork brainstorming session's three-data-kinds insight: deterministic obligations (EMI, SIP, rent) → scheduler, semi-predictable behavioural (groceries, dining) → TFT, stochastic (medical, travel) → widen intervals. Category taxonomy fixed at 12 coarse buckets to decouple the ML contract from classifier evolution. Heuristic recurrence detector chosen over ML classifier to fit v1 timeline. Transaction-level Mamba deferred to v2 roadmap. Status: Proposed. |
-| 2026-04-17 | Spec review APPROVED for commit. Polish fixes applied: M1 corrected the old-checkpoint failure mechanism (`load_from_checkpoint` raises on state_dict mismatch; RFC-004 `_download_and_load` catches and returns None — not library-returns-None); H3 clarified that `scheduled_event_amount` is per-(date, bucket) not per-date and specified inference-time construction via `project_scheduled_cashflows` + dense-grid zero-fill; H1 added an implementation note requiring `CLASSIFIER_LABEL_TO_BUCKET` to enumerate real `Category` enum values from `packages/categorization/constants.py` with a 100 % coverage mapping-validator test. H2 (merchant column projection into `fetch_user_transactions`) deferred to Phase 2 plumbing. |
+| 2026-04-17 | Spec review APPROVED for commit. Polish fixes applied: M1 corrected the old-checkpoint failure mechanism (`load_from_checkpoint` raises on state_dict mismatch; ADR-004 `_download_and_load` catches and returns None — not library-returns-None); H3 clarified that `scheduled_event_amount` is per-(date, bucket) not per-date and specified inference-time construction via `project_scheduled_cashflows` + dense-grid zero-fill; H1 added an implementation note requiring `CLASSIFIER_LABEL_TO_BUCKET` to enumerate real `Category` enum values from `packages/categorization/constants.py` with a 100 % coverage mapping-validator test. H2 (merchant column projection into `fetch_user_transactions`) deferred to Phase 2 plumbing. |
 | 2026-04-17 | **Codex Fix #3** (high) — recurring-rule unique key `(user_id, COALESCE(merchant,''), amount, rrule_freq)` collapsed distinct rules: two monthly rules at the same merchant + amount but different `day_of_month`, `category_bucket`, or `source` would silently overwrite each other on conflict, dropping obligations and corrupting known-future covariates. Expanded `uniq_scheduled_cashflows_rule` to include `category_bucket`, `COALESCE(day_of_month, -1)`, `COALESCE(day_of_week, -1)`, `source`. Added migration audit query (run pre-apply) to detect any existing collisions; v1 ships against an empty table so audit is precautionary. |
 | 2026-04-17 | Codex pass-2 fixes. Risk-table row formerly cited the OBSOLETE 4-column unique key — updated to reflect the post-Codex-Fix-#3 8-column key + ON CONFLICT DO UPDATE preserves freshest bookkeeping. Persistence-schema paragraph similarly updated. |
 | 2026-05-04 | Status flipped Proposed → Implemented. `scheduled_cashflows` migration + `packages/forecasting/scheduler.py` (heuristic recurrence detect + project) + `category_mapping.py` (full 12-bucket coverage of Category enum) + `buckets.py` (avoid circular import) + `dataset.py::aggregate_daily_panel` (panel keyed by user_id + bucket; zero-fill scheduled_event_amount join) + `tft_model.py` defaults bumped to 128/8/3/64 + `stochastic_widener.py` (`compute_bucket_volatility` + `widen_intervals` with LIFE_EVENT awareness) + worker train_model wired to upsert detected rules. Master-plan Stage 4. |

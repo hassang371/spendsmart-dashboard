@@ -1,6 +1,6 @@
-# RFC-NNN: [Title] (Short-Form)
+# ADR-NNN: [Title] (Short-Form)
 
-> **Doc ID:** RFC-NNN-kebab-name
+> **Doc ID:** ADR-NNN-kebab-name
 > **Date:** YYYY-MM-DD
 > **DRI:** [Name — Directly Responsible Individual]
 > **Status:** Draft | Proposed | Approved | In Progress | Implemented | Verified | Rejected | Superseded

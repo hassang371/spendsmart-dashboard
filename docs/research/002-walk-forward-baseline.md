@@ -3,13 +3,13 @@
 > **Date:** 2026-05-05
 > **Scope:** Master plan `docs/plans/2026-04-17-prediction-engine-v1-master.md` §Stage 9
 > **Status:** Deferred (gating constraint is permanent for v1)
-> **RFC:** `docs/rfcs/RFC-006-time-series-evaluation-harness.md`
+> **RFC:** `docs/adr/ADR-006-time-series-evaluation-harness.md`
 
 ## Why this baseline cannot run today
 
-RFC-006's first walk-forward run is specified as: **default + grokking comparison on a stratified 50-user cohort**. The harness code (`packages/forecasting/eval/`) has been wired and unit-tested in Stage 7 (Task #8) and Stage 9-code (Task #22). Both shipped green. What's missing is data, not code.
+ADR-006's first walk-forward run is specified as: **default + grokking comparison on a stratified 50-user cohort**. The harness code (`packages/forecasting/eval/`) has been wired and unit-tested in Stage 7 (Task #8) and Stage 9-code (Task #22). Both shipped green. What's missing is data, not code.
 
-SCALE prod currently has exactly one user (Hassan) with ~3083 transactions spanning 2023-05-08 → 2026-04-16. The minimum viable cohort RFC-006 prescribes is 50 stratified users across at least three usage segments. Hassan ruled out synthetic-data generation explicitly during the v1 build-out:
+SCALE prod currently has exactly one user (Hassan) with ~3083 transactions spanning 2023-05-08 → 2026-04-16. The minimum viable cohort ADR-006 prescribes is 50 stratified users across at least three usage segments. Hassan ruled out synthetic-data generation explicitly during the v1 build-out:
 
 > "Right now we only have one user on supabase which is me … we need realistic datasets online and test on them or do synthetic data generation which I want to highly avoid, lets figure the testing part later and lets just build the whole thing first."
 
@@ -33,7 +33,7 @@ Run this baseline when ALL of:
 2. Stratification keys are populated: `users.segment` (income tier) + `users.activity_level` (txn density) + `users.region`.
 3. Compute budget approved: ~36h on a single M-series box (50 users × 30-day rolling windows × N folds × 2 model variants), or ≤4h on a dedicated A100 if grokking is enabled.
 
-Any of {1, 2, 3} missing → defer further. Do not run on a smaller cohort to "get something on the board" — RFC-006's reporting metrics are stratified and require ≥10 users per segment.
+Any of {1, 2, 3} missing → defer further. Do not run on a smaller cohort to "get something on the board" — ADR-006's reporting metrics are stratified and require ≥10 users per segment.
 
 ## When the run does happen
 
@@ -48,6 +48,6 @@ Until then, this file stands as the explicit acceptance record that Stage 9's ru
 
 ## Refs
 
-- `docs/rfcs/RFC-006-time-series-evaluation-harness.md`
+- `docs/adr/ADR-006-time-series-evaluation-harness.md`
 - `docs/plans/2026-04-17-prediction-engine-v1-master.md` §Stage 9
 - `packages/forecasting/eval/`

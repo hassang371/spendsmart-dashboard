@@ -1,11 +1,11 @@
-# RFC-002: Dual-Layer Auth & Tenant Isolation Policy
+# ADR-002: Dual-Layer Auth & Tenant Isolation Policy
 
-> **Doc ID:** RFC-002-auth-tenant-isolation
+> **Doc ID:** ADR-002-auth-tenant-isolation
 > **Date:** 2026-03-08
 > **DRI:** Hassan
 > **Status:** Implemented
 
-*Use this short-form RFC for small decisions. Use `rfc.md` for significant architectural changes.*
+*Use this short-form ADR for small decisions. Use `adr.md` for significant architectural changes.*
 
 ---
 

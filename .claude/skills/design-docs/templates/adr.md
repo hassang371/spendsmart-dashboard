@@ -1,4 +1,4 @@
-# RFC-NNN: [Title]
+# ADR-NNN: [Title]
 
 > **Date:** YYYY-MM-DD
 > **DRI:** [Name — Directly Responsible Individual]
