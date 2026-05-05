@@ -149,6 +149,8 @@ The skill bound to the spec-review situation lives in `.claude/skills-registry.m
 
 **Block commit until spec review passes.** A doc with open review issues is not ready to commit.
 
+**Scratch carve-out:** Step 4.5 is mandatory for any doc destined for `docs/` and a commit. Eval outputs, spike notes, and other scratch artifacts under `.claude/skills/*-workspace/` may skip review — but they must be deleted or promoted to `docs/` (with full review) before any code references them.
+
 ## Step 5: Commit Docs Before Code
 
 ```bash

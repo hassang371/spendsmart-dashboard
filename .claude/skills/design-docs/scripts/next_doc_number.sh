@@ -46,7 +46,9 @@ HIGHEST=$(ls "$DIR" 2>/dev/null | grep -oE '^[A-Z]*-?[0-9]+' | grep -oE '[0-9]+'
 if [ -z "$HIGHEST" ]; then
   NEXT=1
 else
-  NEXT=$((HIGHEST + 1))
+  # Force base-10 — without 10# prefix, bash treats leading-zero numbers (008, 012)
+  # as octal and silently miscounts (012 → 10 instead of 12).
+  NEXT=$((10#$HIGHEST + 1))
 fi
 
 # Pad to 3 digits
