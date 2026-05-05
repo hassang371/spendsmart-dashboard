@@ -2,7 +2,7 @@
 
 > **Doc ID:** 012-categorization-service-deepening
 > **Date:** 2026-05-05
-> **Status:** Draft
+> **Status:** Implemented
 > **DRI:** Hassan
 > **Type:** Feature LLD
 
@@ -212,3 +212,6 @@ None.
 | Date | Entry |
 |---|---|
 | 2026-05-05 | Draft created — design locked via grilling session (deepen not collapse, class + client-per-call, non-atomic feedback split) |
+| 2026-05-05 | DEVIATION: `get_classifier()` module-level singleton retained in service.py — `apps/api/domains/accounts/router.py` background fine-tuning task calls it directly outside FastAPI request context (no `app.state` access). `CategorizationService` uses the same singleton via its constructor so only one `TransactionClassifier` is loaded. |
+| 2026-05-05 | DEVIATION: `classify_batch_in_process()` compat shim added to service.py — `apps/api/domains/ingestion/router.py` calls it without user context (no adapter). Kept as module-level function wrapping `get_classifier().predict_batch()`. Ingestion tests updated accordingly. |
+| 2026-05-05 | Implementation matches design otherwise. Status → Implemented |

@@ -1,7 +1,9 @@
-"""Integration tests for the categorization API endpoints (v2).
+"""Integration tests for the categorization API endpoints.
 
-Tests the /classify/batch, /classify, /feedback, /metrics, and /models endpoints
-using the v2 TransactionClassifier (MiniLM + Cosine Similarity).
+Tests the HTTP layer via TestClient. CategorizationService injected via
+dependency override — no monkeypatching of free functions.
+
+Refs: docs/features/012-categorization-service-deepening.md
 """
 
 from unittest.mock import MagicMock
@@ -16,14 +18,65 @@ from apps.api.core.auth import (
     get_current_user_id,
     get_user_client,
 )
-from apps.api.domains.categorization.router import router
+from apps.api.domains.categorization.router import get_categorization_service, router
+from apps.api.domains.categorization.service import (
+    CategorizationService,
+    ClassificationResult,
+    FeedbackResult,
+    MetricsResult,
+)
+
+# ── Stub service ──────────────────────────────────────────────────────────────
+
+
+class _StubCategorizationService:
+    """Minimal stub — returns deterministic results without loading MiniLM."""
+
+    confidence_threshold = 0.75
+
+    def classify(self, description: str, user_id: str, client) -> ClassificationResult:
+        upper = description.upper()
+        if "UBER" in upper:
+            return ClassificationResult(category="Taxi & Rideshare", confidence=0.9)
+        if "ZOMATO" in upper or "SWIGGY" in upper:
+            return ClassificationResult(category="Dining", confidence=0.95)
+        if "NETFLIX" in upper:
+            return ClassificationResult(category="Subscriptions", confidence=0.88)
+        return ClassificationResult(category="Uncategorized", confidence=0.3)
+
+    def classify_batch(self, descriptions: list[str], user_id: str, client) -> list[ClassificationResult]:
+        return [self.classify(d, user_id, client) for d in descriptions]
+
+    def store_feedback(self, corrections, user_id: str, client) -> FeedbackResult:
+        rows = []
+        for key, value in corrections.items():
+            if isinstance(value, str):
+                rows.append({"corrected_category": value})
+            elif isinstance(value, list):
+                rows.extend([{"corrected_category": str(key)} for _ in value])
+        categories = sorted({r["corrected_category"] for r in rows})
+        return FeedbackResult(
+            stored_count=len(rows),
+            updated_categories=categories,
+            transaction_sync_failed=False,
+        )
+
+    def compute_metrics(self, user_id: str, client) -> MetricsResult:
+        return MetricsResult(
+            overall_accuracy=0.85,
+            confidence_histogram={"0.0-0.2": 0, "0.2-0.4": 0, "0.4-0.6": 0, "0.6-0.8": 1, "0.8-1.0": 2},
+            total_corrections=3,
+        )
+
+
+# ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def app():
-    app = FastAPI()
-    app.include_router(router, prefix="/api/v1")
-    return app
+    a = FastAPI()
+    a.include_router(router, prefix="/api/v1")
+    return a
 
 
 @pytest.fixture
@@ -32,73 +85,25 @@ def mock_user_client():
     mock_user = MagicMock()
     mock_user.id = "test-user-id"
     mock_client.auth.get_user.return_value = MagicMock(user=mock_user)
-
-    # Mock table calls for feedback insert
-    mock_table = MagicMock()
-    mock_client.table.return_value = mock_table
-    mock_table.insert.return_value = mock_table
-    mock_table.select.return_value = mock_table
-    mock_table.eq.return_value = mock_table
-    mock_table.execute.return_value = MagicMock(data=[])
-
     return mock_client
 
 
 @pytest.fixture
 def client(app, mock_user_client):
+    stub_service = _StubCategorizationService()
     app.dependency_overrides[get_user_client] = lambda: mock_user_client
     app.dependency_overrides[get_current_user_id] = lambda: "test-user-id"
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(id="test-user-id", email=None)
+    app.dependency_overrides[get_categorization_service] = lambda: stub_service
     c = TestClient(app)
     yield c
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(autouse=True)
-def mock_classify(monkeypatch):
-    """Mock the classify functions to avoid loading MiniLM model during tests."""
-
-    def _mock_classify_batch(texts):
-        results = []
-        for text in texts:
-            upper = text.upper()
-            if "UBER" in upper:
-                results.append({"category": "Taxi & Rideshare", "confidence": 0.9})
-            elif "ZOMATO" in upper or "SWIGGY" in upper:
-                results.append({"category": "Dining", "confidence": 0.95})
-            elif "NETFLIX" in upper:
-                results.append({"category": "Subscriptions", "confidence": 0.88})
-            elif "AIRBNB" in upper:
-                results.append({"category": "Hotels & Stays", "confidence": 0.92})
-            else:
-                results.append({"category": "Uncategorized", "confidence": 0.3})
-        return results
-
-    def _mock_classify_single(text):
-        return _mock_classify_batch([text])[0]
-
-    class _MockClassifier:
-        confidence_threshold = 0.75
-
-    monkeypatch.setattr(
-        "apps.api.domains.categorization.router.classify_batch_in_process",
-        _mock_classify_batch,
-    )
-    monkeypatch.setattr(
-        "apps.api.domains.categorization.router.classify_single",
-        _mock_classify_single,
-    )
-    monkeypatch.setattr(
-        "apps.api.domains.categorization.router.get_classifier",
-        lambda: _MockClassifier(),
-    )
-
-
-# ─── /classify/batch tests ───
+# ── /classify/batch ───────────────────────────────────────────────────────────
 
 
 def test_batch_classify_returns_predictions(client):
-    """POST /classify/batch returns predictions list with v2 categories."""
     payload = {
         "descriptions": [
             "Uber trip to airport",
@@ -118,22 +123,19 @@ def test_batch_classify_returns_predictions(client):
 
 
 def test_batch_classify_empty_descriptions(client):
-    """POST /classify/batch with empty list returns 400."""
     response = client.post("/api/v1/categorization/classify/batch", json={"descriptions": []})
     assert response.status_code == 400
 
 
 def test_batch_classify_missing_field(client):
-    """POST /classify/batch without descriptions field returns 422."""
     response = client.post("/api/v1/categorization/classify/batch", json={"texts": ["something"]})
     assert response.status_code == 422
 
 
-# ─── /classify (single) tests ───
+# ── /classify ─────────────────────────────────────────────────────────────────
 
 
 def test_single_classify_food(client):
-    """POST /classify returns correct category for known food merchant."""
     response = client.post(
         "/api/v1/categorization/classify",
         json={"description": "Swiggy food order"},
@@ -145,7 +147,6 @@ def test_single_classify_food(client):
 
 
 def test_single_classify_unknown(client):
-    """POST /classify returns Uncategorized for unknown description."""
     response = client.post(
         "/api/v1/categorization/classify",
         json={"description": "Random store purchase"},
@@ -155,11 +156,10 @@ def test_single_classify_unknown(client):
     assert data["category"] == "Uncategorized"
 
 
-# ─── /feedback tests ───
+# ── /feedback ─────────────────────────────────────────────────────────────────
 
 
 def test_feedback_accepts_corrections(client):
-    """POST /feedback accepts category correction payload."""
     payload = {
         "corrections": {
             "Dining": ["Uber Eats delivery"],
@@ -175,16 +175,14 @@ def test_feedback_accepts_corrections(client):
 
 
 def test_feedback_empty_corrections(client):
-    """POST /feedback with empty corrections returns 400."""
     response = client.post("/api/v1/categorization/feedback", json={"corrections": {}})
     assert response.status_code == 400
 
 
-# ─── /models tests ───
+# ── /models ───────────────────────────────────────────────────────────────────
 
 
 def test_models_endpoint(client):
-    """GET /models returns v2 model info."""
     response = client.get("/api/v1/categorization/models")
 
     assert response.status_code == 200

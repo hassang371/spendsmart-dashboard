@@ -272,8 +272,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("tft_cache_subscriber_unavailable", error=str(e))
 
-    # Eagerly initialize the MiniLM classifier in background thread
-    # so the first import doesn't wait for model loading.
+    # Eagerly initialize CategorizationService (loads MiniLM) in a background
+    # thread so the first request doesn't wait for model loading.
     # /ready returns 503 until this completes.
     import asyncio
 
@@ -281,9 +281,13 @@ async def lifespan(app: FastAPI):
 
     async def _warmup_classifier():
         try:
-            from apps.api.domains.categorization.service import get_classifier
+            from apps.api.domains.categorization.service import (
+                CategorizationService,
+                get_classifier,
+            )
 
-            await asyncio.to_thread(get_classifier)
+            classifier = await asyncio.to_thread(get_classifier)
+            app.state.categorization_service = CategorizationService(classifier)
             logger.info("classifier_warmed_up")
         except Exception as e:
             logger.warning("classifier_warmup_failed", error=str(e))

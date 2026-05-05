@@ -2,74 +2,119 @@
 
 Bug 4: feedback endpoint only wrote to training_corrections. The training
 pipeline reads transactions WHERE is_manual=True — corrections were ignored.
+
+These tests verify the fix lives in CategorizationService.store_feedback()
+(the layer responsible since LLD-012 deepening).
 """
 
-import inspect
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from apps.api.core.auth import CurrentUser, get_current_user, get_current_user_id, get_user_client
+from apps.api.domains.categorization.router import get_categorization_service, router
+from apps.api.domains.categorization.service import CategorizationService, FeedbackResult
 
 
-def test_feedback_handler_updates_transactions():
-    """submit_feedback must update the transactions table after storing corrections."""
-    from apps.api.domains.categorization.router import submit_feedback
+class _RecordingService:
+    """Stub that records store_feedback calls for assertion."""
 
-    source = inspect.getsource(submit_feedback)
-    assert (
-        '"transactions"' in source or "'transactions'" in source
-    ), "submit_feedback must update the 'transactions' table to set is_manual=True."
-    assert "is_manual" in source, "submit_feedback must set is_manual=True on matching transactions."
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def store_feedback(self, corrections, user_id, client) -> FeedbackResult:
+        self.calls.append({"corrections": corrections, "user_id": user_id})
+        categories = []
+        for key, value in corrections.items():
+            if isinstance(value, str):
+                categories.append(value)
+            elif isinstance(value, list):
+                categories.append(str(key))
+        return FeedbackResult(
+            stored_count=sum(1 if isinstance(v, str) else len(v) for v in corrections.values()),
+            updated_categories=sorted(set(categories)),
+            transaction_sync_failed=False,
+        )
 
 
-def test_feedback_calls_transactions_update_for_each_correction():
-    """One transactions.update() call is made per correction description."""
-    import asyncio
+@pytest.fixture
+def app_with_recording_service():
+    recording_service = _RecordingService()
+    a = FastAPI()
+    a.include_router(router, prefix="/api/v1")
+    mock_client = MagicMock()
+    a.dependency_overrides[get_user_client] = lambda: mock_client
+    a.dependency_overrides[get_current_user_id] = lambda: "uid-1"
+    a.dependency_overrides[get_current_user] = lambda: CurrentUser(id="uid-1", email=None)
+    a.dependency_overrides[get_categorization_service] = lambda: recording_service
+    return a, recording_service
 
-    from apps.api.domains.categorization.router import submit_feedback
-    from apps.api.domains.categorization.schemas import FeedbackRequest
 
-    client_mock = MagicMock()
-    # training_corrections insert
-    client_mock.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[])
-    # transactions update chain: .update().eq().eq().execute()
+def test_feedback_handler_calls_store_feedback_with_corrections(app_with_recording_service):
+    """submit_feedback delegates to service.store_feedback with the corrections dict."""
+    app, recording_service = app_with_recording_service
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/categorization/feedback",
+        json={"corrections": {"Swiggy order": "Food", "Uber ride": "Transport"}},
+    )
+
+    assert response.status_code == 200
+    assert len(recording_service.calls) == 1
+    assert recording_service.calls[0]["user_id"] == "uid-1"
+    assert "Swiggy order" in recording_service.calls[0]["corrections"]
+
+
+def test_feedback_calls_store_feedback_for_list_shaped_corrections(app_with_recording_service):
+    """List-valued corrections (category → [descriptions]) forwarded to service."""
+    app, recording_service = app_with_recording_service
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/categorization/feedback",
+        json={"corrections": {"Food": ["Swiggy order", "Zomato order"]}},
+    )
+
+    assert response.status_code == 200
+    assert len(recording_service.calls) == 1
+    assert "Food" in recording_service.calls[0]["corrections"]
+
+
+def test_feedback_transactions_update_in_service(fake_classifier=None):
+    """CategorizationService.store_feedback writes to transactions table (is_manual=True).
+
+    This is the behavior the original regression guarded — now lives in the service.
+    """
+    from packages.categorization.classifier import TransactionClassifier
+
+    clf = MagicMock(spec=TransactionClassifier)
+    clf.embedding_dim = 384
+    clf._category_names = ["Food", "Transport"]
+    clf.confidence_threshold = 0.75
+
+    insert_chain = MagicMock()
+    insert_chain.execute.return_value = MagicMock(data=[])
     update_chain = MagicMock()
-    client_mock.table.return_value.update.return_value = update_chain
     update_chain.eq.return_value = update_chain
     update_chain.execute.return_value = MagicMock(data=[])
-
-    req = FeedbackRequest(corrections={"Swiggy order": "Food", "Uber ride": "Transport"})
-    # Call the handler directly — user_id and client injected as kwargs (bypasses Depends)
-    asyncio.run(submit_feedback(req, user_id="uid-1", client=client_mock))
-
-    # One update call per correction (check transactions table was called)
-    update_calls = [c for c in client_mock.table.call_args_list if c.args and c.args[0] == "transactions"]
-    assert len(update_calls) >= 2, f"Expected 2 transaction update calls, got {len(update_calls)}"
-    assert (
-        update_chain.execute.call_count >= 2
-    ), f"Expected at least 2 .execute() calls on transactions update chain, got {update_chain.execute.call_count}"
-
-
-def test_feedback_calls_transactions_update_for_list_shaped_corrections():
-    """One transactions.update() call is made per description in a list-valued FeedbackRequest."""
-    import asyncio
-
-    from apps.api.domains.categorization.router import submit_feedback
-    from apps.api.domains.categorization.schemas import FeedbackRequest
-
+    table_mock = MagicMock()
+    table_mock.insert.return_value = insert_chain
+    table_mock.update.return_value = update_chain
     client_mock = MagicMock()
-    # training_corrections insert
-    client_mock.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[])
-    # transactions update chain: .update().eq().eq().execute()
-    update_chain = MagicMock()
-    client_mock.table.return_value.update.return_value = update_chain
-    update_chain.eq.return_value = update_chain
-    update_chain.execute.return_value = MagicMock(data=[])
+    client_mock.table.return_value = table_mock
 
-    # List-valued shape: category → [description1, description2]
-    req = FeedbackRequest(corrections={"Food": ["Swiggy order", "Zomato order"]})
-    asyncio.run(submit_feedback(req, user_id="uid-1", client=client_mock))
+    service = CategorizationService(clf)
+    result = service.store_feedback(
+        {"Swiggy order": "Food", "Uber ride": "Transport"},
+        user_id="uid-1",
+        client=client_mock,
+    )
 
-    # One update call per description in the list (2 descriptions → 2 calls)
-    update_calls = [c for c in client_mock.table.call_args_list if c.args and c.args[0] == "transactions"]
-    assert len(update_calls) >= 2, f"Expected 2 transaction update calls, got {len(update_calls)}"
-    assert (
-        update_chain.execute.call_count >= 2
-    ), f"Expected at least 2 .execute() calls on transactions update chain, got {update_chain.execute.call_count}"
+    assert result.stored_count == 2
+    # Verify transactions table was called for is_manual update
+    transactions_calls = [c for c in client_mock.table.call_args_list if c.args and c.args[0] == "transactions"]
+    assert len(transactions_calls) >= 2, "Expected one transactions.update() call per correction"
+    assert result.transaction_sync_failed is False

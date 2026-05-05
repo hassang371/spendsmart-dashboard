@@ -47,6 +47,21 @@ class MetricsResult:
     model: str = "minilm-cosine-v2"
 
 
+# ── Shared classifier singleton ───────────────────────────────────────────────
+# Background tasks (e.g. accounts adapter fine-tuning) need direct access to
+# the TransactionClassifier without going through the FastAPI app.state.
+# get_classifier() returns the same instance that CategorizationService uses.
+
+_classifier: TransactionClassifier | None = None
+
+
+def get_classifier() -> TransactionClassifier:
+    global _classifier
+    if _classifier is None:
+        _classifier = TransactionClassifier()
+    return _classifier
+
+
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
@@ -71,6 +86,19 @@ def _build_correction_rows(corrections: dict[str, str | list[str]], user_id: str
             for description in value:
                 rows.append({"user_id": user_id, "description": str(description), "corrected_category": str(key)})
     return rows
+
+
+# ── Backward-compat helpers (used by ingestion router) ───────────────────────
+# Ingestion calls classify_batch_in_process without user context (no adapter).
+
+
+def classify_batch_in_process(
+    descriptions: list[str],
+    user_id: str | None = None,
+    client: Client | None = None,
+) -> list[dict]:
+    clf = get_classifier()
+    return clf.predict_batch(descriptions)
 
 
 # ── Service ───────────────────────────────────────────────────────────────────
