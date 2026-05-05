@@ -81,3 +81,6 @@ models/
 *.pth
 *.ckpt
 *.bin
+
+# PyTorch Lightning training logs (local-only)
+lightning_logs/

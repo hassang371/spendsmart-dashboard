@@ -80,39 +80,6 @@ Local overrides to settings (gitignored). Developer-specific configuration that 
 
 ---
 
-## .gemini/ — Gemini CLI Context
-
-Gemini CLI configuration for developers who prefer it over Claude Code. It mirrors the intent of `.claude/` but uses Gemini's native file format.
-
-| File | Purpose |
-|---|---|
-| `context-rules.md` | Gemini session rules — equivalent to `.claude/CLAUDE.md` for Gemini. Defines the same workflow gates and principles. |
-| `tech-stack.md` | Stack reference loaded at session start so Gemini knows the project's technologies. |
-| `current_state.md` | Session state file — Gemini writes its current task state here for persistence across context resets. |
-
-### .gemini/knowledge/
-
-Domain knowledge files loaded by Gemini on demand. Each covers a topic that helps the AI reason correctly about complex areas.
-
-| File | Purpose |
-|---|---|
-| `context-compression.md` | How to compress context without losing signal. |
-| `context-degradation.md` | How to detect and recover from context degradation. |
-| `context-fundamentals.md` | Core principles of effective AI context management. |
-| `context-optimization.md` | Techniques for optimising AI session context. |
-| `condition-based-waiting.md` | Pattern for waiting for conditions before proceeding (vs. polling loops). |
-| `defense-in-depth.md` | Security layering principles. |
-| `evaluation.md` | How to evaluate ML model outputs. |
-| `filesystem-context.md` | How to use the filesystem as persistent context. |
-| `memory-systems.md` | AI memory system patterns. |
-| `multi-agent-patterns.md` | Patterns for coordinating multiple AI agents. |
-| `persuasion-principles.md` | Principles for framing AI prompts effectively. |
-| `project-development.md` | Project development workflow knowledge. |
-| `testing-anti-patterns.md` | Common testing mistakes and how to avoid them. |
-| `tool-design.md` | How to design good AI tool interfaces. |
-
----
-
 ## .github/ — CI/CD
 
 GitHub Actions workflows that run on every push and pull request.

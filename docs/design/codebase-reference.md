@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document is the authoritative reference for every file and directory in the SCALE repository. Read it top-down for a full orientation, or jump to a section by layer. For AI development tooling (`.claude/`, `.gemini/`, `.github/`), see [`ai-tooling-guide.md`](ai-tooling-guide.md).
+This document is the authoritative reference for every file and directory in the SCALE repository. Read it top-down for a full orientation, or jump to a section by layer. For AI development tooling (`.claude/`, `.github/`), see [`ai-tooling-guide.md`](ai-tooling-guide.md).
 
 ---
 
@@ -486,7 +486,6 @@ These directories contain AI assistant configuration, CI/CD, and development too
 | Directory | Purpose | Details |
 |---|---|---|
 | `.claude/` | Claude Code configuration — rules, workflows, skills, settings | See [`ai-tooling-guide.md`](ai-tooling-guide.md) |
-| `.gemini/` | Gemini CLI context, rules, and knowledge files | See [`ai-tooling-guide.md`](ai-tooling-guide.md) |
 | `.github/` | GitHub Actions CI/CD workflows and Dependabot config | See [`ai-tooling-guide.md`](ai-tooling-guide.md) |
 | `.git/` | Git object store — managed by Git, never edit manually | — |
 | `.venv/` | Python virtual environment — gitignored, recreated via `make install` | — |

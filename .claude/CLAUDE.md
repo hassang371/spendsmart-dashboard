@@ -55,7 +55,6 @@ docs/
   workflow.md          # Master workflow (situation language, no skill names)
   skills-registry.md   # Situation → skill binding table
   rules/               # Auto-loaded rules (documentation-gate, skills-routing, etc.)
-  workflows/           # On-demand reference workflows — read explicitly, NOT auto-loaded
   skills/              # Project skills (design-docs, website-cloner)
   CLAUDE.md            # This file
 ```
