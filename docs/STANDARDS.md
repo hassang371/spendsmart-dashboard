@@ -14,6 +14,8 @@
 | Bug Report | `docs/bugs/` | `BUG-NNN-kebab-name.md` | Yes (BUG-001…) |
 | ADR | `docs/adr/` | `ADR-NNN-kebab-name.md` | Yes (ADR-001…) |
 | Design Doc (living) | `docs/design/` | `kebab-name.md` | No |
+| Postmortem | `docs/postmortems/` | `POSTMORTEM-YYYY-MM-DD-kebab-name.md` | No (date-prefixed) |
+| Runbook | `docs/runbooks/` | `RUNBOOK-kebab-name.md` | No |
 | Policies | `docs/policies/` | `kebab-name.md` | No |
 | Implementation Plan | `docs/plans/` | `YYYY-MM-DD-kebab-name.md` | No (date-prefixed) |
 | Research | `docs/research/` | `NNN-kebab-name.md` | Yes (001, 002…) |
@@ -29,9 +31,7 @@
 **`docs/archive/`** holds superseded or outdated docs. Move docs here instead of deleting them.
 No naming convention enforced — keep the original filename.
 
-**Deferred (not yet created):**
-- `docs/postmortems/` — add when first user-facing incident occurs (until then, Bug Reports cover)
-- `docs/runbooks/` — add when on-call obligations begin
+**Postmortem + Runbook templates ship with the skill** but the directories are created on first use. Until SCALE has a user-facing incident, Bug Reports continue to cover incident-shaped events.
 
 ---
 
@@ -54,6 +54,8 @@ Additional fields by doc type:
 | Bug Report | `Severity: Critical \| High \| Medium \| Low` |
 | ADR | `OKR Alignment: [which objective this serves]` |
 | Design Doc | `Last Updated: YYYY-MM-DD`, `Version: 1.x` |
+| Postmortem | `Severity: SEV1 \| SEV2 \| SEV3 \| SEV4` |
+| Runbook | `Severity: P1 \| P2 \| P3` (page priority handled) |
 | Implementation Plan | `LLD: [path to Feature LLD or Bug Report this implements]` |
 | Research | `Scope: [what was researched]`, `Researchers: [who/what conducted the research]` |
 
@@ -85,6 +87,18 @@ brainstorm/grilling skills), then record as ADR.
 ### Design Doc
 
 `Current` | `Outdated` | `Deprecated`
+
+### Postmortem
+
+`Draft` → `Reviewed` → `Action Items Tracked` → `Closed`
+
+Closed only when all P0/P1 action items have shipped. P2 items can extend beyond closure if tracked elsewhere.
+
+### Runbook
+
+`Current` | `Outdated` | `Deprecated`
+
+Runbooks rot fastest of all doc types. Update after every incident the runbook was used in (working or not). Mark `Outdated` if the system it describes has changed materially without runbook update.
 
 **Status update rule:** Update the doc status **before or alongside** the final implementation commit — never after.
 
@@ -128,15 +142,14 @@ The Iteration Log is what prevents the multi-doc-spam bug pattern: one BUG-NNN d
 
 ### ADR (all required)
 
-1. Context (the situation that forced a decision)
-2. Decision (what was chosen — direct, no hedging)
-3. Status (Draft / Proposed / Approved / Implemented / Superseded / Rejected)
-4. Consequences (what becomes easier, what becomes harder, what it commits to)
-5. Related Documents
-6. Changelog (append-only — add entries as status changes)
+1. Context (the situation that forced a decision — forces and constraints, not options)
+2. Decision (what was chosen — direct, declarative, no hedging)
+3. Consequences (positive / negative / neutral commitments)
+4. Alternatives Briefly Rejected (two-sentence dismissals — if alternatives need more, this is an RFC, not an ADR)
+5. Related Documents (Supersedes / Superseded by / Related)
+6. Changelog (append-only — add entries on each status transition)
 
-ADRs record decisions. They are immutable in spirit — if the decision changes, write a new
-ADR that supersedes the old one (status `Superseded`).
+Status lives in the metadata block, not a separate section. ADRs record decisions and are immutable in spirit — if the decision changes, write a new ADR with `Supersedes: ADR-NNN` and set the prior ADR's status to `Superseded`.
 
 ### Design Doc — Living Document (all required)
 
@@ -145,6 +158,34 @@ ADR that supersedes the old one (status `Superseded`).
 3. Domain/Module/Endpoint Details
 4. Key Decisions (links to ADRs)
 5. Changelog (append-only, newest at top)
+
+### Postmortem (all required)
+
+1. Summary (2-3 sentences)
+2. Impact (users affected, duration, SLO/revenue impact, data integrity)
+3. Timeline (UTC timestamps from logs/pagers)
+4. Root Cause (with Mermaid diagram, trigger + underlying cause)
+5. What Went Well
+6. What Went Wrong
+7. Where We Got Lucky (near-miss surfacing — highest signal section)
+8. Action Items (priority, owner, due date, tracking link — trackable, not aspirational)
+9. Lessons Learned (pattern + rule change)
+10. Related Documents
+11. Changelog
+
+Postmortems are blameless. Refer to roles, not names ("the on-call engineer", not "Jane").
+
+### Runbook (all required)
+
+1. When This Fires (alert name, symptom, page priority)
+2. Quick Reference (one-line 3am-friendly TL;DR)
+3. Diagnosis (numbered steps, each with command + expected output)
+4. Mitigation (ordered by safety — least risky first)
+5. Verification (checkboxes for confirming recovery)
+6. Escalation (who to page when mitigation fails)
+7. Background (optional — context for non-paging reading)
+8. Related Documents
+9. Changelog (update after every incident the runbook was used in)
 
 ### Policy (all required)
 
@@ -185,8 +226,10 @@ notes, not published docs.
 |---|---|---|
 | Feature LLD | 1 | Sequence (API flows) or Activity (business logic) |
 | Bug Report | 1 | Sequence showing the bug's data path |
-| ADR | 0–2 | Optional — current state vs proposed state if helpful |
+| ADR | 0–1 | Optional — current → proposed if architecture change |
 | Design Doc | 3+ | Architecture + data flow + deployment |
+| Postmortem | 1 | Sequence showing failure path (trigger → system → users) |
+| Runbook | 0 | Optional |
 | Implementation Plan | 0 | Optional (code blocks serve as the primary visual) |
 | Research | 0 | Optional (tables and comparison matrices serve as the primary visual) |
 | Investigation | 0 | Optional |
@@ -207,6 +250,8 @@ notes, not published docs.
 | Bug Report | `BUG-NNN-kebab.md` | `BUG-002-duplicate-ingestion.md` |
 | ADR | `ADR-NNN-kebab.md` | `ADR-002-multi-currency.md` |
 | Design Doc | `system-component.md` | `api-design.md` |
+| Postmortem | `POSTMORTEM-YYYY-MM-DD-kebab.md` | `POSTMORTEM-2026-05-06-auth-token-leak.md` |
+| Runbook | `RUNBOOK-kebab.md` | `RUNBOOK-celery-queue-backlog.md` |
 | Policy | `topic-policy.md` | `migration-policy.md` |
 | Implementation Plan | `YYYY-MM-DD-kebab.md` | `2026-04-06-prediction-engine.md` |
 | Research | `NNN-kebab.md` (3-digit zero-padded) | `001-prediction-engine-model-selection.md` |
@@ -245,12 +290,21 @@ After writing or updating ANY doc, run a spec review before committing. The skil
 the spec-review situation lives in `.claude/skills-registry.md` — workflow files do not name
 the skill directly so plugin changes don't break this rule.
 
+The review evaluates four named gates (see `.claude/skills/design-docs/references/spec-review-gates.md`):
+
+1. **Completeness** — all required sections per this document are present and filled
+2. **Evidence** — every claim has a backing artifact (file:line, benchmark, log, citation)
+3. **Clarity** — a fresh reader can act on the doc without needing prior conversation context
+4. **Consistency** — doc agrees with itself, peer docs, and code
+
+Process:
+
 1. Run spec review (registry: spec-review situation)
-2. Fix all issues found
-3. Re-run until clean (max 3 iterations)
+2. Fix all issues found, naming the failing gate
+3. Re-run until clean (max 3 iterations; surface to user if still failing)
 4. Commit only after spec review passes
 
-This applies to all doc types: Feature LLDs, Bug Reports, ADRs, Design Docs, Policies.
+This applies to all doc types: Feature LLDs, Bug Reports, ADRs, Postmortems, Runbooks, Design Docs, Policies.
 
 ---
 
