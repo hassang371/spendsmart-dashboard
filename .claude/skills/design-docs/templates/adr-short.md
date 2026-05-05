@@ -3,41 +3,38 @@
 > **Doc ID:** ADR-NNN-kebab-name
 > **Date:** YYYY-MM-DD
 > **DRI:** [Name — Directly Responsible Individual]
-> **Status:** Draft | Proposed | Approved | In Progress | Implemented | Verified | Rejected | Superseded
+> **Status:** Draft | Proposed | Approved | Implemented | Superseded | Rejected
 
----
+Short-form ADR for routine architectural decisions (≤4 sections, no major migration impact). For significant decisions with multi-month consequences, use `adr.md` instead.
 
-## Problem Statement
+## Context
 
-What problem are we solving? Why now? (1–3 sentences max)
+What situation forced the decision? 1-3 sentences max. State the forces, not options.
 
 ## Decision
 
-What was chosen, and why?
+> **We will [chosen approach].**
 
-Include a diagram if the decision involves architecture or data flow:
+One paragraph of supporting detail. Diagram only if architecture changes:
 
 ```mermaid
 graph LR
-    A[Current] -->|Change| B[Proposed]
+    A[Current] -->|Change| B[Decided]
 ```
 
-## Alternatives Considered
+## Consequences
 
-| Option | Why rejected |
-|---|---|
-| Option A | [Reason] |
-| Option B | [Reason] |
-
-## Impact
-
-What changes as a result of this decision?
-
-- [File / system affected]
-- [Behavior changed]
-- [Migration required? Yes/No]
+- **Positive:** [What this enables]
+- **Negative:** [What this costs]
+- **Commitment:** [What we're locked into]
 
 ## Related Documents
 
-- Feature LLD: [Link if applicable]
-- HLD: [Link to affected HLD]
+- Supersedes: [ADR-NNN or "none"]
+- Related: [Feature LLDs, Design Docs affected]
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| YYYY-MM-DD | Initial draft — Status: Draft |

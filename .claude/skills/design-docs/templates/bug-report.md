@@ -1,7 +1,8 @@
 # Bug Report: [Brief Description]
 
-> **Doc ID:** BUG-NNN-description
+> **Doc ID:** BUG-NNN-kebab-name
 > **Date:** YYYY-MM-DD
+> **DRI:** [Name — Directly Responsible Individual]
 > **Severity:** Critical | High | Medium | Low
 > **Status:** Investigating | Root Cause Found | In Progress | Fix Applied | Verified
 
@@ -44,29 +45,49 @@ sequenceDiagram
 ### Root Cause
 
 Why did this happen? Trace the data flow backward from the symptom to the source.
+Cite specific files + lines.
 
 ### Contributing Factors
 
-- [What made this possible? Missing validation? Race condition?]
+- [What made this possible? Missing validation? Race condition? Doc drift?]
 
 ## Fix Description
 
 ### Changes Made
 
-| File              | Change      |
-| ----------------- | ----------- |
+| File | Change |
+|------|--------|
 | `path/to/file.ts` | Description |
 
 ### Why This Fix Works
 
-[Explain the fix logic, not just what changed]
+[Explain the fix logic, not just what changed. What invariant is now preserved?]
+
+## Iteration Log
+
+One entry per attempt. The Bug Report doc spans all attempts — never split a bug across multiple BUG-NNN docs. `fix:` commit only after the user explicitly confirms resolution.
+
+| # | Date | Hypothesis | Change | Observed Result | User Verification |
+|---|------|------------|--------|-----------------|-------------------|
+| 1 | YYYY-MM-DD | [What you thought caused it] | [What you changed] | [What happened after] | Pending / Confirmed / Still broken |
+
+If iteration #1 fails (user says "still broken"), append iteration #2 below — do not overwrite.
 
 ## Regression Prevention
 
-- **Test added:** [Name of test that catches this bug]
-- **Guard added:** [Validation, constraint, or check that prevents recurrence]
+- **Test added:** [Exact test function name + path — e.g. `apps/api/tests/test_auth.py::test_token_expiry_boundary`]
+- **Guard added:** [Validation, constraint, or runtime check that prevents recurrence]
 
 ## Related Documents
 
-- Feature: [Link to feature LLD if applicable]
-- HLD: [Link to affected HLD if applicable]
+- Feature LLD: [Link to related Feature LLD if applicable]
+- Design Doc: [Link to affected component Design Doc — e.g. `docs/design/api-design.md`]
+- ADR: [Link to ADR if the bug exposes a decision that needs revisiting]
+
+## Changelog
+
+Append-only. Add an entry at creation, on each status transition, and on each iteration.
+
+| Date | Change |
+|------|--------|
+| YYYY-MM-DD | Initial draft — Status: Investigating |
