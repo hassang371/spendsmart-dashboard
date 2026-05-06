@@ -60,7 +60,7 @@ These are recorded in `skills-registry.md` under "Override rules." Common overri
 | Override | Resolution |
 |---|---|
 | Save path | Skill saves to plugin path → re-route to project path. E.g. plans go to `docs/plans/`, never `docs/superpowers/specs/`. |
-| Doc vocabulary | Skill produces PRD-style doc → suppress, use `design-docs` skill for SCALE LLD vocab. |
+| Doc vocabulary | Skill produces PRD-style doc → suppress, use `orchestra:design-docs` skill for SCALE LLD vocab. |
 | Workflow shape | Skill prescribes horizontal-slice TDD → enforce vertical-slice principle (mattpocock-skills:tdd shape wins). |
 | Duplicate skills | Two skills with similar names (e.g. `caveman:caveman` and `mattpocock-skills:caveman`) → registry chooses one canonical. Use only the canonical. |
 

@@ -16,7 +16,7 @@
 | Discovery / investigation defect-found | (no skill — Discovery Gate rule fires) | — | See `documentation-gate.md` Gate 1 |
 | Pre-design interview / brainstorm (project-aware) | `mattpocock-skills:grill-with-docs` | mattpocock | Reads CONTEXT.md + ADRs |
 | Pre-design interview (no project context yet) | `mattpocock-skills:grill-me` | mattpocock | Fallback when no docs to ground in |
-| Design doc creation (LLD / Bug / ADR) | `design-docs` | project | Project-owned, knows SCALE taxonomy |
+| Design doc creation (LLD / Bug / ADR) | `orchestra:design-docs` | orchestra (user-scoped plugin) | Replaces former project-scoped `design-docs` skill (deleted 2026-05-06). Auto-detects `.claude/orchestra.json`. |
 | Spec review on docs | `superpowers:requesting-code-review` | superpowers | Structured doc critique |
 | Plan writing (multi-step) | `superpowers:writing-plans` | superpowers | **Override save path:** `docs/plans/YYYY-MM-DD-name.md` (NOT `docs/superpowers/specs/`) |
 | Plan execution (subagents) | `superpowers:executing-plans` or `superpowers:subagent-driven-development` | superpowers | |
@@ -71,7 +71,7 @@ Future plugins disabled-but-known would be listed here.
 |---|---|---|---|
 | A | Save plan path | superpowers:writing-plans | `docs/plans/YYYY-MM-DD-name.md` (not `docs/superpowers/specs/`) |
 | B | Save design path | superpowers:brainstorming | `docs/features/`, `docs/bugs/`, `docs/adr/` per type (not `docs/superpowers/specs/`) |
-| D | Doc taxonomy | mattpocock-skills:to-prd | Don't use. Use `design-docs` skill for LLDs instead. |
+| D | Doc taxonomy | mattpocock-skills:to-prd | Don't use. Use `orchestra:design-docs` skill for LLDs instead. |
 | E | TDD execution shape | superpowers:test-driven-development | Iron-law principle preserved as rule. Execute via mattpocock-skills:tdd vertical slicing. |
 | F | Caveman duplicate | mattpocock-skills:caveman | Use `caveman:caveman` (real plugin). Mattpocock copy is suppressed. |
 

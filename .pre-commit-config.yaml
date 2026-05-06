@@ -8,7 +8,9 @@ repos:
       - id: check-merge-conflict
       - id: check-json
       - id: check-yaml
-        args: [--multi]
+        args: [--multi, --unsafe]
+        # --unsafe required for mkdocs.yml (mkdocs-mermaid2-plugin uses
+        # !!python/name:mermaid2.fence_mermaid_custom YAML tag).
       - id: check-toml
       - id: check-added-large-files
       - id: detect-private-key

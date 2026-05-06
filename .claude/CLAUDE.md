@@ -55,7 +55,7 @@ docs/
   workflow.md          # Master workflow (situation language, no skill names)
   skills-registry.md   # Situation → skill binding table
   rules/               # Auto-loaded rules (documentation-gate, skills-routing, etc.)
-  skills/              # Project skills (design-docs, website-cloner)
+  skills/              # Project skills (website-cloner) — design-docs delegated to orchestra plugin (user scope)
   CLAUDE.md            # This file
 ```
 

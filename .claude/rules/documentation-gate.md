@@ -22,7 +22,7 @@ When you are investigating, researching, or analysing code and you find:
 
 **You must:**
 1. STOP — do not discuss solutions, do not continue analysis, do not propose improvements
-2. Create `docs/bugs/BUG-NNN-name.md` immediately (design-docs skill)
+2. Create `docs/bugs/BUG-NNN-name.md` immediately (orchestra:design-docs skill)
 3. Run spec review on it (situation: spec review — see `.claude/skills-registry.md`)
 4. Commit the bug report: `git commit -m "docs: add BUG-NNN — <name>"`
 5. Only then return to investigation or proceed to brainstorm the fix
