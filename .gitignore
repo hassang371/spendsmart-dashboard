@@ -87,6 +87,10 @@ lightning_logs/
 .claude/skills/design-docs-workspace/
 # orchestra (added by orchestra:init)
 .claude/orchestra.local.json
+.claude/scheduled_tasks.lock
 docs/investigations/
 .eval-workspace/
 site/
+
+# orchestra v1.7.0 SCALE migration backup (manual cleanup after 1 week)
+.scale-migration-backup/

@@ -113,3 +113,4 @@ When a plugin is removed:
 1. Find rows in the table bound to its skills
 2. Re-bind to next-best alternative OR mark as "no candidate"
 3. Update workflow rules if a no-candidate situation is critical
+| commit-time decision (any commit, status flip, supersession) | orchestra:commit |

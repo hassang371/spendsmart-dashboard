@@ -71,33 +71,9 @@ a review pass. The review for a minor update is fast — the discipline is the p
 
 ---
 
-## Gate 4: Commit Gate (fires before every fix: or feat: commit)
+## Gate 4 / Gate 5 — moved to orchestra:commit
 
-Every `fix:` commit must have: `Refs: docs/bugs/BUG-NNN-name.md`
-Every `feat:` commit must have: `Refs: docs/features/NNN-name.md` (or `docs/adr/ADR-NNN-name.md`)
-
-A commit without a `Refs:` line for these prefixes is an **orphan commit** and is not allowed.
-If no doc exists, stop and create it first.
-
-### Bug iteration override
-
-For bug-iteration loops:
-- During iteration: WIP commits OK (`wip:` prefix), no `fix:` until user confirms
-- Append iteration entries to BUG-NNN changelog rather than fragment into multiple `fix:` commits
-- One BUG-NNN doc lifetime spans all iterations
-- `fix:` commit only after explicit user confirmation that the bug is resolved
-
----
-
-## Gate 5: Implementation Sync Gate (fires before verification)
-
-Before running the verification suite (Step 5), re-read the design doc and check:
-
-- Did implementation deviate from the documented design?
-- If YES: add a `DEVIATION:` entry to the doc changelog explaining what changed and why
-- If NO: add a confirmation entry: `Implementation matches design. Status → Implemented`
-
-Commit this doc update before running verification. Never verify against a stale doc.
+Gate 4 (Commit) and Gate 5 (Implementation Sync) → see orchestra:commit skill (skills/commit/references/canon-frozen-guard.md + skills/commit/references/commit-strategy.md).
 
 ---
 
@@ -117,11 +93,7 @@ About to write code
 Writing/updating a doc
   → Gate 3: Run spec review before committing
 
-About to commit fix:/feat:
-  → Gate 4: Refs: line present and pointing to a real file? (For bugs: user confirmed resolved?)
-
-About to run verification
-  → Gate 5: design doc re-read + deviations recorded?
+Gate 4 / Gate 5 → orchestra:commit skill (see references/canon-frozen-guard.md + references/commit-strategy.md)
 ```
 
 ---
