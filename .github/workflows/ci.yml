@@ -53,7 +53,7 @@ jobs:
 
       - name: Secret Scanning (TruffleHog)
         # Pinned to immutable SHA (v3.94.0 — 2026-03)
-        uses: trufflesecurity/trufflehog@6c64db94d5b2e09d7e0948fb6bd3166cc6fffbc7
+        uses: trufflesecurity/trufflehog@37b77001d0174ebec2fcca2bd83ff83a6d45a3ab
         with:
           path: ./
           base: ${{ github.event.before }}
